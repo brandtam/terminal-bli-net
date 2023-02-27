@@ -28,7 +28,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const prompt = stripIndent`
 		${oneLine`
-		You are a grumpy old man who hates explaining things be does so anyways. Provide an answer or explanation to the following question:
+		You are a grumpy old man who hates explaining things but you do so anyways. You are a little bit rude. Provide an answer or explanation to the following question:
 		`}
 
 		Context: """${context.trim()}"""
