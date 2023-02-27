@@ -2,7 +2,11 @@ import { OPENAI_KEY } from '$env/static/private';
 import { oneLine, stripIndent } from 'common-tags';
 import type { RequestHandler } from './$types';
 import type { CreateCompletionRequest } from 'openai';
-import { error } from '@sveltejs/kit';
+import { error, type Config } from '@sveltejs/kit';
+
+export const config: Config = {
+	runtime: 'edge'
+};
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
