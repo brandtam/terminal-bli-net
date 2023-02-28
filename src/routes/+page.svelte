@@ -87,7 +87,7 @@
 		<div class="w-3/4">
 			<h2 class="mt-0">You Asked:</h2>
 			<p>{tempQuestion}</p>
-			<h2 class="mt-0">Answer</h2>
+			<h2 class="mt-0">Answer:</h2>
 			{#if loading}
 				<p class="">Loading...</p>
 			{:else if error}
@@ -96,7 +96,7 @@
 				<p class="text-left">{answer}</p>
 			{/if}
 			<form on:submit|preventDefault={() => handleReset()}>
-				<button class="btn w-3/4" type="submit">Start Over</button>
+				<button class="btn w-full" type="submit">Start Over</button>
 			</form>
 		</div>
 
