@@ -7,9 +7,11 @@
 	let error: boolean | null = null
 	let answer = ''
 
+	export let form;
+
 	const handleSubmit = async () => {
 		loading = true
-		error = null
+		error = false
 		answer = ''
 
 		const eventSource = new SSE('/api/answer', {
@@ -24,7 +26,7 @@
 		eventSource.addEventListener('error', (e) => {
 			error = true
 			loading = false
-			alert('Something went wrong')
+			console.log('error', e)
 		})
 
 		eventSource.addEventListener('message', (e) => {
@@ -53,21 +55,25 @@
 </script>
 
 <div class="flex flex-col items-center py-10">
-	<div class="flex flex-col items-center prose card w-96 bg-black shadow-xl text-center">
-		<h1 class="text-purple-600 pt-4">Ask Me Anything</h1>
+	<div data-theme="dark" class="flex flex-col items-center prose card w-96 shadow-xl text-center">
+		<h1 class=" pt-4">Chatr Bot 5000</h1>
 		<form on:submit|preventDefault={() => handleSubmit()}>
-			<label class="text-yellow-500" for="context">What are you wondering?</label>
-			<textarea class="bg-slate-200 w-3/4" name="context" id="context" rows="5" bind:value={context}></textarea>
-			<button class="btn w-3/4 bg-purple-600 hover:bg-blue-600" type="submit">Ask</button>
+			<label class="" for="context">Ask your question. I'm grumpy.
+				{#if form?.errors?.context}
+					<span class="text-red-500">{form?.errors?.context}</span>
+				{/if}
+			</label>
+			<textarea autofocus class="w-3/4 bg-slate-900" name="context" id="context" rows="5" bind:value={context}></textarea>
+			<button class="btn w-3/4" type="submit">Ask</button>
 		</form>
 		<div class="w-3/4">
 			<h2>Answer</h2>
 			{#if loading}
-				<p class="text-yellow-500">Loading...</p>
+				<p class="">Loading...</p>
 			{:else if error}
-				<p class="text-yellow-500">Something went wrong</p>
+				<p class="">Something went wrong</p>
 			{:else}
-				<p class="text-yellow-500 text-left">{answer}</p>
+				<p class=" text-left">{answer}</p>
 			{/if}
 		</div>
 	</div>
