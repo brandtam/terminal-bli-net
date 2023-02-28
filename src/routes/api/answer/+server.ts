@@ -3,6 +3,15 @@ import { oneLine, stripIndent } from 'common-tags';
 import type { RequestHandler } from './$types';
 import type { CreateCompletionRequest } from 'openai';
 import { error, type Config } from '@sveltejs/kit';
+import { z } from 'zod';
+
+const registerSchema = z.object({
+	context: z
+		.string({ required_error: 'A question must be asked.' })
+		.min(10, { message: 'The minimum question size is 10 characters.' })
+		.max(100, { message: 'The maximum quesion size is 100 characters.' })
+		.trim()
+});
 
 export const config: Config = {
 	runtime: 'edge'
@@ -15,6 +24,15 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		const requestData = await request.json();
+
+		try {
+			const result = registerSchema.parse(requestData);
+			console.log('Success', result);
+		} catch (err: unknown) {
+			console.log('Failure', err.flatten());
+			const { fieldErrors: errors } = err.flatten();
+			throw new Error('Validation error', errors);
+		}
 
 		if (!requestData) {
 			throw new Error('No requestData');
@@ -66,6 +84,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 	} catch (err) {
 		console.error(err);
-		throw error(500, 'Error in answer route');
+		throw error(500, `${err}`);
 	}
 };
