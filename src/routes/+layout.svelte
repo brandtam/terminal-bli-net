@@ -8,7 +8,7 @@
 
 </script>
 
-<html data-theme="aqua" class="h-full" lang="en">
+<html data-theme="cupcake" class="h-full" lang="en">
 	<body class="h-full">
 		<slot />
 	</body>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Footer from '$lib/components/Footer.svelte';
+	import Header from '$lib/components/Header.svelte';
 	import type { CreateCompletionResponse } from 'openai'
 	import { SSE } from "sse.js";
 
@@ -73,8 +75,10 @@
 	}
 </script>
 
+<Header />
+
 <div class="flex flex-col items-center py-10">
-	<div data-theme="dark" class="{displayFormCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
+	<div data-theme="cupcake" class="{displayFormCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
 		<h1 class="">ChatrBot 5000</h1>
 		<form on:submit|preventDefault={() => handleSubmit()}>
 			<label class="" for="context">Ask me&nbsp;
@@ -89,12 +93,12 @@
 					</option>
 				{/each}
 			</select>
-			<textarea autofocus class="mt-2 w-3/4 bg-slate-900" name="context" id="context" rows="5" bind:value={context}></textarea>
+			<textarea autofocus class="mt-2 w-3/4" name="context" id="context" rows="5" bind:value={context}></textarea>
 			<button class="btn w-3/4" type="submit">Send It</button>
 		</form>
 	</div>
 
-	<div data-theme="dark" class="{displayAnswerCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
+	<div data-theme="cupcake" class="{displayAnswerCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
 		<h1 class="">ChatrBot 5000</h1>
 		<div class="w-3/4">
 			<h3 class="mt-0">You Asked:</h3>
@@ -114,3 +118,4 @@
 
 	</div>
 </div>
+<Footer />
