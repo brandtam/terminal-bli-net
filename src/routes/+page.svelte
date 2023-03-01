@@ -19,6 +19,8 @@
 		{ value: 'comedian', text: `I'm a Comedian`}
 	];
 
+
+
 	const handleReset = async () => {
 		loading = false
 		error = false
@@ -77,9 +79,10 @@
 
 <Header />
 
-<div class="flex flex-col items-center py-10">
-	<div data-theme="emerald" class="{displayFormCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
-		<h1 class="">ChatrBot 5000</h1>
+<div class="flex flex-col items-center pb-10 pt-2">
+
+	<div class="{displayFormCard ? 'block' : 'hidden'} flex flex-col items-center prose w-full sm:w-3/4 shadow-xl text-center py-10">
+		<h1 class="text-4xl">ChatrBot 5000</h1>
 		<form on:submit|preventDefault={() => handleSubmit()}>
 			<label class="" for="context">Ask me&nbsp;
 				<!-- {#if form?.errors?.context}
@@ -93,12 +96,12 @@
 					</option>
 				{/each}
 			</select>
-			<textarea class="mt-2 w-3/4" name="context" id="context" rows="5" bind:value={context}></textarea>
+			<textarea class="mt-2 w-5/6 sm:w-3/4" name="context" id="context" rows="5" bind:value={context}></textarea>
 			<button class="btn w-3/4" type="submit">Send It</button>
 		</form>
 	</div>
 
-	<div data-theme="emerald" class="{displayAnswerCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
+	<div class="{displayAnswerCard ? 'block' : 'hidden'} flex flex-col items-center prose w-full sm:w-3/4 shadow-xl text-center py-10">
 		<h1 class="">ChatrBot 5000</h1>
 		<div class="w-3/4">
 			<h3 class="mt-0">You Asked:</h3>
@@ -118,4 +121,4 @@
 
 	</div>
 </div>
-<Footer />
+<Footer  />
