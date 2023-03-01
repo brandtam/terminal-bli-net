@@ -99,7 +99,7 @@
 		<div class="w-3/4">
 			<h2 class="mt-0">You Asked:</h2>
 			<p>{tempQuestion}</p>
-			<h2 class="mt-0">Answer:</h2>
+			<h3 class="mt-0 capitalize">{mood} Says:</h3>
 			{#if loading}
 				<p class="">Loading...</p>
 			{:else if error}
