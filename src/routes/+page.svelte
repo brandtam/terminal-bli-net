@@ -75,9 +75,9 @@
 
 <div class="flex flex-col items-center py-10">
 	<div data-theme="dark" class="{displayFormCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
-		<h1 class="">Chatr Bot 5000</h1>
+		<h1 class="">ChatrBot 5000</h1>
 		<form on:submit|preventDefault={() => handleSubmit()}>
-			<label class="" for="context">Ask your question.
+			<label class="" for="context">Ask me&nbsp;
 				<!-- {#if form?.errors?.context}
 					<span class="text-red-500">{form?.errors?.context}</span>
 				{/if} -->
@@ -90,14 +90,14 @@
 				{/each}
 			</select>
 			<textarea autofocus class="mt-2 w-3/4 bg-slate-900" name="context" id="context" rows="5" bind:value={context}></textarea>
-			<button class="btn w-3/4" type="submit">Ask</button>
+			<button class="btn w-3/4" type="submit">Send It</button>
 		</form>
 	</div>
 
 	<div data-theme="dark" class="{displayAnswerCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
-		<h1 class="">Chatr Bot 5000</h1>
+		<h1 class="">ChatrBot 5000</h1>
 		<div class="w-3/4">
-			<h2 class="mt-0">You Asked:</h2>
+			<h3 class="mt-0">You Asked:</h3>
 			<p>{tempQuestion}</p>
 			<h3 class="mt-0 capitalize">{mood} Says:</h3>
 			{#if loading}
