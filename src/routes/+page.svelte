@@ -78,7 +78,7 @@
 <Header />
 
 <div class="flex flex-col items-center py-10">
-	<div data-theme="cupcake" class="{displayFormCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
+	<div data-theme="emerald" class="{displayFormCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
 		<h1 class="">ChatrBot 5000</h1>
 		<form on:submit|preventDefault={() => handleSubmit()}>
 			<label class="" for="context">Ask me&nbsp;
@@ -98,7 +98,7 @@
 		</form>
 	</div>
 
-	<div data-theme="cupcake" class="{displayAnswerCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
+	<div data-theme="emerald" class="{displayAnswerCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
 		<h1 class="">ChatrBot 5000</h1>
 		<div class="w-3/4">
 			<h3 class="mt-0">You Asked:</h3>
