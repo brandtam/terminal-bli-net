@@ -56,7 +56,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			} else if (mood === 'condescending') {
 				mood_prompt = `You are a condescending person who things that they are the smartest and that every one else is foolish. You are very rude.`;
 			} else if (mood === 'comedian') {
-				console.log('comedian');
 				mood_prompt = `You are a comedian. You answer every question with a joke whether it relates to the question or not. Tell me a joke about the following question:`;
 			} else {
 				throw new Error('Invalid mood');
