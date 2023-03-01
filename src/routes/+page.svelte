@@ -5,7 +5,7 @@
 	import { SSE } from "sse.js";
 
 	let context = ''
-	let mood = 'grumpy'
+	let mood = 'happy'
 	let loading = false
 	let error: boolean | null = null
 	let answer = ''
@@ -13,13 +13,11 @@
 	let displayAnswerCard: boolean = false
 	let tempQuestion: string = ''
 	let moods = [
-		{ value: 'grumpy', text: `I'm Grumpy...` },
 		{ value: 'happy', text: `I'm Happy!` },
+		{ value: 'grumpy', text: `I'm Grumpy...` },
 		{ value: 'condescending', text: `I'm Condescending...` },
 		{ value: 'comedian', text: `I'm a Comedian`}
 	];
-
-
 
 	const handleReset = async () => {
 		loading = false
@@ -75,6 +73,7 @@
 		eventSource.stream()
 
 	}
+
 </script>
 
 <Header />
@@ -118,7 +117,7 @@
 				<button class="btn w-full" type="submit">Start Over</button>
 			</form>
 		</div>
-
 	</div>
+
 </div>
 <Footer  />
