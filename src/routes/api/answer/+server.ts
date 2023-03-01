@@ -5,6 +5,8 @@ import type { CreateCompletionRequest } from 'openai';
 import { error, type Config } from '@sveltejs/kit';
 import { z } from 'zod';
 
+let mood_prompt = '';
+
 const registerSchema = z.object({
 	context: z
 		.string({ required_error: 'A question must be asked.' })
@@ -38,15 +40,34 @@ export const POST: RequestHandler = async ({ request }) => {
 			throw new Error('No requestData');
 		}
 
-		const { context } = requestData;
+		const { mood, context } = requestData;
 
 		if (!context) {
 			throw new Error('No context');
 		}
 
+		if (!mood) {
+			throw new Error('No mood');
+		} else {
+			if (mood === 'grumpy') {
+				mood_prompt = `You are a sad, depressed person who hates everything. You really don't want to answer questions.`;
+			} else if (mood === 'happy') {
+				mood_prompt = `You are a happy, enthusiastic person who loves to help people. You are very nice and funny.`;
+			} else if (mood === 'condescending') {
+				mood_prompt = `You are a condescending person who things that they are the smartest and that every one else is foolish. You are very rude.`;
+			} else if (mood === 'comedian') {
+				console.log('comedian');
+				mood_prompt = `You are a comedian. You answer every question with a joke whether it relates to the question or not. Tell me a joke about the following question:`;
+			} else {
+				throw new Error('Invalid mood');
+			}
+		}
+
+		//'Provide an answer or explanation to the following question:'
+
 		const prompt = stripIndent`
 		${oneLine`
-		You are a grumpy old man who hates explaining things but you do so anyways. You are a little bit rude. Provide an answer or explanation to the following question:
+		"""${mood_prompt}"""
 		`}
 
 		Context: """${context.trim()}"""

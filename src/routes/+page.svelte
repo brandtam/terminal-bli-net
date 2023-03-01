@@ -3,14 +3,19 @@
 	import { SSE } from "sse.js";
 
 	let context = ''
+	let mood = 'grumpy'
 	let loading = false
 	let error: boolean | null = null
 	let answer = ''
 	let displayFormCard: boolean = true
 	let displayAnswerCard: boolean = false
 	let tempQuestion: string = ''
-
-	export let form;
+	let moods = [
+		{ value: 'grumpy', text: `I'm Grumpy...` },
+		{ value: 'happy', text: `I'm Happy!` },
+		{ value: 'condescending', text: `I'm Condescending...` },
+		{ value: 'comedian', text: `I'm a Comedian`}
+	];
 
 	const handleReset = async () => {
 		loading = false
@@ -32,7 +37,7 @@
 			headers: {
 				'Content-Type': 'application/json'
 			},
-			payload: JSON.stringify({ context })
+			payload: JSON.stringify({ mood, context })
 		})
 
 		context = ''
@@ -72,12 +77,19 @@
 	<div data-theme="dark" class="{displayFormCard ? 'block' : 'hidden'} flex flex-col items-center prose card w-96 shadow-xl text-center py-10">
 		<h1 class="">Chatr Bot 5000</h1>
 		<form on:submit|preventDefault={() => handleSubmit()}>
-			<label class="" for="context">Ask your question. I'm grumpy.
-				{#if form?.errors?.context}
+			<label class="" for="context">Ask your question.
+				<!-- {#if form?.errors?.context}
 					<span class="text-red-500">{form?.errors?.context}</span>
-				{/if}
+				{/if} -->
 			</label>
-			<textarea autofocus class="w-3/4 bg-slate-900" name="context" id="context" rows="5" bind:value={context}></textarea>
+			<select name="mood" id="mood" class="select select-primary max-w-xs h-2" bind:value={mood}>
+				{#each moods as mood}
+					<option value={mood.value}>
+						{mood.text}
+					</option>
+				{/each}
+			</select>
+			<textarea autofocus class="mt-2 w-3/4 bg-slate-900" name="context" id="context" rows="5" bind:value={context}></textarea>
 			<button class="btn w-3/4" type="submit">Ask</button>
 		</form>
 	</div>
