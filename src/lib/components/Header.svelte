@@ -1,13 +1,11 @@
-<header class="flex justify-between items-center w-full mt-5 border-b-2 pb-7 sm:px-4 px-2">
+<header class="flex justify-between items-center w-full mt-3 border-b-2 pb-2 sm:px-4 px-2">
 	<a href="/" class="flex space-x-3">
 		<img
 			alt="header text"
 			src="/botIcon.png"
-			class="sm:w-12 sm:h-12 w-8 h-8"
-			width={32}
-			height={32}
+			class="sm:w-16 sm:h-16 w-12 h-12"
 		/>
-		<h1 class="sm:text-4xl text-2xl font-bold ml-2">
+		<h1 class="sm:text-4xl text-2xl font-bold ml-2 mt-auto">
 			ChatrBot.ai
 		</h1>
 	</a>

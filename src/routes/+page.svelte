@@ -93,7 +93,7 @@
 					</option>
 				{/each}
 			</select>
-			<textarea autofocus class="mt-2 w-3/4" name="context" id="context" rows="5" bind:value={context}></textarea>
+			<textarea class="mt-2 w-3/4" name="context" id="context" rows="5" bind:value={context}></textarea>
 			<button class="btn w-3/4" type="submit">Send It</button>
 		</form>
 	</div>
