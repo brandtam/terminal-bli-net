@@ -10,7 +10,7 @@ let mood_prompt = '';
 const registerSchema = z.object({
 	context: z
 		.string({ required_error: 'A question must be asked.' })
-		.min(10, { message: 'The minimum question size is 10 characters.' })
+		.min(2, { message: 'The minimum question size is 2 characters.' })
 		.max(100, { message: 'The maximum quesion size is 100 characters.' })
 		.trim()
 });
