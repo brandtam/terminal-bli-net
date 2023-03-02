@@ -1,4 +1,5 @@
 <script lang="ts">
+
 	import Footer from '$lib/components/Footer.svelte';
 	import Header from '$lib/components/Header.svelte';
 	import type { CreateCompletionResponse } from 'openai'
@@ -10,7 +11,6 @@
 	let error: boolean | null = null
 	let answer = ''
 	let displayFormCard: boolean = true
-	let displayAnswerCard: boolean = false
 	let tempQuestion: string = ''
 	let moods = [
 		{ value: 'happy', text: `I'm Happy!` },
@@ -23,7 +23,6 @@
 		loading = false
 		error = false
 		displayFormCard = true
-		displayAnswerCard = false
 		answer = ''
 	}
 
@@ -31,7 +30,6 @@
 		loading = true
 		error = false
 		displayFormCard = false
-		displayAnswerCard = true
 		tempQuestion = context;
 		answer = ''
 
@@ -76,48 +74,62 @@
 
 </script>
 
+<svelte:head>
+  <title>ChatrBot.ai - AI with multiple personalities.</title>
+  <link rel="canonical" href="https://www.chatrbot.ai/" />
+  <meta property="og:title" content="ChatrBot.ai" />
+  <meta property="og:type" content="website" />
+  <meta property="og:decription" content="Chatrbot 5000 is just another one of those OpenAI API projects. It will not revolutionize anything or cure your ills. But it's fun!" />
+  <meta property="og:url" content="https://www.chatrbot.ai/" />
+  <meta property="og:image" content="https://www.chatrbot.ai/preview.png" />
+</svelte:head>
+
 <Header />
 
 <div class="flex flex-col items-center pb-10 pt-2">
 
-	<div class="{displayFormCard ? 'block' : 'hidden'} flex flex-col items-center prose w-full sm:w-3/4 shadow-xl text-center py-10">
-		<h1 class="text-4xl">ChatrBot 5000</h1>
-		<form on:submit|preventDefault={() => handleSubmit()}>
-			<label class="" for="context">Ask me&nbsp;
-				<!-- {#if form?.errors?.context}
-					<span class="text-red-500">{form?.errors?.context}</span>
-				{/if} -->
-			</label>
-			<select name="mood" id="mood" class="select select-primary max-w-xs h-2" bind:value={mood}>
-				{#each moods as mood}
-					<option value={mood.value}>
-						{mood.text}
-					</option>
-				{/each}
-			</select>
-			<textarea class="mt-2 w-5/6 sm:w-3/4" name="context" id="context" rows="5" bind:value={context}></textarea>
-			<button class="btn w-3/4" type="submit">Send It</button>
-		</form>
-	</div>
+	{#if displayFormCard }
 
-	<div class="{displayAnswerCard ? 'block' : 'hidden'} flex flex-col items-center prose w-full sm:w-3/4 shadow-xl text-center py-10">
-		<h1 class="">ChatrBot 5000</h1>
-		<div class="w-3/4">
-			<h3 class="mt-0">You Asked:</h3>
-			<p>{tempQuestion}</p>
-			<h3 class="mt-0 capitalize">{mood} Says:</h3>
-			{#if loading}
-				<p class="">Loading...</p>
-			{:else if error}
-				<p class="">Something went wrong</p>
-			{:else}
-				<p class="text-left">{answer}</p>
-			{/if}
-			<form on:submit|preventDefault={() => handleReset()}>
-				<button class="btn w-full" type="submit">Start Over</button>
+		<div class="flex flex-col items-center prose w-full sm:w-3/4 shadow-xl text-center py-10">
+			<h1 class="text-4xl">ChatrBot 5000</h1>
+			<form on:submit|preventDefault={() => handleSubmit()}>
+				<label class="" for="context">Ask me&nbsp;
+				</label>
+				<select name="mood" id="mood" class="select select-primary max-w-xs h-2" bind:value={mood}>
+					{#each moods as mood}
+						<option value={mood.value}>
+							{mood.text}
+						</option>
+					{/each}
+				</select>
+				<textarea required class="mt-2 w-5/6 sm:w-3/4" name="context" id="context" rows="5" bind:value={context}></textarea>
+				<button class="btn w-3/4" type="submit">Send It</button>
 			</form>
 		</div>
-	</div>
+
+	{:else}
+
+		<div class="flex flex-col items-center prose w-full sm:w-3/4 shadow-xl text-center py-10">
+			<h1 class="">ChatrBot 5000</h1>
+			<div class="w-3/4">
+				<h3 class="mt-0">You Asked:</h3>
+				<p>{tempQuestion}</p>
+				<h3 class="mt-0 capitalize">{mood} Says:</h3>
+				{#if loading}
+					<p class="">Loading...</p>
+				{:else if error}
+					<p class="">Something went wrong</p>
+				{:else}
+					<p class="text-left">{answer}</p>
+				{/if}
+				<form on:submit|preventDefault={() => handleReset()}>
+					<button class="btn w-full" type="submit">Start Over</button>
+				</form>
+			</div>
+		</div>
+
+	{/if}
 
 </div>
-<Footer  />
+
+<Footer/>
