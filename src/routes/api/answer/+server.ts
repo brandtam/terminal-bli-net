@@ -30,10 +30,12 @@ export const POST: RequestHandler = async ({ request }) => {
 		try {
 			const result = registerSchema.parse(requestData);
 			console.log('Success', result);
-		} catch (err: unknown) {
-			console.log('Failure', err.flatten());
-			const { fieldErrors: errors } = err.flatten();
-			throw new Error('Validation error', errors);
+		} catch (err) {
+			if (err instanceof z.ZodError) {
+				console.log('Failure', err.flatten());
+				const { fieldErrors: errors } = err.flatten();
+				throw new Error('Validation error', errors);
+			}
 		}
 
 		if (!requestData) {
