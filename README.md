@@ -59,4 +59,4 @@ Since this specific app uses Vercel Edge Functions you will need to deploy to [V
 
 ## License
 
-tbd
+[MIT](LICENSE.md)
