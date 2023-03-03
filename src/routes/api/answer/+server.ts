@@ -2,8 +2,29 @@ import { OPENAI_KEY } from '$env/static/private';
 import { oneLine, stripIndent } from 'common-tags';
 import type { RequestHandler } from './$types';
 import type { CreateCompletionRequest } from 'openai';
-import { error, type Config } from '@sveltejs/kit';
 import { z } from 'zod';
+
+// import { error, type Config, type HandleServerError } from '@sveltejs/kit';
+// import * as SentryNode from '@sentry/node';
+// import crypto from 'crypto';
+
+// const { SENTRY_DSN } = process.env;
+
+// SentryNode.init({
+// 	dsn: SENTRY_DSN
+// });
+
+// export const handleError: HandleServerError = ({ error, event }) => {
+// 	const errorId = crypto.randomUUID();
+// 	SentryNode.captureException(error, {
+// 		contexts: { sveltekit: { event, errorId } }
+// 	});
+
+// 	return {
+// 		message: "Something went wrong. We've been notified and will look into it.",
+// 		errorId
+// 	};
+// };
 
 let mood_prompt = '';
 
