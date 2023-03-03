@@ -1,17 +1,30 @@
-# create-svelte
+# ChatrBot.ai
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
+A basic chatbot that can be used to answer questions about in different moods for fun.
 
-## Creating a project
+## What it does
 
-If you're seeing this, you've probably already done this step. Congrats!
+In practice, the chatbot can be used to answer questions in different moods. The idea is to show that the responses can be different depending on the mood of the chatbot.
+
+## Install the project
 
 ```bash
-# create a new project in the current directory
-npm create svelte@latest
+# clone the project onto your local machine
+git clone https://github.com/brandtam/sk-chatr-bot.git
 
-# create a new project in my-app
-npm create svelte@latest my-app
+# install the packages with your favorite package manager (pnpm)
+pnpm install
+```
+
+## Setup the OpenAI API
+
+- Create an account on [OpenAI](https://platform.openai.com/)
+- Create an API key
+- Create a `.env` file in the root of the project
+- Add the following to the `.env` file
+
+```bash
+OPENAI_KEY=your_api_key_that_you_copied_from_openai
 ```
 
 ## Developing
@@ -19,10 +32,8 @@ npm create svelte@latest my-app
 Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
 
 ```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+# start the server locally
+pnpm dev
 ```
 
 ## Building
@@ -30,9 +41,15 @@ npm run dev -- --open
 To create a production version of your app:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
-You can preview the production build with `npm run preview`.
+## Deploying to Production
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs#adapters) for your target environment.
+
+- Copy the OpenAi API key to the server using the hosts secrets manager, or environment variables.
+
+## License
+
+tbd
