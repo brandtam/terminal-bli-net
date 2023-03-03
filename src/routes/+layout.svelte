@@ -1,11 +1,16 @@
 <script>
 	import "../app.css";
 
-	import { dev } from '$app/environment';
-	import { inject } from '@vercel/analytics';
+	import * as Sentry from "@sentry/svelte";
+	import { BrowserTracing } from "@sentry/tracing";
 
-	inject({ mode: dev ? 'development' : 'production'});
-
+	Sentry.init({
+		dsn: "https://REDACTED_SENTRY_DSN",
+		integrations: [new BrowserTracing()],
+		// We recommend adjusting this value in production, or using tracesSampler
+		// for finer control
+		tracesSampleRate: 1.0,
+	});
 </script>
 
 <svelte:head>

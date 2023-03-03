@@ -41,7 +41,9 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@vercel/analytics": "^0.1.11",
+		"@sentry/node": "^7.40.0",
+		"@sentry/svelte": "^7.40.0",
+		"@sentry/tracing": "^7.40.0",
 		"common-tags": "^1.8.2",
 		"daisyui": "^2.51.2",
 		"openai": "^3.1.0",
