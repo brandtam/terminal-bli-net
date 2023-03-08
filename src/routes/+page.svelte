@@ -82,7 +82,7 @@
 
   <meta property="og:title" content="ChatrBot.ai" />
   <meta property="og:type" content="website" />
-  <meta property="og:decription" content="ChatrBot 5000 is just another one of those OpenAI API projects. It will not revolutionize anything or cure your ills. But it's fun!" />
+  <meta property="og:description" content="ChatrBot 5000 is just another one of those OpenAI API projects. It will not revolutionize anything or cure your ills. But it's fun!" />
   <meta property="og:url" content="https://www.chatrbot.ai/" />
   <meta property="og:image" content="https://www.chatrbot.ai/preview.png" />
 </svelte:head>
