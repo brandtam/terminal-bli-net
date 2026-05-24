@@ -55,12 +55,12 @@ export function isSlotActive(slot: Slot, now: Date, timezone?: string): boolean 
 }
 
 export function isOnAir(group: GroupMeta, now: Date, timezone?: string): boolean {
-	if (!group.active) return false;
+	if (!group.active || !group.schedule) return false;
 	return group.schedule.some((slot) => isSlotActive(slot, now, timezone));
 }
 
 export function minutesRemaining(group: GroupMeta, now: Date, timezone?: string): number | null {
-	if (!group.active) return null;
+	if (!group.active || !group.schedule) return null;
 	const currentMinute = nowToMinutesSinceSunday(now, timezone);
 	const weekMinutes = 7 * 1440;
 
@@ -89,7 +89,7 @@ export function nextOnAir(
 	now: Date,
 	timezone?: string
 ): { day: DayOfWeek; start: string; minutesUntil: number } | null {
-	if (!group.active || group.schedule.length === 0) return null;
+	if (!group.active || !group.schedule || group.schedule.length === 0) return null;
 	if (isOnAir(group, now, timezone)) return null;
 
 	const currentMinute = nowToMinutesSinceSunday(now, timezone);
@@ -133,7 +133,7 @@ export function validateOverlapInvariant(groups: GroupMeta[]): {
 
 			let covered = false;
 			for (const group of activeGroups) {
-				for (const slot of group.schedule) {
+				for (const slot of group.schedule ?? []) {
 					const slotStart = minutesSinceSunday(slot.day, slot.start);
 					const slotEnd = slotStart + slot.duration;
 
