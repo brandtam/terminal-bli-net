@@ -19,6 +19,7 @@
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.39.0",
 		"agents": "^0.0.67",
+		"dompurify": "^3.4.5",
 		"marked": "^15.0.0",
 		"openai": "^4.76.0",
 		"zod": "^3.24.0"
