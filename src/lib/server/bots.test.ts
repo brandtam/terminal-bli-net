@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { validateBotPrompt, validateAllBots } from './bots';
+import {
+	validateBotPrompt,
+	validateAllBots,
+	loadChannels,
+	getChannelBySlug,
+	loadGroups
+} from './bots';
 import type { Bot } from '$lib/types';
 
 const validBot: Bot = {
@@ -56,5 +62,64 @@ describe('validateAllBots', () => {
 		const bot2 = { ...validBot, id: 'radar' };
 		const results = validateAllBots([validBot, bot2]);
 		expect(results.size).toBe(0);
+	});
+});
+
+describe('loadChannels', () => {
+	it('returns an array of channels', () => {
+		const channels = loadChannels();
+		expect(Array.isArray(channels)).toBe(true);
+		expect(channels.length).toBeGreaterThan(0);
+	});
+
+	it('each channel has slug, name, number, network, and schedule of length 48', () => {
+		const channels = loadChannels();
+		for (const ch of channels) {
+			expect(ch.slug).toBeDefined();
+			expect(typeof ch.slug).toBe('string');
+			expect(ch.name).toBeDefined();
+			expect(typeof ch.name).toBe('string');
+			expect(ch.number).toBeDefined();
+			expect(typeof ch.number).toBe('number');
+			expect(ch.network).toBeDefined();
+			expect(typeof ch.network).toBe('string');
+			expect(Array.isArray(ch.schedule)).toBe(true);
+			expect(ch.schedule).toHaveLength(48);
+		}
+	});
+});
+
+describe('getChannelBySlug', () => {
+	it('returns the correct channel for ch1-nbc', () => {
+		const ch = getChannelBySlug('ch1-nbc');
+		expect(ch).toBeDefined();
+		expect(ch!.slug).toBe('ch1-nbc');
+		expect(ch!.network).toBe('NBC');
+	});
+
+	it('returns undefined for nonexistent slug', () => {
+		expect(getChannelBySlug('nonexistent')).toBeUndefined();
+	});
+});
+
+describe('loadGroups', () => {
+	it('returns shows with episodes', () => {
+		const groups = loadGroups();
+		expect(Array.isArray(groups)).toBe(true);
+		expect(groups.length).toBeGreaterThan(0);
+
+		const withEpisodes = groups.filter((g) => g.episodes && g.episodes.length > 0);
+		expect(withEpisodes.length).toBeGreaterThan(0);
+
+		for (const g of withEpisodes) {
+			expect(g.slug).toBeDefined();
+			expect(g.name).toBeDefined();
+			expect(Array.isArray(g.episodes)).toBe(true);
+			for (const ep of g.episodes!) {
+				expect(ep.season).toBeDefined();
+				expect(ep.episode).toBeDefined();
+				expect(ep.title).toBeDefined();
+			}
+		}
 	});
 });

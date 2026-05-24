@@ -1,7 +1,8 @@
-import type { Bot, GroupMeta } from '$lib/types';
+import type { Bot, Channel, GroupMeta } from '$lib/types';
 
 let cachedBots: Bot[] | null = null;
 let cachedGroups: GroupMeta[] | null = null;
+let cachedChannels: Channel[] | null = null;
 
 export function loadBots(): Bot[] {
 	if (cachedBots) return cachedBots;
@@ -30,6 +31,26 @@ export function loadGroups(): GroupMeta[] {
 
 	cachedGroups = groups;
 	return groups;
+}
+
+export function loadChannels(): Channel[] {
+	if (cachedChannels) return cachedChannels;
+
+	const channelModules = import.meta.glob('/channels/*.json', { eager: true, import: 'default' });
+	const channels: Channel[] = [];
+
+	for (const [, data] of Object.entries(channelModules)) {
+		channels.push(data as Channel);
+	}
+
+	cachedChannels = channels;
+	return channels;
+}
+
+export const loadShows = loadGroups;
+
+export function getChannelBySlug(slug: string): Channel | undefined {
+	return loadChannels().find((c) => c.slug === slug);
 }
 
 export function getBotById(id: string): Bot | undefined {
