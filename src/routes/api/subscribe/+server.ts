@@ -1,37 +1,37 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!platform?.env) {
 		throw error(500, 'Platform bindings not available');
 	}
 
-	const body = (await request.json()) as { email: string; timezone: string; shows: string[] };
-	const { email, timezone, shows } = body;
+	const body = await request.json();
+	const { email, timezone, shows } = body as {
+		email?: string;
+		timezone?: string;
+		shows?: string[];
+	};
 
-	if (!email || typeof email !== 'string' || !email.includes('@')) {
-		throw error(400, 'Invalid email address');
+	if (!email || !EMAIL_RE.test(email)) {
+		throw error(400, 'A valid email address is required');
+	}
+
+	if (!timezone || typeof timezone !== 'string') {
+		throw error(400, 'A timezone string is required');
 	}
 
 	if (!shows || !Array.isArray(shows) || shows.length === 0) {
-		throw error(400, 'Must subscribe to at least one show');
+		throw error(400, 'At least one show subscription is required');
 	}
 
-	try {
-		const id = platform.env.REMINDER_AGENT.idFromName('singleton');
-		const stub = platform.env.REMINDER_AGENT.get(id);
-		const response = await stub.fetch(new Request('https://internal/subscribe', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ email, timezone: timezone || 'America/New_York', shows })
-		}));
+	const id = platform.env.REMINDER_AGENT.idFromName('singleton');
+	const stub = platform.env.REMINDER_AGENT.get(id);
 
-		if (!response.ok) {
-			throw error(response.status, await response.text());
-		}
+	await (stub as unknown as { subscribe: (e: string, tz: string, s: string[]) => Promise<void> })
+		.subscribe(email, timezone, shows);
 
-		return json({ ok: true });
-	} catch (e) {
-		throw error(500, `Subscription failed: ${e}`);
-	}
+	return json({ ok: true });
 };
