@@ -6,6 +6,28 @@ export interface Slot {
 	duration: number;
 }
 
+export interface Episode {
+	season: number;
+	episode: number;
+	title: string;
+	year: string;
+	premise: string;
+}
+
+export interface ChannelSlot {
+	showSlug: string;
+	season: number;
+	episode: number;
+}
+
+export interface Channel {
+	slug: string;
+	name: string;
+	number: number;
+	network: string;
+	schedule: (ChannelSlot | null)[];
+}
+
 export interface GroupMeta {
 	slug: string;
 	name: string;
@@ -14,8 +36,12 @@ export interface GroupMeta {
 	era: string;
 	image: string;
 	active: boolean;
-	schedule: Slot[];
+	schedule?: Slot[];
+	color?: string;
+	episodes?: Episode[];
 }
+
+export type Show = GroupMeta;
 
 export interface Bot {
 	id: string;

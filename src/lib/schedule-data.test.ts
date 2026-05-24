@@ -33,7 +33,7 @@ describe('schedule overlap invariant (live data)', () => {
 	it('each group has at least 3 schedule slots', () => {
 		const groups = loadAllGroups();
 		for (const g of groups) {
-			expect(g.schedule.length).toBeGreaterThanOrEqual(3);
+			expect(g.schedule!.length).toBeGreaterThanOrEqual(3);
 		}
 	});
 });

@@ -86,7 +86,7 @@ export class ReminderAgent extends Agent<Env> {
 				if (!group) continue;
 
 				// Check whether any slot for this show starts within the next 12 h
-				const upcoming = isShowUpcomingWithin(group.schedule, now, 12);
+				const upcoming = isShowUpcomingWithin(group.schedule ?? [], now, 12);
 				if (!upcoming) continue;
 
 				// Pick the first bot in the group to speak in-voice
