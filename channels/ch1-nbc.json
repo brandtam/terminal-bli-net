@@ -1,0 +1,248 @@
+{
+  "slug": "ch1-nbc",
+  "name": "NBC Prime",
+  "number": 4,
+  "network": "NBC",
+  "schedule": [
+    {
+      "showSlug": "office",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 1
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 3
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 12
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 15
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 18
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 2,
+      "episode": 3
+    },
+    {
+      "showSlug": "parks-and-rec",
+      "season": 2,
+      "episode": 1
+    },
+    {
+      "showSlug": "parks-and-rec",
+      "season": 2,
+      "episode": 5
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 2,
+      "episode": 11
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 6
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 17
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 19
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 4,
+      "episode": 11
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 19
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 22
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 4,
+      "episode": 17
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 4,
+      "episode": 20
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 5,
+      "episode": 2
+    },
+    {
+      "showSlug": "parks-and-rec",
+      "season": 2,
+      "episode": 10
+    },
+    {
+      "showSlug": "parks-and-rec",
+      "season": 2,
+      "episode": 16
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 5,
+      "episode": 13
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 5,
+      "episode": 21
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 5,
+      "episode": 22
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 6,
+      "episode": 12
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 7,
+      "episode": 6
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 7,
+      "episode": 11
+    },
+    {
+      "showSlug": "office",
+      "season": 3,
+      "episode": 1
+    },
+    {
+      "showSlug": "office",
+      "season": 3,
+      "episode": 6
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 7,
+      "episode": 16
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 8,
+      "episode": 3
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 8,
+      "episode": 12
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 8,
+      "episode": 19
+    },
+    {
+      "showSlug": "parks-and-rec",
+      "season": 2,
+      "episode": 20
+    },
+    {
+      "showSlug": "parks-and-rec",
+      "season": 2,
+      "episode": 23
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 9,
+      "episode": 3
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 9,
+      "episode": 13
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 9,
+      "episode": 21
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 9,
+      "episode": 23
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 2,
+      "episode": 3
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 2,
+      "episode": 11
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 6
+    },
+    {
+      "showSlug": "office",
+      "season": 3,
+      "episode": 16
+    },
+    {
+      "showSlug": "office",
+      "season": 3,
+      "episode": 23
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 17
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 19
+    }
+  ]
+}
