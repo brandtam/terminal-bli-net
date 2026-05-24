@@ -11,32 +11,22 @@
 		}
 	],
 
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "REMINDER_AGENT",
-				"class_name": "ReminderAgent"
-			}
-		]
-	},
-
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": ["ReminderAgent"]
-		}
-	],
-
-	"send_email": [
-		{
-			"name": "SEND_EMAIL"
-		}
-	],
+	// ReminderAgent DO + send_email are a future feature.
+	// Cloudflare Pages (adapter-cloudflare) can't export DO classes from _worker.js,
+	// so these must be deployed as a separate Worker when ready.
+	// Commented out to eliminate startup warnings.
+	//
+	// "durable_objects": {
+	// 	"bindings": [{ "name": "REMINDER_AGENT", "class_name": "ReminderAgent" }]
+	// },
+	// "migrations": [
+	// 	{ "tag": "v1", "new_sqlite_classes": ["ReminderAgent"] }
+	// ],
+	// "send_email": [{ "name": "SEND_EMAIL" }],
 
 	// Secrets (set via `wrangler secret put`):
 	// ANTHROPIC_API_KEY
 	// OPENAI_API_KEY (optional)
-	// EMAIL_SECRET (HMAC key for unsubscribe signatures)
 
 	"vars": {
 		"PROVIDER": "claude",
