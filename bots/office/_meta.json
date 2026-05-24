@@ -1,0 +1,19 @@
+{
+  "slug": "office",
+  "name": "The Office",
+  "description": "A documentary crew captures the everyday absurdity of life at a mid-size paper company.",
+  "setting": "Dunder Mifflin, Scranton, Pennsylvania",
+  "era": "Mid-2000s",
+  "image": "/bots/office/group-icon.png",
+  "active": true,
+  "schedule": [
+    { "day": "mon", "start": "04:00", "duration": 180 },
+    { "day": "mon", "start": "10:00", "duration": 180 },
+    { "day": "tue", "start": "22:00", "duration": 180 },
+    { "day": "wed", "start": "00:00", "duration": 240 },
+    { "day": "thu", "start": "16:00", "duration": 180 },
+    { "day": "fri", "start": "13:00", "duration": 180 },
+    { "day": "sat", "start": "22:00", "duration": 180 },
+    { "day": "sun", "start": "00:00", "duration": 240 }
+  ]
+}

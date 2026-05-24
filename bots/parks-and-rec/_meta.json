@@ -1,0 +1,20 @@
+{
+  "slug": "parks-and-rec",
+  "name": "Parks and Recreation",
+  "description": "A mid-level bureaucrat in a small Indiana town tries to make her community better, one park at a time.",
+  "setting": "Pawnee Parks Department, Pawnee, Indiana",
+  "era": "2010s",
+  "image": "/bots/parks-and-rec/group-icon.png",
+  "active": true,
+  "schedule": [
+    { "day": "mon", "start": "16:00", "duration": 180 },
+    { "day": "tue", "start": "07:00", "duration": 180 },
+    { "day": "wed", "start": "13:00", "duration": 180 },
+    { "day": "thu", "start": "04:00", "duration": 180 },
+    { "day": "thu", "start": "10:00", "duration": 180 },
+    { "day": "fri", "start": "16:00", "duration": 180 },
+    { "day": "sat", "start": "07:00", "duration": 180 },
+    { "day": "sat", "start": "16:00", "duration": 180 },
+    { "day": "sun", "start": "19:00", "duration": 180 }
+  ]
+}

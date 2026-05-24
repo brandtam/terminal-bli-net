@@ -1,0 +1,20 @@
+{
+  "slug": "seinfeld",
+  "name": "Seinfeld",
+  "description": "A show about nothing, set in a New York apartment where four friends overthink everything.",
+  "setting": "Upper West Side, New York City",
+  "era": "1990s",
+  "image": "/bots/seinfeld/group-icon.png",
+  "active": true,
+  "schedule": [
+    { "day": "tue", "start": "04:00", "duration": 180 },
+    { "day": "tue", "start": "19:00", "duration": 180 },
+    { "day": "wed", "start": "16:00", "duration": 180 },
+    { "day": "thu", "start": "07:00", "duration": 180 },
+    { "day": "thu", "start": "22:00", "duration": 180 },
+    { "day": "fri", "start": "00:00", "duration": 240 },
+    { "day": "fri", "start": "10:00", "duration": 180 },
+    { "day": "sat", "start": "13:00", "duration": 180 },
+    { "day": "sat", "start": "19:00", "duration": 180 }
+  ]
+}

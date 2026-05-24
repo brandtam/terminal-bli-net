@@ -1,0 +1,22 @@
+{
+  "slug": "arrested-development",
+  "name": "Arrested Development",
+  "description": "A wealthy family loses everything and one son has no choice but to keep them all together.",
+  "setting": "Newport Beach and Sudden Valley, Orange County, California",
+  "era": "Mid-2000s",
+  "image": "/bots/arrested-development/group-icon.png",
+  "active": true,
+  "schedule": [
+    { "day": "mon", "start": "13:00", "duration": 180 },
+    { "day": "mon", "start": "22:00", "duration": 180 },
+    { "day": "tue", "start": "00:00", "duration": 240 },
+    { "day": "tue", "start": "10:00", "duration": 180 },
+    { "day": "wed", "start": "07:00", "duration": 180 },
+    { "day": "thu", "start": "13:00", "duration": 180 },
+    { "day": "thu", "start": "19:00", "duration": 180 },
+    { "day": "fri", "start": "04:00", "duration": 180 },
+    { "day": "sat", "start": "10:00", "duration": 180 },
+    { "day": "sun", "start": "07:00", "duration": 180 },
+    { "day": "sun", "start": "22:00", "duration": 120 }
+  ]
+}

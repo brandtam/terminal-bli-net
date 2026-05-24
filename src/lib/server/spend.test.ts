@@ -1,3 +1,4 @@
+/// <reference types="@cloudflare/workers-types" />
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
 	canRespond,

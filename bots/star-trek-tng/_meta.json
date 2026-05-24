@@ -1,0 +1,20 @@
+{
+  "slug": "star-trek-tng",
+  "name": "Star Trek: The Next Generation",
+  "description": "The crew of the USS Enterprise-D explores the galaxy, seeking out new life and new civilizations.",
+  "setting": "USS Enterprise-D, United Federation of Planets",
+  "era": "24th Century",
+  "image": "/bots/star-trek-tng/group-icon.png",
+  "active": true,
+  "schedule": [
+    { "day": "mon", "start": "07:00", "duration": 180 },
+    { "day": "tue", "start": "13:00", "duration": 180 },
+    { "day": "wed", "start": "10:00", "duration": 180 },
+    { "day": "wed", "start": "22:00", "duration": 180 },
+    { "day": "thu", "start": "00:00", "duration": 240 },
+    { "day": "fri", "start": "19:00", "duration": 180 },
+    { "day": "sat", "start": "04:00", "duration": 180 },
+    { "day": "sun", "start": "10:00", "duration": 180 },
+    { "day": "sun", "start": "16:00", "duration": 180 }
+  ]
+}
