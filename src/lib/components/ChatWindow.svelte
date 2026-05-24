@@ -5,6 +5,7 @@
 	import type { Bot, ChatMessage, TextChunk } from '$lib/types';
 	import { loadConversations, saveConversation, getSessionId } from '$lib/persistence';
 	import { formatTimeUntil } from '$lib/schedule';
+	import Dropdown from './Dropdown.svelte';
 
 	type ChatMode = 'group' | string; // 'group' or a botId
 
@@ -31,11 +32,11 @@
 	let streamingBotName = $state('');
 	let logEl: HTMLDivElement | undefined = $state();
 	let messageCount = $state(0);
-	let modeOpen = $state(false);
 
-	const modeLabel = $derived(
-		chatMode === 'group' ? 'Group Chat' : (castBots.find(b => b.id === chatMode)?.name ?? 'Group Chat')
-	);
+	const modeOptions = $derived([
+		{ value: 'group', label: 'Group Chat' },
+		...castBots.map(b => ({ value: b.id, label: b.name }))
+	]);
 
 	const castNames = $derived(castBots.map((b) => b.name.split(' ')[0]).join(' · '));
 
@@ -61,14 +62,6 @@
 			messages = saved.messages;
 			messageCount = messages.filter((m) => m.role === 'user').length;
 		}
-
-		const closeDropdown = (e: MouseEvent) => {
-			if (modeOpen && !(e.target as HTMLElement).closest('.mode-picker-wrap')) {
-				modeOpen = false;
-			}
-		};
-		document.addEventListener('mousedown', closeDropdown);
-		return () => document.removeEventListener('mousedown', closeDropdown);
 	});
 
 	function scrollToBottom() {
@@ -269,41 +262,11 @@
 			{#if minutesLeft !== null}
 				<span class="countdown">{formatTimeUntil(minutesLeft)} left</span>
 			{/if}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="mode-picker-wrap" onclick={(e) => e.stopPropagation()}>
-				<button
-					class="mode-trigger"
-					class:open={modeOpen}
-					onclick={() => (modeOpen = !modeOpen)}
-				>
-					{modeLabel} ▾
-				</button>
-				{#if modeOpen}
-					<div class="mode-dropdown">
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div
-							class="mode-item"
-							class:selected={chatMode === 'group'}
-							onclick={() => { chatMode = 'group'; modeOpen = false; }}
-						>
-							<span class="mode-check">{chatMode === 'group' ? '✓' : ''}</span>
-							<span>Group Chat</span>
-						</div>
-						<div class="mode-sep"></div>
-						{#each castBots as bot}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								class="mode-item"
-								class:selected={chatMode === bot.id}
-								onclick={() => { chatMode = bot.id; modeOpen = false; }}
-							>
-								<span class="mode-check">{chatMode === bot.id ? '✓' : ''}</span>
-								<span>{bot.name}</span>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
+			<Dropdown
+				options={modeOptions}
+				bind:value={chatMode}
+				separatorAfter={['group']}
+			/>
 		</div>
 	</div>
 
@@ -407,65 +370,6 @@
 		font-family: 'Press Start 2P', monospace;
 		font-size: 8px;
 		color: var(--accent);
-	}
-	.mode-picker-wrap {
-		position: relative;
-	}
-	.mode-trigger {
-		font-family: 'Pixelify Sans', sans-serif;
-		font-size: 14px;
-		background: var(--paper);
-		border: 2px solid var(--ink);
-		box-shadow: 2px 2px 0 var(--ink);
-		padding: 4px 10px;
-		cursor: pointer;
-		color: var(--ink);
-		white-space: nowrap;
-		letter-spacing: 0.02em;
-	}
-	.mode-trigger:hover, .mode-trigger.open {
-		background: var(--ink);
-		color: var(--paper);
-	}
-	.mode-trigger:active {
-		box-shadow: 0 0 0 var(--ink);
-		transform: translate(2px, 2px);
-	}
-	.mode-dropdown {
-		position: absolute;
-		top: calc(100% + 2px);
-		right: 0;
-		background: var(--paper);
-		border: 2px solid var(--ink);
-		box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
-		min-width: 180px;
-		padding: 4px 0;
-		z-index: 100;
-		font-family: 'Pixelify Sans', sans-serif;
-		font-size: 14px;
-	}
-	.mode-item {
-		display: flex;
-		align-items: baseline;
-		gap: 6px;
-		padding: 5px 10px;
-		cursor: pointer;
-	}
-	.mode-item:hover {
-		background: var(--ink);
-		color: var(--paper);
-	}
-	.mode-check {
-		display: inline-block;
-		width: 14px;
-		font-family: 'Press Start 2P', monospace;
-		font-size: 10px;
-	}
-	.mode-sep {
-		height: 1px;
-		background: var(--ink);
-		margin: 4px 8px;
-		opacity: 0.2;
 	}
 	.chat-log {
 		flex: 1;
