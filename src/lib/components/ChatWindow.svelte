@@ -133,7 +133,15 @@
 		'p', 'em', 'strong', 'code', 'pre', 'ul', 'ol', 'li', 'a', 'br',
 		'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'span', 'del'
 	];
-	const ALLOWED_ATTR = ['href', 'title'];
+	const ALLOWED_ATTR = ['href', 'title', 'target', 'rel'];
+
+	// Force all links to open in a new tab with noopener
+	DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+		if (node.tagName === 'A' && node.hasAttribute('href')) {
+			node.setAttribute('target', '_blank');
+			node.setAttribute('rel', 'noopener noreferrer');
+		}
+	});
 
 	function renderMarkdown(text: string): string {
 		const raw = marked.parse(text, { async: false }) as string;
