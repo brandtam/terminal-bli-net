@@ -63,8 +63,7 @@
 				body: JSON.stringify({
 					botId: bot.id,
 					messages: messages.slice(-20),
-					sessionId: getSessionId(),
-					sessionMessageCount: messageCount
+					sessionId: getSessionId()
 				})
 			});
 

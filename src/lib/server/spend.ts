@@ -74,22 +74,28 @@ function secondsUntilNextHour(now: Date = new Date()): number {
 // Public API
 // ---------------------------------------------------------------------------
 
+/** "session:<uuid>" */
+export function sessionKey(sessionId: string): string {
+	return `session:${sessionId}`;
+}
+
 /**
  * Check whether the request should be allowed to proceed.
  *
  * Checks are evaluated in this order (cheapest first):
- *   1. Per-session message cap
+ *   1. Per-session message cap  (server-side via KV)
  *   2. Monthly spend kill-switch
  *   3. Per-IP hourly rate limit
  */
 export async function canRespond(
 	config: SpendConfig,
 	ip: string,
-	sessionId: string,
-	sessionMessageCount: number
+	sessionId: string
 ): Promise<CanRespondResult> {
-	// 1. Session cap (no KV call needed)
-	if (sessionMessageCount >= config.sessionCap) {
+	// 1. Session cap (tracked server-side in KV, not client-supplied)
+	const sessionRaw = await config.kv.get(sessionKey(sessionId));
+	const sessionCount = sessionRaw ? parseInt(sessionRaw, 10) : 0;
+	if (sessionCount >= config.sessionCap) {
 		return {
 			allowed: false,
 			reason: `Session message limit reached (${config.sessionCap} messages). Please start a new session.`
@@ -119,16 +125,28 @@ export async function canRespond(
 	return { allowed: true };
 }
 
+/** TTL for session keys — 24 hours. */
+const SESSION_TTL = 86400;
+
 /**
- * Increment the per-IP rate counter for the current clock-hour.
+ * Increment the per-IP rate counter for the current clock-hour and the
+ * per-session message counter.
  * Call this when a message is accepted (before or after the LLM responds).
  */
-export async function recordMessage(kv: KVNamespace, ip: string): Promise<void> {
-	const key = rateLimitKey(ip);
-	const raw = await kv.get(key);
-	const count = raw ? parseInt(raw, 10) : 0;
+export async function recordMessage(kv: KVNamespace, ip: string, sid: string): Promise<void> {
+	const rateKey = rateLimitKey(ip);
+	const rateRaw = await kv.get(rateKey);
+	const rateCount = rateRaw ? parseInt(rateRaw, 10) : 0;
 	const ttl = secondsUntilNextHour();
-	await kv.put(key, String(count + 1), { expirationTtl: ttl });
+
+	const sessKey = sessionKey(sid);
+	const sessRaw = await kv.get(sessKey);
+	const sessCount = sessRaw ? parseInt(sessRaw, 10) : 0;
+
+	await Promise.all([
+		kv.put(rateKey, String(rateCount + 1), { expirationTtl: ttl }),
+		kv.put(sessKey, String(sessCount + 1), { expirationTtl: SESSION_TTL })
+	]);
 }
 
 /**
