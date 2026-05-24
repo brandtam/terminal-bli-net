@@ -72,6 +72,33 @@
 		}
 	});
 
+	const EXCUSES = [
+		"Sorry, I got distracted by something off-camera.",
+		"Hold on, someone's knocking at the door.",
+		"I just remembered I left something in the oven.",
+		"The phone is ringing, give me a second.",
+		"I think I hear my mother calling.",
+		"Wait — what year is it again?",
+		"My brain just did that thing where it completely shuts off.",
+		"I spaced out, can you say that again later?",
+		"I'm having a moment, just... give me a minute.",
+		"Something came up, I gotta deal with this real quick.",
+		"I just got paged, hold that thought.",
+		"There's some kind of situation happening over here.",
+		"Excuse me, I need to take this call.",
+		"I completely lost my train of thought.",
+		"The signal's bad, I'm getting static.",
+		"Can we pick this up in a minute? Something just came up.",
+		"I think we're experiencing technical difficulties.",
+		"Hang on, the studio lights just went out.",
+		"Sorry, the teleprompter is broken.",
+		"We're on a commercial break, be right back.",
+	];
+
+	function randomExcuse(): string {
+		return EXCUSES[Math.floor(Math.random() * EXCUSES.length)];
+	}
+
 	/** Parse `[Name] content` prefix from assistant messages */
 	function parseResponder(content: string): { name: string | null; text: string } {
 		const match = content.match(/^\[([^\]]+)\]\s*/);
@@ -121,9 +148,10 @@
 
 			if (!response.ok) {
 				const err = await response.text();
+				console.error(`Chat error (${response.status}):`, err);
 				messages = [
 					...messages,
-					{ role: 'assistant', content: `[${respondingBot.name}] [Error: ${err}]` }
+					{ role: 'assistant', content: `[${respondingBot.name}] ${randomExcuse()}` }
 				];
 				busy = false;
 				streamingBotName = '';
@@ -156,12 +184,10 @@
 						];
 						streamingText = '';
 					} else if (chunk.type === 'error') {
+						console.error('Stream error:', chunk.error);
 						messages = [
 							...messages,
-							{
-								role: 'assistant',
-								content: `[${respondingBot.name}] [Error: ${chunk.error}]`
-							}
+							{ role: 'assistant', content: `[${respondingBot.name}] ${randomExcuse()}` }
 						];
 						streamingText = '';
 					}
@@ -176,9 +202,10 @@
 				streamingText = '';
 			}
 		} catch (e) {
+			console.error('Connection error:', e);
 			messages = [
 				...messages,
-				{ role: 'assistant', content: `[${respondingBot.name}] [Connection error: ${e}]` }
+				{ role: 'assistant', content: `[${respondingBot.name}] ${randomExcuse()}` }
 			];
 		} finally {
 			busy = false;
