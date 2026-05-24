@@ -66,4 +66,22 @@ export interface WindowState {
 export interface TweaksState {
 	wallpaper: string;
 	accent: string;
+	tvGridLoop: number;
+	marqueeLoop: number;
+	tvPauseOnHover: boolean;
+}
+
+export interface MenuItem {
+	label: string;
+	shortcut?: string;
+	disabled?: boolean;
+	action?: () => void;
+	separator?: boolean;
+}
+
+export interface AppMenuConfig {
+	appName: string;
+	appMenu: MenuItem[];
+	contextMenus: Record<string, MenuItem[]>;
+	contextInfo?: string;
 }

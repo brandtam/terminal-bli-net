@@ -1,18 +1,37 @@
 import type { WindowState, TweaksState, Conversation } from './types';
 
 const KEYS = {
-	windows: 'chatrbot:windows',
-	tweaks: 'chatrbot:tweaks',
-	conversations: 'chatrbot:conversations',
-	timezone: 'chatrbot:timezone',
-	sessionId: 'chatrbot:session',
-	firstVisit: 'chatrbot:firstVisit'
+	windows: 'terminal.os.windows',
+	tweaks: 'terminal.os.tweaks',
+	conversations: 'terminal.app.chatrbot.conversations',
+	timezone: 'terminal.os.timezone',
+	sessionId: 'terminal.os.session',
+	firstVisit: 'terminal.os.firstVisit'
 } as const;
+
+const LEGACY_KEYS: Record<string, string> = {
+	'terminal.os.windows': 'chatrbot:windows',
+	'terminal.os.tweaks': 'chatrbot:tweaks',
+	'terminal.app.chatrbot.conversations': 'chatrbot:conversations',
+	'terminal.os.timezone': 'chatrbot:timezone',
+	'terminal.os.session': 'chatrbot:session',
+	'terminal.os.firstVisit': 'chatrbot:firstVisit'
+};
 
 function get<T>(key: string, fallback: T): T {
 	if (typeof localStorage === 'undefined') return fallback;
 	try {
-		const raw = localStorage.getItem(key);
+		let raw = localStorage.getItem(key);
+		if (raw === null) {
+			const legacyKey = LEGACY_KEYS[key];
+			if (legacyKey) {
+				raw = localStorage.getItem(legacyKey);
+				if (raw !== null) {
+					localStorage.setItem(key, raw);
+					localStorage.removeItem(legacyKey);
+				}
+			}
+		}
 		if (raw === null) return fallback;
 		return JSON.parse(raw) as T;
 	} catch {
@@ -25,7 +44,7 @@ function set<T>(key: string, value: T): void {
 	try {
 		localStorage.setItem(key, JSON.stringify(value));
 	} catch {
-		// quota exceeded — silently fail
+		// quota exceeded
 	}
 }
 
@@ -38,7 +57,13 @@ export function saveWindows(windows: WindowState[]): void {
 }
 
 export function loadTweaks(): TweaksState {
-	return get<TweaksState>(KEYS.tweaks, { wallpaper: 'teal', accent: '#f54e00' });
+	return get<TweaksState>(KEYS.tweaks, {
+		wallpaper: 'teal',
+		accent: '#f54e00',
+		tvGridLoop: 400,
+		marqueeLoop: 100,
+		tvPauseOnHover: false
+	});
 }
 
 export function saveTweaks(tweaks: TweaksState): void {
@@ -78,4 +103,12 @@ export function isFirstVisit(): boolean {
 		return true;
 	}
 	return false;
+}
+
+export function appRead<T>(appId: string, key: string, fallback: T): T {
+	return get<T>(`terminal.app.${appId}.${key}`, fallback);
+}
+
+export function appWrite<T>(appId: string, key: string, value: T): void {
+	set(`terminal.app.${appId}.${key}`, value);
 }
