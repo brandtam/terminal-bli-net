@@ -1,0 +1,47 @@
+{
+	"name": "chatrbot-ai",
+	"compatibility_date": "2024-12-30",
+	"compatibility_flags": ["nodejs_compat"],
+	"pages_build_output_dir": ".svelte-kit/cloudflare",
+
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "PLACEHOLDER_KV_ID"
+		}
+	],
+
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "REMINDER_AGENT",
+				"class_name": "ReminderAgent"
+			}
+		]
+	},
+
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["ReminderAgent"]
+		}
+	],
+
+	"send_email": [
+		{
+			"name": "SEND_EMAIL"
+		}
+	],
+
+	// Secrets (set via `wrangler secret put`):
+	// ANTHROPIC_API_KEY
+	// OPENAI_API_KEY (optional)
+	// EMAIL_SECRET (HMAC key for unsubscribe signatures)
+
+	"vars": {
+		"PROVIDER": "claude",
+		"MONTHLY_SPEND_CAP": "50",
+		"RATE_LIMIT_PER_HOUR": "30",
+		"SESSION_MESSAGE_CAP": "50"
+	}
+}
