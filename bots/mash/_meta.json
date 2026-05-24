@@ -6,6 +6,7 @@
   "era": "1950s (Korean War)",
   "image": "/bots/mash/group-icon.png",
   "active": true,
+  "color": "#556b2f",
   "schedule": [
     { "day": "mon", "start": "00:00", "duration": 240 },
     { "day": "mon", "start": "19:00", "duration": 180 },
@@ -17,5 +18,31 @@
     { "day": "sat", "start": "00:00", "duration": 240 },
     { "day": "sun", "start": "04:00", "duration": 180 },
     { "day": "sun", "start": "13:00", "duration": 180 }
+  ],
+  "episodes": [
+    { "season": 1, "episode": 1, "title": "Pilot", "year": "1972", "premise": "Hawkeye and Trapper scheme to raise money for a local boy's college fund by throwing a raffle, setting the tone for how humor masks the horror of wartime surgery." },
+    { "season": 1, "episode": 4, "title": "Chief Surgeon Who?", "year": "1972", "premise": "Frank Burns protests when the laid-back Hawkeye is named chief surgeon over him, convinced rank should trump skill while wounded pour in from the front." },
+    { "season": 1, "episode": 10, "title": "I Hate a Mystery", "year": "1972", "premise": "Personal items go missing around camp and Hawkeye plays detective, setting an elaborate dinner-party trap to catch the thief among their own staff." },
+    { "season": 1, "episode": 12, "title": "Dear Dad", "year": "1972", "premise": "Hawkeye writes a letter home to his father describing Christmas at the 4077th — the pranks, the wounded, and the impossible task of finding holiday spirit in a war zone." },
+    { "season": 1, "episode": 20, "title": "The Army-Navy Game", "year": "1973", "premise": "An unexploded bomb lands in the compound during the Army-Navy football game broadcast, and Hawkeye and Trapper must defuse it using instructions radioed from HQ." },
+    { "season": 1, "episode": 22, "title": "Major Fred C. Dobbs", "year": "1973", "premise": "Trapper discovers gold in the hills near camp and the entire unit catches gold fever, abandoning their duties in a frenzy of prospecting and claim-staking." },
+    { "season": 2, "episode": 5, "title": "Dr. Pierce and Mr. Hyde", "year": "1973", "premise": "Hawkeye goes 72 hours without sleep during a casualty surge and begins hallucinating, refusing to stop operating even as his grip on reality deteriorates." },
+    { "season": 2, "episode": 13, "title": "Deal Me Out", "year": "1973", "premise": "A marathon poker game in the Swamp gets repeatedly interrupted by crises — a wounded POW, a psychotic patient, and Radar's attempts to play with the big boys." },
+    { "season": 2, "episode": 18, "title": "Tuttle", "year": "1973", "premise": "Hawkeye invents a fictional officer named Captain Tuttle to funnel supplies to a local orphanage, but the deception spirals when HQ wants to meet their new hero." },
+    { "season": 3, "episode": 2, "title": "Rainbow Bridge", "year": "1974", "premise": "The 4077th arranges a risky prisoner exchange at a bridge in no-man's land, trading wounded enemy soldiers for captured American GIs under tense ceasefire conditions." },
+    { "season": 3, "episode": 24, "title": "Abyssinia, Henry", "year": "1975", "premise": "Colonel Henry Blake receives his discharge papers and says emotional goodbyes to everyone at the 4077th, only for devastating news to arrive after his departure." },
+    { "season": 4, "episode": 1, "title": "Welcome to Korea", "year": "1975", "premise": "BJ Hunnicutt arrives as Trapper's replacement and Hawkeye drives him from Seoul to the 4077th, witnessing the casual brutality of the war firsthand on the journey." },
+    { "season": 4, "episode": 17, "title": "Dear Peggy", "year": "1976", "premise": "BJ writes to his wife about life at the 4077th while struggling with the guilt of finding moments of happiness so far from home and family." },
+    { "season": 4, "episode": 25, "title": "The Interview", "year": "1976", "premise": "A TV journalist interviews the staff of the 4077th in black-and-white, and each character reveals their true feelings about the war in unscripted-feeling monologues." },
+    { "season": 5, "episode": 6, "title": "The Abduction of Margaret Houlihan", "year": "1976", "premise": "Hot Lips vanishes from camp and everyone fears she's been captured by the enemy, launching a frantic search while she's actually on a secret intelligence mission." },
+    { "season": 5, "episode": 13, "title": "Dear Sigmund", "year": "1976", "premise": "Psychiatrist Sidney Freedman visits the 4077th to treat his own burnout, writing to Freud about the impossible sanity of people living inside insanity." },
+    { "season": 5, "episode": 20, "title": "The Bus", "year": "1977", "premise": "The staff's bus breaks down in enemy territory on the way back from a medical conference, stranding them overnight with dwindling supplies and rising fear." },
+    { "season": 6, "episode": 24, "title": "Potter's Retirement", "year": "1978", "premise": "Colonel Potter considers retiring after discovering someone in camp has been filing complaints about him to HQ, shaking his faith in the unit he loves." },
+    { "season": 7, "episode": 9, "title": "Point of View", "year": "1978", "premise": "The entire episode is shot from the perspective of a wounded soldier who cannot speak, watching the 4077th staff care for him through his own eyes." },
+    { "season": 8, "episode": 11, "title": "Dreams", "year": "1980", "premise": "Exhausted surgeons collapse for brief naps between waves of casualties and we enter their surreal, disturbing dreams — each revealing deep psychological wounds from the war." },
+    { "season": 8, "episode": 12, "title": "Death Takes a Holiday", "year": "1980", "premise": "On Christmas Eve, Hawkeye, BJ, and Margaret fight to keep a mortally wounded soldier alive until midnight so his children won't associate Christmas with their father's death." },
+    { "season": 9, "episode": 1, "title": "Old Soldiers", "year": "1980", "premise": "Potter receives news that the last member of his WWI army buddies has died, and he quietly mourns alone while sharing the story of their decades-long pact." },
+    { "season": 10, "episode": 9, "title": "Heal Thyself", "year": "1982", "premise": "A visiting surgeon cracks under the pressure of a massive casualty influx, forcing Hawkeye and BJ to recognize how close they all are to the same breaking point." },
+    { "season": 11, "episode": 16, "title": "Goodbye, Farewell and Amen", "year": "1983", "premise": "The war ends and the 4077th prepares to disband — Hawkeye works through a devastating repressed memory with Sidney while everyone says final goodbyes to the place that changed them." }
   ]
 }

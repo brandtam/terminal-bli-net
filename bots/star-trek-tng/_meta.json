@@ -6,6 +6,7 @@
   "era": "24th Century",
   "image": "/bots/star-trek-tng/group-icon.png",
   "active": true,
+  "color": "#8e44ad",
   "schedule": [
     { "day": "mon", "start": "07:00", "duration": 180 },
     { "day": "tue", "start": "13:00", "duration": 180 },
@@ -16,5 +17,30 @@
     { "day": "sat", "start": "04:00", "duration": 180 },
     { "day": "sun", "start": "10:00", "duration": 180 },
     { "day": "sun", "start": "16:00", "duration": 180 }
+  ],
+  "episodes": [
+    { "season": 1, "episode": 1, "title": "Encounter at Farpoint", "year": "1987", "premise": "The omnipotent Q puts humanity on trial as Captain Picard takes command of the Enterprise-D, and the crew must solve the mystery of Farpoint Station to prove humanity's worth." },
+    { "season": 1, "episode": 23, "title": "Skin of Evil", "year": "1988", "premise": "A malevolent oil-slick entity holds Troi hostage on a desolate planet and casually kills a senior crew member, proving that evil in the universe can be senseless and absolute." },
+    { "season": 2, "episode": 9, "title": "The Measure of a Man", "year": "1989", "premise": "Data faces a Starfleet tribunal to determine whether he is property or a person with rights, with Picard arguing for his freedom and Riker forced to argue against it." },
+    { "season": 2, "episode": 16, "title": "Q Who", "year": "1989", "premise": "Q flings the Enterprise across the galaxy to introduce them to the Borg — a cybernetic collective that cannot be reasoned with, outmatches them completely, and is heading toward Earth." },
+    { "season": 3, "episode": 10, "title": "The Defector", "year": "1990", "premise": "A Romulan admiral defects to the Federation claiming the Empire is about to launch an invasion, and Picard must determine if it's genuine intelligence or an elaborate trap." },
+    { "season": 3, "episode": 15, "title": "Yesterday's Enterprise", "year": "1990", "premise": "A time rift brings the Enterprise-C forward in time, creating a dark alternate timeline where the Federation is losing a war with the Klingons and Tasha Yar is still alive." },
+    { "season": 3, "episode": 16, "title": "The Offspring", "year": "1990", "premise": "Data creates a daughter android named Lal and fights to keep Starfleet from taking her away, but her rapid emotional development pushes her neural net past its limits." },
+    { "season": 3, "episode": 26, "title": "The Best of Both Worlds, Part I", "year": "1990", "premise": "The Borg arrive at Earth's doorstep and assimilate Captain Picard into Locutus, leaving Riker in command with an impossible choice as the fleet is decimated at Wolf 359." },
+    { "season": 4, "episode": 1, "title": "The Best of Both Worlds, Part II", "year": "1990", "premise": "Riker must rescue Picard from the Borg Cube and use his assimilated captain's link to the collective to find a way to destroy the ship before it reaches Earth." },
+    { "season": 4, "episode": 2, "title": "Family", "year": "1990", "premise": "Picard returns to his family vineyard in France to recover from his assimilation, confronting his brother and finally breaking down over what the Borg did to him." },
+    { "season": 4, "episode": 21, "title": "The Drumhead", "year": "1991", "premise": "A visiting admiral's investigation into a security breach turns into a McCarthyist witch hunt aboard the Enterprise, and Picard must stand against the paranoia consuming Starfleet." },
+    { "season": 5, "episode": 2, "title": "Darmok", "year": "1991", "premise": "Picard is stranded on a planet with an alien captain whose species communicates entirely through mythological metaphor, and they must learn to understand each other before a beast kills them both." },
+    { "season": 5, "episode": 18, "title": "Cause and Effect", "year": "1992", "premise": "The Enterprise is caught in a time loop, destroyed in a collision every few hours, with the crew experiencing deja vu and finding cryptic clues from their previous iterations." },
+    { "season": 5, "episode": 23, "title": "I, Borg", "year": "1992", "premise": "The crew rescues a lone Borg drone and Picard plans to use him as a weapon to destroy the collective, but the drone develops individuality and Picard faces a moral crisis." },
+    { "season": 5, "episode": 25, "title": "The Inner Light", "year": "1992", "premise": "A alien probe renders Picard unconscious and he lives an entire lifetime as a man on a dying world — marriage, children, grandchildren — in just 25 minutes of real time." },
+    { "season": 6, "episode": 10, "title": "Chain of Command, Part I", "year": "1992", "premise": "Picard is sent on a covert mission into Cardassian territory and captured, beginning a brutal interrogation where his torturer insists there are five lights when there are four." },
+    { "season": 6, "episode": 11, "title": "Chain of Command, Part II", "year": "1993", "premise": "Picard endures escalating physical and psychological torture by Gul Madred while a new captain restructures the Enterprise, and Picard must hold onto his identity or break completely." },
+    { "season": 6, "episode": 15, "title": "Tapestry", "year": "1993", "premise": "Q gives a dying Picard the chance to relive and change a reckless moment from his youth, only to discover that without his mistakes he becomes a timid, unremarkable officer." },
+    { "season": 6, "episode": 21, "title": "Frame of Mind", "year": "1993", "premise": "Riker loses his grip on reality, shifting between performing in a play about an asylum and actually being a patient in one, unable to determine which world is real." },
+    { "season": 7, "episode": 4, "title": "Gambit, Part I", "year": "1993", "premise": "Picard is presumed dead and Riker tracks the pirates responsible, only to find Picard alive and undercover among them in a scheme involving ancient Vulcan artifacts." },
+    { "season": 7, "episode": 12, "title": "The Pegasus", "year": "1994", "premise": "Riker's former captain returns with orders to recover a lost ship hiding a Federation secret — an illegal cloaking device — forcing Riker to choose between old loyalties and Picard's trust." },
+    { "season": 7, "episode": 15, "title": "Lower Decks", "year": "1994", "premise": "Four junior officers navigate promotions, rivalries, and a classified mission, giving a rare view of life below the senior staff — ending with a devastating loss that Picard can only announce." },
+    { "season": 7, "episode": 25, "title": "All Good Things...", "year": "1994", "premise": "Q sends Picard shifting between three time periods where a spatial anomaly threatens to erase humanity from existence, and Picard must solve the paradox that he himself will create." }
   ]
 }
