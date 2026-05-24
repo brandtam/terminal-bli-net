@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { Bot, GroupMeta, WindowState, TweaksState } from '$lib/types';
+	import type { Bot, Channel, GroupMeta, WindowState, TweaksState } from '$lib/types';
 	import type { OsApi, AlertSpec } from '$lib/os/os-api';
 	import { windowAppId } from '$lib/os/os-api';
 	import { APPS } from '$lib/os/app-registry';
@@ -31,6 +31,7 @@
 
 	let groups = $state<GroupMeta[]>([]);
 	let bots = $state<Bot[]>([]);
+	let channels = $state<Channel[]>([]);
 	let windows = $state<WindowState[]>([]);
 	let zCounter = $state(10);
 	let activeId = $state<string | null>(null);
@@ -55,8 +56,9 @@
 			.then((res) => (res.ok ? res.json() : null))
 			.then((data) => {
 				if (data) {
-					groups = (data as { groups: GroupMeta[]; bots: Bot[] }).groups;
-					bots = (data as { groups: GroupMeta[]; bots: Bot[] }).bots;
+					groups = (data as { groups: GroupMeta[]; bots: Bot[]; channels: Channel[] }).groups;
+					bots = (data as { groups: GroupMeta[]; bots: Bot[]; channels: Channel[] }).bots;
+					channels = (data as { groups: GroupMeta[]; bots: Bot[]; channels: Channel[] }).channels;
 				}
 			})
 			.catch(() => {});
@@ -444,6 +446,7 @@
 				<TVGuide
 					{groups}
 					{bots}
+					{channels}
 					{timezone}
 					{now}
 					{activeChatGroupSlug}
