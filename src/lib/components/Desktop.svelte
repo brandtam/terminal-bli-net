@@ -4,7 +4,7 @@
 	import type { OsApi, AlertSpec } from '$lib/os/os-api';
 	import { windowAppId } from '$lib/os/os-api';
 	import { APPS } from '$lib/os/app-registry';
-	import { isOnAir, currentlyAiring, minutesRemaining, nextOnAir, formatTimeUntil } from '$lib/schedule';
+	import { isShowOnAir, getSlotIndex, getCurrentSlot } from '$lib/schedule';
 	import {
 		loadWindows,
 		saveWindows,
@@ -226,12 +226,10 @@
 	}
 
 	function openChat(group: GroupMeta, bot: Bot) {
-		if (!isOnAir(group, now, timezone)) {
-			const next = nextOnAir(group, now, timezone);
-			const nextText = next ? `Next airing: in ${formatTimeUntil(next.minutesUntil)}.` : '';
+		if (!isShowOnAir(group.slug, channels, now, timezone)) {
 			showAlert({
 				title: `${group.name.toUpperCase()} is off air`,
-				body: `You can only chat with characters from shows that are currently broadcasting. ${nextText}`,
+				body: `You can only chat with characters from shows that are currently broadcasting. Check the TV Guide for upcoming broadcasts.`,
 				buttons: [
 					{ label: 'Browse TV Guide', action: () => { dismissAlert(); openWindow('tv-guide'); } },
 					{ label: 'OK', primary: true },
@@ -247,7 +245,7 @@
 		// TODO: open email opt-in
 	}
 
-	const isRecording = $derived(currentlyAiring(groups, now, timezone).length > 0);
+	const isRecording = $derived(channels.some(ch => getCurrentSlot(ch, now, timezone) !== null));
 
 	const activeChatGroupSlug = $derived.by(() => {
 		const chatWindow = windows.find((w) => w.id.startsWith('chat-'));
@@ -313,21 +311,20 @@
 		setTweak,
 		guide: {
 			currentlyAiring: (showId: string) => {
-				const group = groups.find((g) => g.slug === showId);
-				return group ? isOnAir(group, now, timezone) : false;
+				return isShowOnAir(showId, channels, now, timezone);
 			},
-			nextAiring: (showId: string) => {
-				const group = groups.find((g) => g.slug === showId);
-				if (!group) return 'sometime';
-				const next = nextOnAir(group, now, timezone);
-				if (!next) return 'sometime';
-				return formatTimeUntil(next.minutesUntil);
+			nextAiring: (_showId: string) => {
+				return 'Check the TV Guide';
 			},
-			liveCount: () => groups.filter((g) => g.active && isOnAir(g, now, timezone)).length,
+			liveCount: () => {
+				const slotIdx = getSlotIndex(now, timezone);
+				const liveShowSlugs = new Set(channels.map(ch => ch.schedule[slotIdx]?.showSlug).filter(Boolean));
+				return liveShowSlugs.size;
+			},
 			shows: () => groups.filter((g) => g.active).map((g) => ({
 				id: g.slug,
 				name: g.name,
-				onAir: isOnAir(g, now, timezone)
+				onAir: isShowOnAir(g.slug, channels, now, timezone)
 			})),
 		},
 		listWindows: () => windows,
@@ -464,8 +461,10 @@
 				{#if bot}
 					<ChatWindow
 						{bot}
-						minutesLeft={group ? minutesRemaining(group, now, timezone) : null}
-						offAir={group ? !isOnAir(group, now, timezone) : true}
+						minutesLeft={group && isShowOnAir(group.slug, channels, now, timezone)
+							? 30 - (now.getMinutes() % 30)
+							: null}
+						offAir={group ? !isShowOnAir(group.slug, channels, now, timezone) : true}
 					/>
 				{/if}
 			{:else if w.id === 'terminal-prefs'}
