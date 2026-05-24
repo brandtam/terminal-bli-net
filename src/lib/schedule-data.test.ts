@@ -5,7 +5,7 @@ import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 
 function loadAllGroups(): GroupMeta[] {
-	const botsDir = resolve(import.meta.dirname, '../../bots');
+	const botsDir = resolve(process.cwd(), 'bots');
 	const dirs = readdirSync(botsDir).filter((d) => statSync(join(botsDir, d)).isDirectory());
 	return dirs.map((d) => JSON.parse(readFileSync(join(botsDir, d, '_meta.json'), 'utf-8')));
 }
