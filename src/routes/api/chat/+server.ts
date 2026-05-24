@@ -2,14 +2,9 @@ import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { streamCompletion } from '$lib/server/llm';
 import { canRespond, recordTokens, recordMessage } from '$lib/server/spend';
-import { getBotById, loadGroups } from '$lib/server/bots';
+import { getBotById, loadChannels, loadGroups } from '$lib/server/bots';
 import { buildSystemPrompt } from '$lib/server/prompt';
-import type { Channel, ChatMessage } from '$lib/types';
-
-/** Placeholder until channel data is loaded in Step 6 */
-function loadChannels(): Channel[] {
-	return [];
-}
+import type { ChatMessage } from '$lib/types';
 
 const VALID_ROLES = new Set(['user', 'assistant']);
 const MAX_MESSAGES = 20;

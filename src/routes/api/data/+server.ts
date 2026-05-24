@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { loadBots, loadGroups } from '$lib/server/bots';
+import { loadBots, loadChannels, loadGroups } from '$lib/server/bots';
 
 export const GET: RequestHandler = async () => {
 	const bots = loadBots();
@@ -8,5 +8,5 @@ export const GET: RequestHandler = async () => {
 
 	const safeBots = bots.map(({ prompt, ...rest }) => rest);
 
-	return json({ groups, bots: safeBots });
+	return json({ groups, bots: safeBots, channels: loadChannels() });
 };
