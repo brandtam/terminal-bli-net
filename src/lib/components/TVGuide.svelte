@@ -472,11 +472,16 @@
 			<!-- Channel rows -->
 			{#each schedule as { group, ch, items }, chIdx}
 				{@const isAlt = chIdx % 2 === 1}
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
 				<div
 					class="tvg-cell tvg-ch-cell"
 					class:alt={isAlt}
 					class:current={group.slug === activeChatGroupSlug}
-					style="grid-column: 1; grid-row: {chIdx + 2};"
+					style="grid-column: 1; grid-row: {chIdx + 2}; cursor: pointer;"
+					onclick={() => {
+						const nowItem = items.find((it) => it.start === 0);
+						if (nowItem) selectFeatured(group, nowItem);
+					}}
 				>
 					<div class="ch-num">{ch.ch}</div>
 					<div class="ch-net">{ch.net}</div>
