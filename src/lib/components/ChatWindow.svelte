@@ -7,10 +7,12 @@
 
 	let {
 		bot,
-		minutesLeft = null
+		minutesLeft = null,
+		offAir = false
 	}: {
 		bot: Bot;
 		minutesLeft: number | null;
+		offAir?: boolean;
 	} = $props();
 
 	let messages = $state<ChatMessage[]>([]);
@@ -181,13 +183,19 @@
 		{/if}
 	</div>
 
+	{#if offAir}
+		<div class="off-air-banner">
+			{bot.name.toUpperCase()} has gone off air. Check the TV Guide for what's on now.
+		</div>
+	{/if}
+
 	<form class="chat-input" onsubmit={(e) => { e.preventDefault(); send(); }}>
 		<input
 			bind:value={input}
-			placeholder={busy ? 'typing...' : `say something to ${bot.name}...`}
-			disabled={busy}
+			placeholder={offAir ? `${bot.name} is off air` : busy ? 'typing...' : `say something to ${bot.name}...`}
+			disabled={busy || offAir}
 		/>
-		<button type="submit" disabled={busy}>{busy ? '...' : 'SEND'}</button>
+		<button type="submit" disabled={busy || offAir}>{offAir ? 'OFF AIR' : busy ? '...' : 'SEND'}</button>
 	</form>
 </div>
 
@@ -330,6 +338,17 @@
 	.chat-input button:disabled {
 		background: var(--paper-soft);
 		color: var(--ink);
-		cursor: wait;
+		cursor: not-allowed;
+	}
+	.off-air-banner {
+		padding: 8px 12px;
+		background: var(--ink);
+		color: var(--accent-2);
+		font-family: 'Press Start 2P', monospace;
+		font-size: 9px;
+		letter-spacing: 0.03em;
+		line-height: 1.4;
+		text-align: center;
+		flex-shrink: 0;
 	}
 </style>

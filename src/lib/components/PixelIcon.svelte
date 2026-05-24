@@ -65,6 +65,25 @@
 		<rect x="5" y="6" width="1" height="6" fill="#0a0a0a" />
 		<rect x="7" y="6" width="1" height="6" fill="#0a0a0a" />
 		<rect x="9" y="6" width="1" height="6" fill="#0a0a0a" />
+	{:else if kind === 'calc'}
+		<rect x="2" y="14" width="11" height="1" fill="rgba(0,0,0,0.25)" />
+		<rect x="2" y="2" width="11" height="12" fill="#dcd6c8" stroke="#0a0a0a" />
+		<rect x="3" y="3" width="9" height="3" fill="#a6f000" stroke="#0a0a0a" />
+		<rect x="9" y="4" width="2" height="1" fill="#0a0a0a" />
+		{#each [0, 1, 2] as r}
+			{#each [0, 1, 2] as c}
+				<rect x={3 + c * 3} y={7 + r * 2} width="2" height="1" fill="#0a0a0a" />
+			{/each}
+		{/each}
+		<rect x="12" y="7" width="1" height="5" fill="#f54e00" stroke="#0a0a0a" />
+	{:else if kind === 'floppy'}
+		<rect x="2" y="14" width="12" height="1" fill="rgba(0,0,0,0.25)" />
+		<rect x="2" y="2" width="12" height="12" fill="#3a322a" stroke="#0a0a0a" />
+		<rect x="4" y="3" width="8" height="3" fill="#bdb6a4" stroke="#0a0a0a" />
+		<rect x="6" y="3" width="1" height="3" fill="#3a322a" />
+		<rect x="3" y="8" width="10" height="5" fill="#fff" stroke="#0a0a0a" />
+		<rect x="4" y="9" width="4" height="1" fill="#f54e00" />
+		<rect x="4" y="11" width="6" height="1" fill="#0a0a0a" />
 	{:else if kind === 'guide' || kind === 'tvguide'}
 		<rect x="2" y="14" width="11" height="1" fill="rgba(0,0,0,0.25)" />
 		<rect x="3" y="13" width="1" height="2" fill="#0a0a0a" />

@@ -1,0 +1,55 @@
+/* Terminal — Windows 95 chrome tokens (placeholder)
+   Fill in these overrides to ship a Win95 theme.
+   See Chrome System Spec §4.1 for the full matrix. */
+
+[data-os-theme="win95"] {
+  /* Window */
+  --chrome-window-bg:           #c0c0c0;
+  --chrome-window-border:       none;
+  --chrome-window-border-color: #808080;
+  --chrome-window-shadow:       none;
+  --chrome-window-radius:       0;
+
+  /* Title bar */
+  --chrome-titlebar-bg:          linear-gradient(90deg, #000080, #1084d0);
+  --chrome-titlebar-bg-inactive: #808080;
+  --chrome-titlebar-fg:          #ffffff;
+  --chrome-titlebar-height:      20px;
+  --chrome-titlebar-font:        700 11px system-ui, Tahoma, sans-serif;
+  --chrome-titlebar-align:       left;
+
+  /* Window buttons */
+  --chrome-wbtn-size:            16px;
+  --chrome-wbtn-style:           bevel;
+  --chrome-wbtn-close-position:  right;
+  --chrome-wbtn-close-glyph:     "×";
+  --chrome-wbtn-close-bg:        #c0c0c0;
+  --chrome-wbtn-close-fg:        #000000;
+
+  /* Resize */
+  --chrome-resize-visible:       0;
+  --chrome-resize-edge-grab:     4px;
+
+  /* Menu bar */
+  --chrome-menubar-location:     window;
+  --chrome-menubar-bg:           #c0c0c0;
+  --chrome-menubar-fg:           #000000;
+  --chrome-menubar-hover-bg:     #000080;
+  --chrome-menubar-hover-fg:     #ffffff;
+  --chrome-menubar-font:         11px system-ui, Tahoma, sans-serif;
+  --chrome-menubar-height:       20px;
+
+  /* Scrollbar */
+  --chrome-scroll-width:         16px;
+  --chrome-scroll-track-bg:      #c0c0c0;
+  --chrome-scroll-thumb-bg:      #808080;
+  --chrome-scroll-arrows:        both;
+
+  /* Button */
+  --chrome-btn-style:            bevel;
+  --chrome-btn-shadow:           none;
+  --chrome-btn-pressed-style:    invert;
+
+  /* Density */
+  --chrome-density:              compact;
+}

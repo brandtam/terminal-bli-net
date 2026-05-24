@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Bot, GroupMeta, WindowState, TweaksState } from '$lib/types';
-	import { isOnAir, currentlyAiring, minutesRemaining } from '$lib/schedule';
+	import type { OsApi, AlertSpec } from '$lib/os/os-api';
+	import { windowAppId } from '$lib/os/os-api';
+	import { APPS } from '$lib/os/app-registry';
+	import { isOnAir, currentlyAiring, minutesRemaining, nextOnAir, formatTimeUntil } from '$lib/schedule';
 	import {
 		loadWindows,
 		saveWindows,
 		loadTweaks,
 		saveTweaks,
 		loadTimezone,
+		saveTimezone,
 		isFirstVisit
 	} from '$lib/persistence';
 	import Window from './Window.svelte';
@@ -17,13 +21,26 @@
 	import Dock from './Dock.svelte';
 	import ChatWindow from './ChatWindow.svelte';
 	import TVGuide from './TVGuide.svelte';
+	import WelcomeWindow from '$lib/apps/welcome/WelcomeWindow.svelte';
+	import PricingContent from '$lib/apps/textedit/PricingContent.svelte';
+	import ReadmeContent from '$lib/apps/textedit/ReadmeContent.svelte';
+	import StatsWindow from '$lib/apps/stats/StatsWindow.svelte';
+	import ErrorDialog from '$lib/apps/finder/ErrorDialog.svelte';
+	import TrashWindow from '$lib/apps/finder/TrashWindow.svelte';
+	import AboutAppWindow from '$lib/apps/finder/AboutAppWindow.svelte';
 
 	let groups = $state<GroupMeta[]>([]);
 	let bots = $state<Bot[]>([]);
 	let windows = $state<WindowState[]>([]);
 	let zCounter = $state(10);
 	let activeId = $state<string | null>(null);
-	let tweaks = $state<TweaksState>({ wallpaper: 'teal', accent: '#f54e00' });
+	let tweaks = $state<TweaksState>({
+		wallpaper: 'teal',
+		accent: '#f54e00',
+		tvGridLoop: 400,
+		marqueeLoop: 100,
+		tvPauseOnHover: false
+	});
 	let timezone = $state<string | undefined>(undefined);
 	let now = $state(new Date());
 	let chatBotId = $state<Record<string, string>>({});
@@ -32,7 +49,7 @@
 	onMount(() => {
 		tweaks = loadTweaks();
 		timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-		isMobile = window.innerWidth < 768;
+		isMobile = window.innerWidth < 720;
 
 		fetch('/api/data')
 			.then((res) => (res.ok ? res.json() : null))
@@ -51,22 +68,43 @@
 			openWindow('tv-guide');
 		}
 
+		const hash = window.location.hash.slice(1);
+		if (hash) {
+			openWindow(hash);
+		}
+
 		const tick = setInterval(() => {
 			now = new Date();
-		}, 30000);
+		}, 1000);
 
 		const handleResize = () => {
-			isMobile = window.innerWidth < 768;
+			isMobile = window.innerWidth < 720;
 		};
 		window.addEventListener('resize', handleResize);
 
 		const handleKeydown = (e: KeyboardEvent) => {
-			if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'g') {
+			if (!(e.metaKey || e.ctrlKey)) return;
+			const key = e.key.toLowerCase();
+			if (key === 'g') {
 				e.preventDefault();
 				openWindow('tv-guide');
-			} else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'w') {
+			} else if (key === 'w') {
 				e.preventDefault();
 				if (activeId) closeWindow(activeId);
+			} else if (key === 'n') {
+				e.preventDefault();
+				const app = APPS[activeId ? windowAppId(activeId) : 'finder'];
+				const menus = app?.menus(os) ?? [];
+				const fileMenu = menus.find((m) => m.label === 'File');
+				const newItem = fileMenu?.items.find((it) => it.type === 'action' && it.shortcut === '⌘N');
+				if (newItem && newItem.type === 'action' && newItem.action) newItem.action(os);
+				else openWindow('tv-guide');
+			} else if (key === ',') {
+				e.preventDefault();
+				const appId = activeId ? windowAppId(activeId) : 'finder';
+				const app = APPS[appId];
+				if (app?.preferences) os.openPreferences(appId);
+				else os.openTweaks();
 			}
 		};
 		window.addEventListener('keydown', handleKeydown);
@@ -83,18 +121,32 @@
 	});
 
 	$effect(() => {
+		if (typeof window === 'undefined') return;
+		const hash = activeId || '';
+		window.history.replaceState(null, '', hash ? `#${hash}` : window.location.pathname);
+	});
+
+	$effect(() => {
 		saveWindows(windows);
 	});
 
 	function getWindowDef(id: string): { title: string; w: number; h: number } {
 		const defs: Record<string, { title: string; w: number; h: number }> = {
 			welcome: { title: 'Welcome.app', w: 460, h: 540 },
-			'tv-guide': { title: 'TV Guide.app', w: 620, h: 540 },
+			'tv-guide': { title: 'TV Guide.app', w: 660, h: 700 },
+			'terminal-prefs': { title: 'Terminal Preferences', w: 380, h: 360 },
+			'tvguide-prefs': { title: 'TV Guide Preferences', w: 360, h: 360 },
+			'chatrbot-prefs': { title: 'chatrbot Preferences', w: 360, h: 280 },
 			pricing: { title: 'Pricing.txt', w: 460, h: 380 },
 			readme: { title: 'README.TXT', w: 380, h: 420 },
-			about: { title: 'About this Mac', w: 380, h: 420 },
+			about: { title: 'About Terminal', w: 420, h: 480 },
+			'about-chatrbot': { title: 'About chatrbot', w: 420, h: 460 },
+			'about-tvguide': { title: 'About TV Guide', w: 420, h: 460 },
+			'about-textedit': { title: 'About TextEdit', w: 420, h: 380 },
+			'about-stats': { title: 'About Stats', w: 420, h: 360 },
+			stats: { title: 'Stats.app', w: 360, h: 360 },
 			error: { title: 'System Error', w: 420, h: 260 },
-			trash: { title: 'Trash', w: 380, h: 320 }
+			trash: { title: 'Trash — empty', w: 380, h: 320 }
 		};
 		if (id.startsWith('chat-')) {
 			const botId = id.replace('chat-', '');
@@ -158,7 +210,19 @@
 	}
 
 	function openChat(group: GroupMeta, bot: Bot) {
-		if (!isOnAir(group, now, timezone)) return;
+		if (!isOnAir(group, now, timezone)) {
+			const next = nextOnAir(group, now, timezone);
+			const nextText = next ? `Next airing: in ${formatTimeUntil(next.minutesUntil)}.` : '';
+			showAlert({
+				title: `${group.name.toUpperCase()} is off air`,
+				body: `You can only chat with characters from shows that are currently broadcasting. ${nextText}`,
+				buttons: [
+					{ label: 'Browse TV Guide', action: () => { dismissAlert(); openWindow('tv-guide'); } },
+					{ label: 'OK', primary: true },
+				],
+			});
+			return;
+		}
 		const windowId = `chat-${bot.id}`;
 		chatBotId[windowId] = bot.id;
 		openWindow(windowId);
@@ -181,14 +245,144 @@
 	}
 
 	const isRecording = $derived(currentlyAiring(groups, now, timezone).length > 0);
+
+	const activeChatGroupSlug = $derived.by(() => {
+		const chatWindow = windows.find((w) => w.id.startsWith('chat-'));
+		if (!chatWindow) return null;
+		const botId = chatWindow.id.replace('chat-', '');
+		const bot = bots.find((b) => b.id === botId);
+		return bot?.group ?? null;
+	});
+
+	function setTimezone(tz: string) {
+		timezone = tz === 'local' ? Intl.DateTimeFormat().resolvedOptions().timeZone : tz;
+		saveTimezone(timezone);
+	}
+
+	let alertSpec = $state<(AlertSpec & { id: number }) | null>(null);
+	function showAlert(spec: AlertSpec) { alertSpec = { ...spec, id: Math.random() }; }
+	function dismissAlert() { alertSpec = null; }
+
+	function setTweak(key: string, value: unknown) {
+		tweaks = { ...tweaks, [key]: value } as TweaksState;
+		saveTweaks(tweaks);
+	}
+
+	const os: OsApi = {
+		launchApp: (appId, payload) => {
+			if (appId === 'tvguide') return openWindow('tv-guide');
+			if (appId === 'chatrbot' && payload?.showId) {
+				const showId = payload.showId as string;
+				const group = groups.find((g) => g.slug === showId);
+				const groupBots = bots.filter((b) => b.group === showId);
+				const firstBot = groupBots[0];
+				if (group && firstBot) openChat(group, firstBot);
+				return;
+			}
+			if (appId === 'textedit') {
+				if (payload?.open === 'README.txt') return openWindow('readme');
+				if (payload?.open === 'Pricing.txt') return openWindow('pricing');
+				return openWindow('readme');
+			}
+			if (appId === 'stats') return openWindow('stats');
+			if (appId === 'error') return openWindow('error');
+			if (appId === 'welcome') return openWindow('welcome');
+		},
+		closeFocused: () => { if (activeId) closeWindow(activeId); },
+		closeWindow,
+		focusWindow,
+		openWindow,
+		openTweaks: () => openWindow('terminal-prefs'),
+		openPreferences: (appId) => {
+			const a = APPS[appId];
+			if (a?.preferences) openWindow(a.preferences);
+		},
+		openAbout: (appId) => {
+			if (appId === 'chatrbot') return openWindow('about-chatrbot');
+			if (appId === 'tvguide') return openWindow('about-tvguide');
+			if (appId === 'textedit') return openWindow('about-textedit');
+			if (appId === 'stats') return openWindow('about-stats');
+			return openWindow('about');
+		},
+		get now() { return now; },
+		get timezone() { return timezone; },
+		get tweaks() { return tweaks; },
+		setTweak,
+		guide: {
+			currentlyAiring: (showId: string) => {
+				const group = groups.find((g) => g.slug === showId);
+				return group ? isOnAir(group, now, timezone) : false;
+			},
+			nextAiring: (showId: string) => {
+				const group = groups.find((g) => g.slug === showId);
+				if (!group) return 'sometime';
+				const next = nextOnAir(group, now, timezone);
+				if (!next) return 'sometime';
+				return formatTimeUntil(next.minutesUntil);
+			},
+			liveCount: () => groups.filter((g) => g.active && isOnAir(g, now, timezone)).length,
+			shows: () => groups.filter((g) => g.active).map((g) => ({
+				id: g.slug,
+				name: g.name,
+				onAir: isOnAir(g, now, timezone)
+			})),
+		},
+		listWindows: () => windows,
+		alert: showAlert,
+		startNewConversation: () => openWindow('tv-guide'),
+	};
+
+	const activeAppId = $derived(activeId ? windowAppId(activeId) : 'finder');
+	const activeApp = $derived(APPS[activeAppId] || APPS.finder);
+
+	const chatContextInfo = $derived.by((): string | undefined => {
+		if (activeApp.id === 'chatrbot' && activeId?.startsWith('chat-')) {
+			const botId = activeId.replace('chat-', '');
+			const bot = bots.find((b) => b.id === botId);
+			return bot?.name;
+		}
+		return undefined;
+	});
+
+	function focusChat(groupSlug: string) {
+		const chatWindow = windows.find((w) => {
+			if (!w.id.startsWith('chat-')) return false;
+			const botId = w.id.replace('chat-', '');
+			const bot = bots.find((b) => b.id === botId);
+			return bot?.group === groupSlug;
+		});
+		if (chatWindow) {
+			focusWindow(chatWindow.id);
+		}
+	}
 </script>
 
+{#if isMobile}
+<div class="mobile-fallback">
+	<h1>terminal<span class="mobile-accent">.bli.net</span></h1>
+	<p class="mobile-tagline">Previously on screens…</p>
+	<div class="mobile-body">
+		<p>Terminal is a retro desktop OS that lives in a browser tab. It's built for screens wide enough to drag windows around on.</p>
+		<p>Open this on a laptop or desktop to get the full experience — menu bar, draggable windows, a TV Guide, and characters you can chat with.</p>
+	</div>
+	<div class="mobile-footer">terminal.bli.net · built in a garage</div>
+</div>
+{:else}
 <div class="desktop" data-wallpaper={tweaks.wallpaper}>
-	<MenuBar onopen={openWindow} openWindows={windows.length} {isRecording} />
+	<MenuBar
+		app={activeApp}
+		{os}
+		openWindows={windows.length}
+		{isRecording}
+		contextInfo={chatContextInfo}
+		{now}
+		{timezone}
+		onSetTimezone={setTimezone}
+	/>
 
 	{#if !isMobile || windows.length === 0}
 		<div class="desktop-icons left">
-			<DesktopIcon label="chatrbot HD" ondblclick={() => openWindow('welcome')}>
+			<DesktopIcon label="Terminal HD" ondblclick={() => openWindow('welcome')}>
 				<PixelIcon kind="hd" />
 			</DesktopIcon>
 			<DesktopIcon label="TV Guide.app" ondblclick={() => openWindow('tv-guide')}>
@@ -203,19 +397,26 @@
 			<DesktopIcon label="Pricing.txt" ondblclick={() => openWindow('pricing')}>
 				<PixelIcon kind="doc" accent />
 			</DesktopIcon>
+			<DesktopIcon label="Stats.app" ondblclick={() => openWindow('stats')}>
+				<PixelIcon kind="calc" />
+			</DesktopIcon>
+			<DesktopIcon label="DO_NOT_OPEN" ondblclick={() => openWindow('error')}>
+				<PixelIcon kind="floppy" />
+			</DesktopIcon>
 			<DesktopIcon label="Trash" ondblclick={() => openWindow('trash')}>
 				<PixelIcon kind="trash" />
 			</DesktopIcon>
 		</div>
 
 		<div class="sticky">
-			<h4>v3 launch — todo</h4>
+			<h4>v1 launch — todo</h4>
 			<div class="sticky-body">
-				☑ ship 6 shows<br />
-				☑ build desktop OS<br />
+				☑ ship Seinfeld<br />
+				☑ ship The Office<br />
 				☒ get sued<br />
 				☐ teach Kramer to type<br />
-				☐ <i>"try Game of Thrones?"</i>
+				☐ figure out Joey/Phoebe<br />
+				☐ <i>"try Succession?"</i>
 			</div>
 		</div>
 	{/if}
@@ -237,43 +438,19 @@
 			onresize={resizeWindow}
 		>
 			{#if w.id === 'welcome'}
-				<div class="window-content welcome-content">
-					<h1 class="welcome-title">chatrbot<span class="accent">.ai</span><span class="blink-cursor"></span></h1>
-					<div class="lede">
-						<b>It's like a group chat,</b> except the group is Jerry, George, Kramer & Elaine.
-						Or Michael & the gang from Scranton. Or Picard on the bridge. You get it.
-					</div>
-					<p class="tagline">
-						We took ~6,000 episodes of TV nobody can shut up about, fed them to some very rude
-						language models, and built a desktop OS around them. You can text these people now.
-						They will text back. Mostly in character. Sometimes too in character.
-					</p>
-					<div class="btn-row">
-						<button class="btn primary" onclick={() => openWindow('tv-guide')}>OPEN TV GUIDE &rarr;</button>
-						<button class="btn" onclick={() => openWindow('about')}>What is this?</button>
-					</div>
-					<div class="logo-marquee">
-						<div class="logo-marquee-track">
-							<span>&#9733; AS SEEN ON: your roommate's TikTok</span>
-							<span>&#9733; FEATURED IN: a Reddit thread you'd be embarrassed by</span>
-							<span>&#9733; TRUSTED BY: 4 cousins and a guy named Doug</span>
-							<span>&#9733; ZERO (0) VENTURE FUNDING</span>
-							<span>&#9733; AS SEEN ON: your roommate's TikTok</span>
-							<span>&#9733; FEATURED IN: a Reddit thread you'd be embarrassed by</span>
-							<span>&#9733; TRUSTED BY: 4 cousins and a guy named Doug</span>
-							<span>&#9733; ZERO (0) VENTURE FUNDING</span>
-						</div>
-					</div>
-					<p class="muted" style="margin:0;">
-						&uarr; open windows by double-clicking the icons, dragging stuff around, or pretending it's 1994.
-					</p>
-				</div>
+				<WelcomeWindow onopen={openWindow} />
 			{:else if w.id === 'tv-guide'}
 				<TVGuide
 					{groups}
 					{bots}
 					{timezone}
+					{now}
+					{activeChatGroupSlug}
+					gridLoop={tweaks.tvGridLoop}
+					marqueeLoop={tweaks.marqueeLoop}
+					pauseOnHover={tweaks.tvPauseOnHover}
 					onOpenChat={openChat}
+					onFocusChat={focusChat}
 					onSubscribe={handleSubscribe}
 				/>
 			{:else if w.id.startsWith('chat-')}
@@ -284,123 +461,114 @@
 					<ChatWindow
 						{bot}
 						minutesLeft={group ? minutesRemaining(group, now, timezone) : null}
+						offAir={group ? !isOnAir(group, now, timezone) : true}
 					/>
 				{/if}
+			{:else if w.id === 'terminal-prefs'}
+				<div class="window-content prefs-content">
+					<h3 class="prefs-heading">TERMINAL PREFERENCES</h3>
+					<div class="pref-row">
+						<div class="pref-label">WALLPAPER</div>
+						<div style="display: flex; gap: 6px; flex-wrap: wrap;">
+							{#each [
+								{ value: 'teal', label: 'Teal', color: '#5e8585' },
+								{ value: 'speckle', label: 'Speckle', color: '#c8bda6' },
+								{ value: 'yellow', label: 'Yellow', color: '#f9bd2b' },
+								{ value: 'pink', label: 'Pink', color: '#ee63b3' },
+								{ value: 'navy', label: 'Navy', color: '#16243a' },
+							] as opt}
+								<button
+									class="btn btn-with-chip {tweaks.wallpaper === opt.value ? 'selected' : ''}"
+									onclick={() => setTweak('wallpaper', opt.value)}
+								>
+									<span class="btn-chip" style:background={opt.color}></span>
+									{opt.label}
+								</button>
+							{/each}
+						</div>
+						<div class="pref-hint">desktop pattern — survives reload</div>
+					</div>
+					<div class="pref-row">
+						<div class="pref-label">ACCENT</div>
+						<div style="display: flex; gap: 6px;">
+							{#each ['#f54e00', '#2b6cb0', '#a6f000', '#ff79c6', '#0a0a0a'] as c}
+								<button
+									class="btn btn-swatch {tweaks.accent === c ? 'selected' : ''}"
+									style:background={c}
+									onclick={() => setTweak('accent', c)}
+									title={c}
+								></button>
+							{/each}
+						</div>
+						<div class="pref-hint">primary call-to-action color across the OS</div>
+					</div>
+					<p class="muted" style="margin-top: 14px; font-size: 15px;">
+						App-specific settings live in each app's Help → Preferences menu.
+					</p>
+				</div>
+			{:else if w.id === 'tvguide-prefs'}
+				<div class="window-content prefs-content">
+					<h3 class="prefs-heading">TV GUIDE PREFERENCES</h3>
+					<div class="pref-row">
+						<div class="pref-label">GRID LOOP</div>
+						<input
+							type="range" min={30} max={400} step={5}
+							value={tweaks.tvGridLoop}
+							oninput={(e) => setTweak('tvGridLoop', parseInt((e.target as HTMLInputElement).value, 10))}
+							style="width: 100%;"
+						/>
+						<div class="pref-hint">{tweaks.tvGridLoop}s · how long for the timeline to scroll a full 24 hours</div>
+					</div>
+					<div class="pref-row">
+						<div class="pref-label">MARQUEE LOOP</div>
+						<input
+							type="range" min={10} max={120} step={2}
+							value={tweaks.marqueeLoop}
+							oninput={(e) => setTweak('marqueeLoop', parseInt((e.target as HTMLInputElement).value, 10))}
+							style="width: 100%;"
+						/>
+						<div class="pref-hint">{tweaks.marqueeLoop}s · bottom chyron drift speed</div>
+					</div>
+					<div class="pref-row">
+						<div class="pref-label">PAUSE ON HOVER</div>
+						<label style="display: flex; gap: 8px; align-items: center; cursor: pointer;">
+							<input
+								type="checkbox"
+								checked={tweaks.tvPauseOnHover}
+								onchange={(e) => setTweak('tvPauseOnHover', (e.target as HTMLInputElement).checked)}
+							/>
+							<span>{tweaks.tvPauseOnHover ? 'on' : 'off'}</span>
+						</label>
+						<div class="pref-hint">freeze the auto-scroll when your mouse is over the grid</div>
+					</div>
+					<p class="muted" style="margin-top: 16px; font-size: 15px;">
+						Wallpaper, accent color, and other OS-wide settings live in the <span class="kbd">●</span> menu → Tweaks…
+					</p>
+				</div>
+			{:else if w.id === 'chatrbot-prefs'}
+				<div class="window-content prefs-content">
+					<h3 class="prefs-heading">CHATRBOT PREFERENCES</h3>
+					<p style="opacity: 0.7;">No preferences yet — the chat just chats.</p>
+					<p class="muted" style="margin-top: 12px; font-size: 15px;">
+						Coming later: typing speed, sound effects, default opener.
+					</p>
+				</div>
 			{:else if w.id === 'pricing'}
-				<div class="window-content readme">
-					<pre class="pricing-txt">Pricing.txt
-===========
-
-Tier 1: $0/mo — current tier, also the only tier
-Tier 2: $0/mo — same as Tier 1, but in a different font
-Tier 3: lol
-
-FAQ:
-Q: Is this really free?
-A: Yes.
-Q: How?
-A: I write code at night and own the domain.
-Q: Can I buy you a coffee?
-A: That's nice. No.</pre>
-				</div>
+				<PricingContent />
 			{:else if w.id === 'readme'}
-				<div class="window-content readme">
-					<h3>README.TXT — v3.0</h3>
-					<p>
-						welcome to chatrbot.ai — a desktop full of chats with people who don't
-						exist (in this universe). shows have broadcast schedules. you can only
-						chat when they're on the air.
-					</p>
-					<h3>HOW IT WORKS</h3>
-					<p>
-						1. check the <b>TV Guide</b>. 2. find a show that's on. 3. click a
-						character. 4. they reply, in character.
-					</p>
-					<h3>KEYBOARD SHORTCUTS</h3>
-					<ul>
-						<li><span class="kbd">⌘G</span> TV Guide</li>
-						<li><span class="kbd">⌘W</span> close window</li>
-					</ul>
-					<h3>HOUSE RULES</h3>
-					<ul>
-						<li>characters can be rude. that is the point.</li>
-						<li>shows go off-air. that is also the point.</li>
-						<li>screenshots are encouraged, framed printouts are unhinged.</li>
-					</ul>
-					<h3>FAQ</h3>
-					<p>
-						<b>Is this legal?</b> Probably. Parody is. We're not licensed by anyone.
-					</p>
-					<p>
-						<b>Does it use AI?</b> Yes. We won't pretend it doesn't. The vibes are
-						100% homemade.
-					</p>
-				</div>
-			{:else if w.id === 'about'}
-				<div class="window-content readme">
-					<div class="about-header">
-						<div class="about-icon">:)</div>
-						<div>
-							<div class="about-title">chatrbot.ai</div>
-							<div class="about-version">
-								Version 3.0 "Pilot" · Built in a garage · Yes, like that one
-							</div>
-						</div>
-					</div>
-					<h3>WHAT</h3>
-					<p>
-						a chat simulator for casts of TV shows. it runs on the world's most
-						expensive improv troupe. shows have broadcast schedules — you can only
-						chat when they're on.
-					</p>
-					<h3>WHY</h3>
-					<p>
-						your favorite show ended. you want one more episode. we can't do that.
-						but we can have George yell at you for forgetting milk.
-					</p>
-					<h3>WHO</h3>
-					<p>one person, zero VCs. ships when the code compiles.</p>
-					<h3>DISCLAIMER</h3>
-					<p>
-						These are AI characters. Not the real people, alive or fictional.
-						Conversations are private (we don't store them server-side). The shows
-						are when they're on.
-					</p>
-				</div>
+				<ReadmeContent />
+			{:else if w.id === 'about' || w.id.startsWith('about-')}
+				{@const aboutAppId = w.id === 'about' ? 'finder' : w.id.replace('about-', '')}
+				{@const aboutApp = APPS[aboutAppId]}
+				{#if aboutApp?.about}
+					<AboutAppWindow about={aboutApp.about} />
+				{/if}
+			{:else if w.id === 'stats'}
+				<StatsWindow showCount={groups.filter((g) => g.active).length} botCount={bots.length} />
 			{:else if w.id === 'error'}
-				<div class="window-content error-content">
-					<div class="bomb">⚠</div>
-					<div>
-						<div class="error-title">Sorry, a system error occurred.</div>
-						<div class="error-detail">
-							"ID = -42: hubris overflow"<br />
-							<span class="muted">You knew this would happen.</span>
-						</div>
-						<div class="error-btns">
-							<button class="btn" onclick={() => closeWindow('error')}>
-								Restart
-							</button>
-							<button class="btn primary" onclick={() => closeWindow('error')}>
-								Forget it
-							</button>
-						</div>
-					</div>
-				</div>
+				<ErrorDialog onclose={() => closeWindow('error')} />
 			{:else if w.id === 'trash'}
-				<div class="window-content readme">
-					<h3>TRASH</h3>
-					<p>In here you'll find:</p>
-					<ul>
-						<li>The pilot script</li>
-						<li>Whatever Charlie ate</li>
-						<li>"a Nigerian prince" — clearly real, do not delete</li>
-						<li>Season 9 of every show</li>
-						<li>A half-finished Game of Thrones bot (it refused to end)</li>
-					</ul>
-					<p class="muted">
-						Empty Trash from the Special menu. Or don't. Lot of memories in there.
-					</p>
-				</div>
+				<TrashWindow />
 			{:else}
 				<div class="window-content">
 					<p>Coming soon...</p>
@@ -410,9 +578,84 @@ A: That's nice. No.</pre>
 	{/each}
 
 	<Dock onopen={openWindow} openIds={windows.map((w) => w.id)} />
+
+	{#if alertSpec}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="system-alert-backdrop" onclick={(e) => e.stopPropagation()}>
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="system-alert window" onclick={(e) => e.stopPropagation()}>
+				<div class="window-titlebar" style="cursor: default;">
+					<div class="btns">
+						<button class="window-btn close" onclick={dismissAlert} aria-label="close"></button>
+					</div>
+					<div class="title">{alertSpec.title || 'System Alert'}</div>
+				</div>
+				<div class="window-body" style="padding: 18px; display: flex; gap: 14px;">
+					<div class="bomb">⚠</div>
+					<div style="flex: 1; min-width: 0;">
+						<div style="font-family: 'Press Start 2P', monospace; font-size: 11px; margin-bottom: 10px; line-height: 1.4;">
+							{alertSpec.title}
+						</div>
+						<div style="font-family: 'VT323', monospace; font-size: 17px; margin-bottom: 14px; line-height: 1.3;">
+							{alertSpec.body}
+						</div>
+						<div style="display: flex; gap: 8px; flex-wrap: wrap;">
+							{#each alertSpec.buttons || [{ label: 'OK', primary: true }] as b}
+								<button
+									class="btn {b.primary ? 'primary' : ''}"
+									onclick={() => { dismissAlert(); b.action?.(); }}
+								>{b.label}</button>
+							{/each}
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
+{/if}
 
 <style>
+	.mobile-fallback {
+		position: fixed;
+		inset: 0;
+		background: var(--brand-color-teal);
+		color: var(--brand-color-paper);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 32px 24px;
+		text-align: center;
+		font-family: var(--brand-font-body, 'VT323', monospace);
+	}
+	.mobile-fallback h1 {
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
+		font-size: 20px;
+		margin: 0 0 8px;
+		font-weight: normal;
+		letter-spacing: -0.5px;
+	}
+	.mobile-accent { color: var(--brand-color-orange); }
+	.mobile-tagline {
+		font-family: var(--brand-font-body, 'VT323', monospace);
+		font-size: 24px;
+		margin: 0 0 24px;
+		opacity: 0.85;
+	}
+	.mobile-body {
+		font-size: 20px;
+		line-height: 1.4;
+		max-width: 360px;
+	}
+	.mobile-body p { margin: 0 0 12px; }
+	.mobile-footer {
+		margin-top: 32px;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
+		font-size: 8px;
+		opacity: 0.5;
+		letter-spacing: 0.05em;
+	}
 	.desktop {
 		position: fixed;
 		inset: 0;
@@ -526,159 +769,48 @@ A: That's nice. No.</pre>
 		font-size: 18px;
 		line-height: 1.35;
 	}
-	.readme h3 {
-		font-family: 'Press Start 2P', monospace;
-		font-size: 10px;
-		margin: 14px 0 6px;
-		font-weight: normal;
-	}
-	.readme h3:first-child {
-		margin-top: 0;
-	}
-	.readme p {
-		margin: 0 0 8px;
-	}
-	.readme ul {
-		padding-left: 18px;
-		margin: 4px 0 8px;
-	}
-	.readme li {
-		margin: 2px 0;
-	}
-	.pricing-txt {
+
+	/* Preferences windows */
+	.prefs-content {
 		font-family: 'VT323', monospace;
 		font-size: 18px;
-		line-height: 1.4;
-		white-space: pre-wrap;
-		margin: 0;
-		padding: 14px;
 	}
-	.about-header {
-		display: flex;
-		gap: 14px;
-		align-items: center;
-		border-bottom: 2px solid var(--ink);
+	.prefs-heading {
+		font-family: 'Press Start 2P', monospace;
+		font-size: 11px;
+		margin: 0 0 14px;
+		font-weight: normal;
+	}
+	.pref-row {
+		margin-bottom: 14px;
+		border-bottom: 1px solid var(--paper-soft);
 		padding-bottom: 12px;
-		margin-bottom: 12px;
 	}
-	.about-icon {
-		width: 64px;
-		height: 64px;
-		background: var(--accent-2);
-		border: 2px solid var(--ink);
-		display: grid;
-		place-items: center;
+	.pref-label {
 		font-family: 'Press Start 2P', monospace;
-		font-size: 22px;
+		font-size: 9px;
+		margin-bottom: 6px;
 	}
-	.about-title {
-		font-family: 'Press Start 2P', monospace;
+	.pref-hint {
+		opacity: 0.6;
 		font-size: 14px;
-	}
-	.about-version {
-		font-family: 'VT323', monospace;
-		font-size: 17px;
-		opacity: 0.8;
 		margin-top: 4px;
 	}
-	.error-content {
-		padding: 18px;
-		display: flex;
-		gap: 14px;
-		font-family: 'Pixelify Sans', sans-serif;
-		font-size: 14px;
-		height: 100%;
-		box-sizing: border-box;
-	}
-	.bomb {
-		width: 44px;
-		height: 44px;
-		background: var(--ink);
-		border-radius: 50%;
+
+	/* System alert */
+	.system-alert-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.35);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: var(--paper);
-		font-size: 28px;
-		flex-shrink: 0;
+		z-index: 20000;
 	}
-	.error-title {
-		font-family: 'Press Start 2P', monospace;
-		font-size: 11px;
-		margin-bottom: 10px;
-		line-height: 1.4;
-	}
-	.error-detail {
-		font-family: 'VT323', monospace;
-		font-size: 17px;
-		margin-bottom: 14px;
-		line-height: 1.3;
-	}
-	.error-btns {
-		display: flex;
-		gap: 8px;
-		flex-wrap: wrap;
-	}
-
-	/* Welcome window */
-	.welcome-content {
-		font-family: 'VT323', monospace;
-	}
-	.welcome-title {
-		font-family: 'Press Start 2P', monospace;
-		font-size: 28px;
-		line-height: 1.2;
-		margin: 0 0 14px;
-		letter-spacing: -1px;
-		font-weight: normal;
-	}
-	.welcome-title .accent {
-		color: var(--accent);
-	}
-	.blink-cursor {
-		display: inline-block;
-		width: 14px;
-		height: 24px;
-		background: var(--ink);
-		vertical-align: -4px;
-		margin-left: 4px;
-		animation: blink 1s steps(2, end) infinite;
-	}
-	.lede {
-		font-size: 20px;
-		line-height: 1.35;
-		margin: 0 0 16px;
-		background: var(--accent-2);
-		padding: 10px 12px;
-		border: 2px solid var(--ink);
-	}
-	.tagline {
-		font-size: 22px;
-		line-height: 1.3;
-		margin: 0 0 18px;
-	}
-	.btn-row {
-		display: flex;
-		gap: 10px;
-		flex-wrap: wrap;
-		margin-bottom: 14px;
-	}
-	.logo-marquee {
-		overflow: hidden;
-		border-top: 2px solid var(--ink);
-		border-bottom: 2px solid var(--ink);
-		background: var(--paper-soft);
-		padding: 10px 0;
-		margin: 14px 0;
-	}
-	.logo-marquee-track {
-		display: flex;
-		gap: 36px;
-		animation: scroll-marquee 22s linear infinite;
-		white-space: nowrap;
-		width: max-content;
-		font-family: 'Press Start 2P', monospace;
-		font-size: 11px;
+	:global(.system-alert) {
+		position: relative !important;
+		width: 420px;
+		max-width: calc(100vw - 40px);
 	}
 
 	@media (max-width: 767px) {

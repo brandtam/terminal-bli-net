@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-	<title>chatrbot.ai — chat with the cast</title>
+	<title>Terminal — Previously on screens…</title>
 </svelte:head>
 
 <Desktop />

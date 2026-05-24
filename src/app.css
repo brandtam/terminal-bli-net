@@ -1,10 +1,13 @@
 :root {
-	--bg: #008080;
-	--ink: #0a0a0a;
-	--paper: #ffffff;
+	/* Bridge: old var names → brand tokens.
+	   Existing components use --ink, --paper, etc.
+	   These aliases let them keep working during migration. */
+	--bg: var(--brand-color-teal);
+	--ink: var(--brand-color-ink);
+	--paper: var(--brand-color-paper);
 	--paper-soft: #e9e8df;
-	--accent: #f54e00;
-	--accent-2: #f9bd2b;
+	--accent: var(--brand-color-orange);
+	--accent-2: var(--brand-color-yellow);
 	--shadow: rgba(0, 0, 0, 0.35);
 	--dither: linear-gradient(45deg, #5e8585 25%, transparent 25%, transparent 75%, #5e8585 75%),
 		linear-gradient(45deg, #5e8585 25%, transparent 25%, transparent 75%, #5e8585 75%);
@@ -92,6 +95,34 @@ body {
 .btn.yellow {
 	background: var(--accent-2);
 	color: var(--ink);
+}
+.btn.selected {
+	transform: translate(3px, 3px);
+	box-shadow: 0 0 0 var(--ink);
+}
+.btn-with-chip {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	font-size: 13px;
+}
+.btn-with-chip .btn-chip {
+	width: 12px;
+	height: 12px;
+	border: 1px solid var(--ink);
+	display: inline-block;
+	flex-shrink: 0;
+}
+.btn-swatch {
+	width: 28px;
+	height: 28px;
+	padding: 0;
+}
+.btn:active,
+.btn.selected {
+	transform: translate(3px, 3px);
+	box-shadow: 0 0 0 var(--ink);
 }
 
 .kbd {
