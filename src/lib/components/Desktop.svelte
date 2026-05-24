@@ -34,6 +34,7 @@
 	let windows = $state<WindowState[]>([]);
 	let zCounter = $state(10);
 	let activeId = $state<string | null>(null);
+	let mounted = $state(false);
 	let tweaks = $state<TweaksState>({
 		wallpaper: 'teal',
 		accent: '#f54e00',
@@ -108,6 +109,8 @@
 		};
 		window.addEventListener('keydown', handleKeydown);
 
+		mounted = true;
+
 		return () => {
 			clearInterval(tick);
 			window.removeEventListener('resize', handleResize);
@@ -126,6 +129,7 @@
 	});
 
 	$effect(() => {
+		if (!mounted) return;
 		saveWindows(windows);
 	});
 
