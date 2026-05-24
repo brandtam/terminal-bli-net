@@ -43,7 +43,6 @@
 	});
 	let timezone = $state<string | undefined>(undefined);
 	let now = $state(new Date());
-	let chatBotId = $state<Record<string, string>>({});
 	let isMobile = $state(false);
 
 	onMount(() => {
@@ -224,7 +223,6 @@
 			return;
 		}
 		const windowId = `chat-${bot.id}`;
-		chatBotId[windowId] = bot.id;
 		openWindow(windowId);
 	}
 
