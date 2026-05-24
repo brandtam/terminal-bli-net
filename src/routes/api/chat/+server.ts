@@ -13,7 +13,12 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 	const env = platform.env;
 	const ip = getClientAddress();
 
-	const body = await request.json();
+	let body: unknown;
+	try {
+		body = await request.json();
+	} catch {
+		throw error(400, 'Invalid JSON body');
+	}
 	const { botId, messages, sessionId, sessionMessageCount } = body as {
 		botId: string;
 		messages: ChatMessage[];
