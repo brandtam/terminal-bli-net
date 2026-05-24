@@ -165,11 +165,10 @@
 			trash: { title: 'Trash — empty', w: 380, h: 320 }
 		};
 		if (id.startsWith('chat-')) {
-			const botId = id.replace('chat-', '');
-			const bot = bots.find((b) => b.id === botId);
-			const group = bot ? groups.find((g) => g.slug === bot.group) : null;
+			const showSlug = id.replace('chat-', '');
+			const group = groups.find((g) => g.slug === showSlug);
 			return {
-				title: bot ? `${bot.name} · ${group?.name ?? bot.group}` : 'Chat',
+				title: group ? `chatrbot - ${group.name}` : 'Chat',
 				w: 440,
 				h: 560
 			};
@@ -225,7 +224,7 @@
 		activeId = id;
 	}
 
-	function openChat(group: GroupMeta, bot: Bot) {
+	function openChat(group: GroupMeta) {
 		if (!isShowOnAir(group.slug, channels, now, timezone)) {
 			showAlert({
 				title: `${group.name.toUpperCase()} is off air`,
@@ -237,7 +236,7 @@
 			});
 			return;
 		}
-		const windowId = `chat-${bot.id}`;
+		const windowId = `chat-${group.slug}`;
 		openWindow(windowId);
 	}
 
@@ -250,9 +249,7 @@
 	const activeChatGroupSlug = $derived.by(() => {
 		const chatWindow = windows.find((w) => w.id.startsWith('chat-'));
 		if (!chatWindow) return null;
-		const botId = chatWindow.id.replace('chat-', '');
-		const bot = bots.find((b) => b.id === botId);
-		return bot?.group ?? null;
+		return chatWindow.id.replace('chat-', '');
 	});
 
 	function setTimezone(tz: string) {
@@ -275,9 +272,7 @@
 			if (appId === 'chatrbot' && payload?.showId) {
 				const showId = payload.showId as string;
 				const group = groups.find((g) => g.slug === showId);
-				const groupBots = bots.filter((b) => b.group === showId);
-				const firstBot = groupBots[0];
-				if (group && firstBot) openChat(group, firstBot);
+				if (group) openChat(group);
 				return;
 			}
 			if (appId === 'textedit') {
@@ -337,20 +332,15 @@
 
 	const chatContextInfo = $derived.by((): string | undefined => {
 		if (activeApp.id === 'chatrbot' && activeId?.startsWith('chat-')) {
-			const botId = activeId.replace('chat-', '');
-			const bot = bots.find((b) => b.id === botId);
-			return bot?.name;
+			const showSlug = activeId.replace('chat-', '');
+			const group = groups.find((g) => g.slug === showSlug);
+			return group?.name;
 		}
 		return undefined;
 	});
 
 	function focusChat(groupSlug: string) {
-		const chatWindow = windows.find((w) => {
-			if (!w.id.startsWith('chat-')) return false;
-			const botId = w.id.replace('chat-', '');
-			const bot = bots.find((b) => b.id === botId);
-			return bot?.group === groupSlug;
-		});
+		const chatWindow = windows.find((w) => w.id === `chat-${groupSlug}`);
 		if (chatWindow) {
 			focusWindow(chatWindow.id);
 		}
@@ -455,16 +445,18 @@
 					onSubscribe={handleSubscribe}
 				/>
 			{:else if w.id.startsWith('chat-')}
-				{@const botId = w.id.replace('chat-', '')}
-				{@const bot = bots.find((b) => b.id === botId)}
-				{@const group = bot ? groups.find((g) => g.slug === bot.group) : null}
-				{#if bot}
+				{@const showSlug = w.id.replace('chat-', '')}
+				{@const group = groups.find((g) => g.slug === showSlug)}
+				{@const showBots = bots.filter((b) => b.group === showSlug)}
+				{#if group && showBots.length > 0}
 					<ChatWindow
-						{bot}
-						minutesLeft={group && isShowOnAir(group.slug, channels, now, timezone)
+						{showSlug}
+						showName={group.name}
+						castBots={showBots}
+						minutesLeft={isShowOnAir(group.slug, channels, now, timezone)
 							? 30 - (now.getMinutes() % 30)
 							: null}
-						offAir={group ? !isShowOnAir(group.slug, channels, now, timezone) : true}
+						offAir={!isShowOnAir(group.slug, channels, now, timezone)}
 					/>
 				{/if}
 			{:else if w.id === 'terminal-prefs'}
