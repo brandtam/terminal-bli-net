@@ -4,6 +4,9 @@
 	"compatibility_flags": ["nodejs_compat"],
 	"pages_build_output_dir": ".svelte-kit/cloudflare",
 
+	// For production: replace PLACEHOLDER_KV_ID with a real namespace ID from
+	// `wrangler kv namespace create KV`, or bind via the Pages dashboard.
+	// The placeholder works for local dev (miniflare creates an in-memory KV).
 	"kv_namespaces": [
 		{
 			"binding": "KV",
