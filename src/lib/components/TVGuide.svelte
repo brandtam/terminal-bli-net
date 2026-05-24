@@ -318,7 +318,7 @@
 		}
 	});
 
-	const animState = { gridLoop: gridLoop, paused: false };
+	const animState = { gridLoop: 0, paused: false };
 	$effect(() => { animState.gridLoop = gridLoop; });
 	$effect(() => { animState.paused = paused; });
 
