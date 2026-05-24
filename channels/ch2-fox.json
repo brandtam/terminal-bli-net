@@ -1,0 +1,248 @@
+{
+  "slug": "ch2-fox",
+  "name": "FOX Comedy",
+  "number": 5,
+  "network": "FOX",
+  "schedule": [
+    {
+      "showSlug": "seinfeld",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 2,
+      "episode": 3
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 2,
+      "episode": 11
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 6
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 17
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 19
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 2
+    },
+    {
+      "showSlug": "office",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 1
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 5
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 10
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 12
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 20
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 22
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 4,
+      "episode": 11
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 4,
+      "episode": 17
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 2,
+      "episode": 3
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 2,
+      "episode": 4
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 2,
+      "episode": 6
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 3
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 12
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 2,
+      "episode": 9
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 2,
+      "episode": 13
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 2,
+      "episode": 16
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 2,
+      "episode": 18
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 3,
+      "episode": 2
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 3,
+      "episode": 5
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 4,
+      "episode": 20
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 5,
+      "episode": 2
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 3,
+      "episode": 7
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 3,
+      "episode": 9
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 3,
+      "episode": 11
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 3,
+      "episode": 12
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 15
+    },
+    {
+      "showSlug": "office",
+      "season": 2,
+      "episode": 18
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 3,
+      "episode": 13
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 2
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 5
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 10
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 12
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 20
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 22
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 5,
+      "episode": 13
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 5,
+      "episode": 21
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 2,
+      "episode": 3
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 2,
+      "episode": 4
+    }
+  ]
+}
