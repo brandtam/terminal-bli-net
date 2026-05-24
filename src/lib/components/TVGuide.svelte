@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { GroupMeta, Bot } from '$lib/types';
-	import { isOnAir, minutesRemaining, isSlotActive } from '$lib/schedule';
+	import { isOnAir, minutesRemaining } from '$lib/schedule';
 	import { onMount } from 'svelte';
 
 	let {
@@ -266,15 +266,6 @@
 	let scrollerEl = $state<HTMLDivElement | null>(null);
 	let paused = $state(false);
 	let featured = $state<FeaturedShow | null>(null);
-
-	let halfHourKey = $derived.by(() => {
-		const opts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
-		if (timezone) opts.timeZone = timezone;
-		const parts = new Intl.DateTimeFormat('en-US', opts).formatToParts(now);
-		const h = parts.find((p) => p.type === 'hour')?.value ?? '0';
-		const m = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0');
-		return `${h}:${m >= 30 ? '30' : '00'}`;
-	});
 
 	let slots = $derived(buildTimeSlots(now, timezone));
 
