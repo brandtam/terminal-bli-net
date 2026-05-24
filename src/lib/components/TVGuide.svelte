@@ -382,11 +382,12 @@
 		{@const feat = featured}
 		{@const featuredGroup = groups.find((g) => g.slug === feat.groupSlug)}
 		{@const featuredBots = featuredGroup ? getGroupBots(featuredGroup) : []}
+		{@const liveNow = featuredGroup ? isOnAir(featuredGroup, now, timezone) : false}
 		<div class="tvg-preview">
 			<div class="tvg-preview-bar">
 				<span class="tvg-preview-net">{feat.net} · CHANNEL {feat.ch}</span>
 				<span class="tvg-preview-time">
-					{#if feat.isLive}ON NOW{:else}UPCOMING{/if}
+					{#if liveNow}ON NOW{:else}UPCOMING{/if}
 					{#if feat.runtime}<span class="tvg-preview-runtime">· {feat.runtime}</span>{/if}
 				</span>
 			</div>
@@ -405,7 +406,7 @@
 						<span class="tvg-preview-line">"{PREVIEW_LINES[feat.groupSlug] || '...'}"</span>
 					</div>
 				</div>
-				{#if feat.isLive && featuredGroup}
+				{#if liveNow && featuredGroup}
 					<button
 						class="tvg-preview-cta"
 						onclick={() => {
