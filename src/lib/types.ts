@@ -71,17 +71,3 @@ export interface TweaksState {
 	tvPauseOnHover: boolean;
 }
 
-export interface MenuItem {
-	label: string;
-	shortcut?: string;
-	disabled?: boolean;
-	action?: () => void;
-	separator?: boolean;
-}
-
-export interface AppMenuConfig {
-	appName: string;
-	appMenu: MenuItem[];
-	contextMenus: Record<string, MenuItem[]>;
-	contextInfo?: string;
-}

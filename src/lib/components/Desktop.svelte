@@ -232,18 +232,6 @@
 		// TODO: open email opt-in
 	}
 
-	function getShowColors(slug: string): string {
-		const colors: Record<string, string> = {
-			mash: '#a6f000',
-			seinfeld: '#f9bd2b',
-			office: '#a6d8ff',
-			'arrested-development': '#f54e00',
-			'star-trek-tng': '#2b6cb0',
-			'parks-and-rec': '#ff79c6'
-		};
-		return colors[slug] || '#a6f000';
-	}
-
 	const isRecording = $derived(currentlyAiring(groups, now, timezone).length > 0);
 
 	const activeChatGroupSlug = $derived.by(() => {

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { AppDef, AppMenuSpec, AppMenuItem, OsApi, StatusExtra } from '$lib/os/os-api';
+	import type { AppDef, AppMenuItem, OsApi } from '$lib/os/os-api';
 
 	let {
 		app,
