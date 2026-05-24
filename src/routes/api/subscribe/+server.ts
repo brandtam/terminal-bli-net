@@ -8,7 +8,12 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		throw error(500, 'Platform bindings not available');
 	}
 
-	const body = await request.json();
+	let body: unknown;
+	try {
+		body = await request.json();
+	} catch {
+		throw error(400, 'Invalid JSON body');
+	}
 	const { email, timezone, shows } = body as {
 		email?: string;
 		timezone?: string;
