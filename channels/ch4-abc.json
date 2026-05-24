@@ -5,24 +5,24 @@
   "network": "ABC",
   "schedule": [
     {
-      "showSlug": "parks-and-rec",
-      "season": 2,
-      "episode": 1
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 20
     },
     {
-      "showSlug": "parks-and-rec",
+      "showSlug": "arrested-development",
       "season": 2,
-      "episode": 5
+      "episode": 4
     },
     {
-      "showSlug": "parks-and-rec",
-      "season": 2,
-      "episode": 10
+      "showSlug": "seinfeld",
+      "season": 8,
+      "episode": 19
     },
     {
-      "showSlug": "parks-and-rec",
-      "season": 2,
-      "episode": 16
+      "showSlug": "seinfeld",
+      "season": 7,
+      "episode": 11
     },
     {
       "showSlug": "parks-and-rec",
@@ -31,43 +31,48 @@
     },
     {
       "showSlug": "parks-and-rec",
-      "season": 2,
-      "episode": 23
+      "season": 3,
+      "episode": 4
     },
     {
-      "showSlug": "office",
-      "season": 1,
-      "episode": 1
-    },
-    {
-      "showSlug": "office",
-      "season": 2,
-      "episode": 1
-    },
-    {
-      "showSlug": "arrested-development",
-      "season": 1,
-      "episode": 1
-    },
-    {
-      "showSlug": "arrested-development",
-      "season": 1,
-      "episode": 2
-    },
-    {
-      "showSlug": "office",
+      "showSlug": "seinfeld",
       "season": 2,
       "episode": 3
     },
     {
-      "showSlug": "office",
-      "season": 2,
-      "episode": 12
+      "showSlug": "seinfeld",
+      "season": 4,
+      "episode": 11
     },
     {
-      "showSlug": "office",
+      "showSlug": "seinfeld",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "arrested-development",
       "season": 2,
-      "episode": 15
+      "episode": 3
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 5
+    },
+    {
+      "showSlug": "mash",
+      "season": 4,
+      "episode": 17
+    },
+    {
+      "showSlug": "mash",
+      "season": 2,
+      "episode": 5
     },
     {
       "showSlug": "office",
@@ -80,49 +85,19 @@
       "episode": 19
     },
     {
-      "showSlug": "parks-and-rec",
+      "showSlug": "arrested-development",
       "season": 3,
-      "episode": 2
-    },
-    {
-      "showSlug": "parks-and-rec",
-      "season": 3,
-      "episode": 4
-    },
-    {
-      "showSlug": "office",
-      "season": 2,
-      "episode": 22
-    },
-    {
-      "showSlug": "office",
-      "season": 3,
-      "episode": 1
-    },
-    {
-      "showSlug": "office",
-      "season": 3,
-      "episode": 6
+      "episode": 12
     },
     {
       "showSlug": "arrested-development",
-      "season": 1,
+      "season": 3,
       "episode": 5
     },
     {
-      "showSlug": "arrested-development",
-      "season": 1,
-      "episode": 10
-    },
-    {
       "showSlug": "office",
-      "season": 3,
-      "episode": 16
-    },
-    {
-      "showSlug": "office",
-      "season": 3,
-      "episode": 23
+      "season": 4,
+      "episode": 14
     },
     {
       "showSlug": "office",
@@ -131,23 +106,53 @@
     },
     {
       "showSlug": "office",
+      "season": 2,
+      "episode": 15
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 12
+    },
+    {
+      "showSlug": "arrested-development",
+      "season": 1,
+      "episode": 22
+    },
+    {
+      "showSlug": "star-trek-tng",
+      "season": 5,
+      "episode": 18
+    },
+    {
+      "showSlug": "star-trek-tng",
+      "season": 6,
+      "episode": 11
+    },
+    {
+      "showSlug": "star-trek-tng",
+      "season": 2,
+      "episode": 16
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 5,
+      "episode": 2
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 5,
+      "episode": 22
+    },
+    {
+      "showSlug": "seinfeld",
       "season": 4,
-      "episode": 14
-    },
-    {
-      "showSlug": "office",
-      "season": 5,
-      "episode": 1
-    },
-    {
-      "showSlug": "office",
-      "season": 5,
-      "episode": 14
+      "episode": 20
     },
     {
       "showSlug": "parks-and-rec",
-      "season": 3,
-      "episode": 8
+      "season": 2,
+      "episode": 16
     },
     {
       "showSlug": "parks-and-rec",
@@ -155,94 +160,89 @@
       "episode": 13
     },
     {
-      "showSlug": "office",
+      "showSlug": "star-trek-tng",
+      "season": 6,
+      "episode": 21
+    },
+    {
+      "showSlug": "star-trek-tng",
       "season": 5,
-      "episode": 26
-    },
-    {
-      "showSlug": "office",
-      "season": 6,
-      "episode": 4
-    },
-    {
-      "showSlug": "office",
-      "season": 6,
-      "episode": 12
-    },
-    {
-      "showSlug": "office",
-      "season": 7,
-      "episode": 17
-    },
-    {
-      "showSlug": "arrested-development",
-      "season": 1,
-      "episode": 12
-    },
-    {
-      "showSlug": "arrested-development",
-      "season": 1,
-      "episode": 20
-    },
-    {
-      "showSlug": "office",
-      "season": 7,
-      "episode": 19
-    },
-    {
-      "showSlug": "office",
-      "season": 7,
-      "episode": 22
-    },
-    {
-      "showSlug": "office",
-      "season": 9,
-      "episode": 23
-    },
-    {
-      "showSlug": "office",
-      "season": 1,
-      "episode": 1
-    },
-    {
-      "showSlug": "office",
-      "season": 2,
-      "episode": 1
-    },
-    {
-      "showSlug": "office",
-      "season": 2,
-      "episode": 3
-    },
-    {
-      "showSlug": "office",
-      "season": 2,
-      "episode": 12
-    },
-    {
-      "showSlug": "office",
-      "season": 2,
-      "episode": 15
-    },
-    {
-      "showSlug": "parks-and-rec",
-      "season": 4,
       "episode": 2
     },
     {
+      "showSlug": "star-trek-tng",
+      "season": 6,
+      "episode": 10
+    },
+    {
+      "showSlug": "star-trek-tng",
+      "season": 1,
+      "episode": 23
+    },
+    {
+      "showSlug": "star-trek-tng",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "mash",
+      "season": 3,
+      "episode": 2
+    },
+    {
+      "showSlug": "mash",
+      "season": 3,
+      "episode": 24
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 3,
+      "episode": 17
+    },
+    {
+      "showSlug": "seinfeld",
+      "season": 6,
+      "episode": 12
+    },
+    {
+      "showSlug": "office",
+      "season": 1,
+      "episode": 1
+    },
+    {
+      "showSlug": "office",
+      "season": 3,
+      "episode": 1
+    },
+    {
+      "showSlug": "office",
+      "season": 5,
+      "episode": 14
+    },
+    {
+      "showSlug": "mash",
+      "season": 5,
+      "episode": 20
+    },
+    {
+      "showSlug": "mash",
+      "season": 1,
+      "episode": 22
+    },
+    {
+      "showSlug": "parks-and-rec",
+      "season": 5,
+      "episode": 14
+    },
+    {
+      "showSlug": "parks-and-rec",
+      "season": 5,
+      "episode": 16
+    },
+    {
       "showSlug": "parks-and-rec",
       "season": 4,
       "episode": 4
-    },
-    {
-      "showSlug": "office",
-      "season": 2,
-      "episode": 18
-    },
-    {
-      "showSlug": "office",
-      "season": 2,
-      "episode": 19
     }
   ]
 }
