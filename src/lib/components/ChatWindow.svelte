@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { marked } from 'marked';
+	import DOMPurify from 'dompurify';
 	import type { Bot, ChatMessage, TextChunk } from '$lib/types';
 	import { loadConversations, saveConversation, getSessionId } from '$lib/persistence';
 	import { formatTimeUntil } from '$lib/schedule';
@@ -129,8 +130,19 @@
 		}
 	}
 
+	const ALLOWED_TAGS = [
+		'p', 'em', 'strong', 'code', 'pre', 'ul', 'ol', 'li', 'a', 'br',
+		'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'span', 'del'
+	];
+	const ALLOWED_ATTR = ['href', 'title'];
+
 	function renderMarkdown(text: string): string {
-		return marked.parse(text, { async: false }) as string;
+		const raw = marked.parse(text, { async: false }) as string;
+		return DOMPurify.sanitize(raw, {
+			ALLOWED_TAGS,
+			ALLOWED_ATTR,
+			ALLOW_DATA_ATTR: false
+		});
 	}
 </script>
 

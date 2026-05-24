@@ -14,6 +14,9 @@ importers:
       agents:
         specifier: ^0.0.67
         version: 0.0.67(@cloudflare/workers-types@4.20260523.1)(react@19.2.6)
+      dompurify:
+        specifier: ^3.4.5
+        version: 3.4.5
       marked:
         specifier: ^15.0.0
         version: 15.0.12
@@ -1376,6 +1379,9 @@ packages:
 
   diff-match-patch@1.0.5:
     resolution: {integrity: sha512-IayShXAgj/QMXgB0IWmKx+rOPuGMhqm5w6jvFxmVenXKIzRqTAAsbBPT3kWQeGANj3jGgvcvv4yK6SxqYmikgw==}
+
+  dompurify@3.4.5:
+    resolution: {integrity: sha512-OrwIBKsdNSVEeubdJ1HBv/wNENRM9ytAVCv7YXt//A3vPdVMNuACRqK9mXCGCBW2ln7BT/A4X0jXHo2Gu89miA==}
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -3496,6 +3502,10 @@ snapshots:
   devalue@5.8.1: {}
 
   diff-match-patch@1.0.5: {}
+
+  dompurify@3.4.5:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
 
   dunder-proto@1.0.1:
     dependencies:
