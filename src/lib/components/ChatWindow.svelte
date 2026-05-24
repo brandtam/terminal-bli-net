@@ -6,25 +6,52 @@
 	import { loadConversations, saveConversation, getSessionId } from '$lib/persistence';
 	import { formatTimeUntil } from '$lib/schedule';
 
+	type ChatMode = 'group' | string; // 'group' or a botId
+
 	let {
-		bot,
+		showSlug,
+		showName,
+		castBots,
 		minutesLeft = null,
 		offAir = false
 	}: {
-		bot: Bot;
+		showSlug: string;
+		showName: string;
+		castBots: Bot[];
 		minutesLeft: number | null;
 		offAir?: boolean;
 	} = $props();
+
+	let chatMode = $state<ChatMode>('group');
 
 	let messages = $state<ChatMessage[]>([]);
 	let input = $state('');
 	let busy = $state(false);
 	let streamingText = $state('');
+	let streamingBotName = $state('');
 	let logEl: HTMLDivElement | undefined = $state();
 	let messageCount = $state(0);
 
+	const castNames = $derived(castBots.map((b) => b.name.split(' ')[0]).join(' · '));
+
+	const showInitials = $derived(
+		showName
+			.split(' ')
+			.map((w) => w[0])
+			.join('')
+			.slice(0, 2)
+	);
+
+	const inputPlaceholder = $derived.by(() => {
+		if (offAir) return `${showName} is off air`;
+		if (busy) return 'typing...';
+		if (chatMode === 'group') return `say something to the room (${showName})...`;
+		const bot = castBots.find((b) => b.id === chatMode);
+		return bot ? `say something to ${bot.name}...` : `say something...`;
+	});
+
 	onMount(() => {
-		const saved = loadConversations()[bot.id];
+		const saved = loadConversations()[showSlug];
 		if (saved) {
 			messages = saved.messages;
 			messageCount = messages.filter((m) => m.role === 'user').length;
@@ -45,6 +72,15 @@
 		}
 	});
 
+	/** Parse `[Name] content` prefix from assistant messages */
+	function parseResponder(content: string): { name: string | null; text: string } {
+		const match = content.match(/^\[([^\]]+)\]\s*/);
+		if (match) {
+			return { name: match[1], text: content.slice(match[0].length) };
+		}
+		return { name: null, text: content };
+	}
+
 	async function send() {
 		const text = input.trim();
 		if (!text || busy) return;
@@ -52,6 +88,14 @@
 		busy = true;
 		streamingText = '';
 		messageCount++;
+
+		// Pick which bot responds
+		const respondingBot =
+			chatMode === 'group'
+				? castBots[Math.floor(Math.random() * castBots.length)]
+				: castBots.find((b) => b.id === chatMode) ?? castBots[0];
+
+		streamingBotName = respondingBot.name;
 
 		const userMsg: ChatMessage = { role: 'user', content: text };
 		messages = [...messages, userMsg];
@@ -61,16 +105,28 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					botId: bot.id,
-					messages: messages.slice(-20),
+					botId: respondingBot.id,
+					messages: messages
+						.slice(-20)
+						.map((m) => {
+							if (m.role === 'assistant') {
+								const { text: stripped } = parseResponder(m.content);
+								return { role: m.role, content: stripped };
+							}
+							return m;
+						}),
 					sessionId: getSessionId()
 				})
 			});
 
 			if (!response.ok) {
 				const err = await response.text();
-				messages = [...messages, { role: 'assistant', content: `[Error: ${err}]` }];
+				messages = [
+					...messages,
+					{ role: 'assistant', content: `[${respondingBot.name}] [Error: ${err}]` }
+				];
 				busy = false;
+				streamingBotName = '';
 				return;
 			}
 
@@ -96,13 +152,16 @@
 					} else if (chunk.type === 'done') {
 						messages = [
 							...messages,
-							{ role: 'assistant', content: streamingText }
+							{ role: 'assistant', content: `[${respondingBot.name}] ${streamingText}` }
 						];
 						streamingText = '';
 					} else if (chunk.type === 'error') {
 						messages = [
 							...messages,
-							{ role: 'assistant', content: `[Error: ${chunk.error}]` }
+							{
+								role: 'assistant',
+								content: `[${respondingBot.name}] [Error: ${chunk.error}]`
+							}
 						];
 						streamingText = '';
 					}
@@ -110,19 +169,23 @@
 			}
 
 			if (streamingText) {
-				messages = [...messages, { role: 'assistant', content: streamingText }];
+				messages = [
+					...messages,
+					{ role: 'assistant', content: `[${respondingBot.name}] ${streamingText}` }
+				];
 				streamingText = '';
 			}
 		} catch (e) {
 			messages = [
 				...messages,
-				{ role: 'assistant', content: `[Connection error: ${e}]` }
+				{ role: 'assistant', content: `[${respondingBot.name}] [Connection error: ${e}]` }
 			];
 		} finally {
 			busy = false;
-			saveConversation(bot.id, {
-				botId: bot.id,
-				group: bot.group,
+			streamingBotName = '';
+			saveConversation(showSlug, {
+				botId: showSlug,
+				group: showSlug,
 				messages,
 				updatedAt: Date.now()
 			});
@@ -156,47 +219,55 @@
 <div class="chat-container">
 	<div class="chat-header">
 		<div class="chat-avatar">
-			{bot.name
-				.split(' ')
-				.map((w) => w[0])
-				.join('')
-				.slice(0, 2)}
+			{showInitials}
 		</div>
 		<div class="who">
-			<span class="name">{bot.name.toUpperCase()}</span>
-			<small>{bot.occupation}</small>
+			<span class="name">{showName.toUpperCase()}</span>
+			<small>{castNames}</small>
 		</div>
-		{#if minutesLeft !== null}
-			<span class="countdown">{formatTimeUntil(minutesLeft)} left</span>
-		{/if}
+		<div class="chat-header-right">
+			{#if minutesLeft !== null}
+				<span class="countdown">{formatTimeUntil(minutesLeft)} left</span>
+			{/if}
+			<select
+				class="mode-select"
+				bind:value={chatMode}
+			>
+				<option value="group">Group Chat</option>
+				{#each castBots as bot}
+					<option value={bot.id}>{bot.name}</option>
+				{/each}
+			</select>
+		</div>
 	</div>
 
 	<div class="chat-log" bind:this={logEl}>
 		<div class="bubble system">
-			— {bot.greeting} —
+			— Switched to {showName}. {castBots.map((b) => b.name.split(' ')[0]).join(', ')} are now in the room. —
 		</div>
-		{#each messages as m, i}
+		{#each messages as m}
 			{#if m.role === 'user'}
 				<div class="bubble user">
 					<span class="who-label">YOU</span>
 					{m.content}
 				</div>
 			{:else}
+				{@const parsed = parseResponder(m.content)}
 				<div class="bubble bot">
-					<span class="who-label">{bot.name.toUpperCase()}</span>
-					{@html renderMarkdown(m.content)}
+					<span class="who-label">{parsed.name?.toUpperCase() ?? showName.toUpperCase()}</span>
+					{@html renderMarkdown(parsed.text)}
 				</div>
 			{/if}
 		{/each}
 		{#if streamingText}
 			<div class="bubble bot streaming">
-				<span class="who-label">{bot.name.toUpperCase()}</span>
+				<span class="who-label">{streamingBotName.toUpperCase()}</span>
 				{@html renderMarkdown(streamingText)}
 			</div>
 		{/if}
 		{#if busy && !streamingText}
 			<div class="bubble bot typing">
-				<span class="who-label">{bot.name.toUpperCase()} is typing</span>
+				<span class="who-label">{streamingBotName.toUpperCase()} is typing</span>
 				<span class="dot">●</span><span class="dot">●</span><span class="dot">●</span>
 			</div>
 		{/if}
@@ -204,14 +275,14 @@
 
 	{#if offAir}
 		<div class="off-air-banner">
-			{bot.name.toUpperCase()} has gone off air. Check the TV Guide for what's on now.
+			{showName.toUpperCase()} has gone off air. Check the TV Guide for what's on now.
 		</div>
 	{/if}
 
 	<form class="chat-input" onsubmit={(e) => { e.preventDefault(); send(); }}>
 		<input
 			bind:value={input}
-			placeholder={offAir ? `${bot.name} is off air` : busy ? 'typing...' : `say something to ${bot.name}...`}
+			placeholder={inputPlaceholder}
 			disabled={busy || offAir}
 		/>
 		<button type="submit" disabled={busy || offAir}>{offAir ? 'OFF AIR' : busy ? '...' : 'SEND'}</button>
@@ -249,6 +320,7 @@
 		font-family: 'Press Start 2P', monospace;
 		font-size: 10px;
 		line-height: 1.4;
+		min-width: 0;
 	}
 	.who small {
 		display: block;
@@ -257,11 +329,27 @@
 		margin-top: 4px;
 		opacity: 0.75;
 	}
-	.countdown {
+	.chat-header-right {
 		margin-left: auto;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 4px;
+		flex-shrink: 0;
+	}
+	.countdown {
 		font-family: 'Press Start 2P', monospace;
 		font-size: 8px;
 		color: var(--accent);
+	}
+	.mode-select {
+		font-family: 'Press Start 2P', monospace;
+		font-size: 8px;
+		background: var(--paper);
+		border: 2px solid var(--ink);
+		padding: 3px 6px;
+		cursor: pointer;
+		color: var(--ink);
 	}
 	.chat-log {
 		flex: 1;
@@ -302,6 +390,7 @@
 	.bubble.bot {
 		align-self: flex-start;
 		background: var(--paper);
+		border-left: 4px solid var(--accent);
 	}
 	.bubble.system {
 		align-self: center;

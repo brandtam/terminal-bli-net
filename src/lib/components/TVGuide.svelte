@@ -26,7 +26,7 @@
 		gridLoop?: number;
 		marqueeLoop?: number;
 		pauseOnHover?: boolean;
-		onOpenChat: (group: GroupMeta, bot: Bot) => void;
+		onOpenChat: (group: GroupMeta) => void;
 		onFocusChat: (groupSlug: string) => void;
 		onSubscribe: (group: GroupMeta) => void;
 	} = $props();
@@ -307,10 +307,7 @@
 		if (!isShowOnAir(cell.showSlug, channels, now, timezone)) return;
 		const group = groups.find(g => g.slug === cell.showSlug);
 		if (!group) return;
-		const groupBots = getGroupBots(group);
-		if (groupBots.length > 0) {
-			onOpenChat(group, groupBots[0]);
-		}
+		onOpenChat(group);
 	}
 </script>
 
@@ -347,10 +344,7 @@
 					<button
 						class="tvg-preview-cta"
 						onclick={() => {
-							if (featuredGroup) {
-								const fBots = getGroupBots(featuredGroup);
-								if (fBots.length > 0) onOpenChat(featuredGroup, fBots[0]);
-							}
+							if (featuredGroup) onOpenChat(featuredGroup);
 						}}
 					>
 						▸ START<br/>CHAT
