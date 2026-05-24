@@ -88,13 +88,13 @@
 
 	function getWindowDef(id: string): { title: string; w: number; h: number } {
 		const defs: Record<string, { title: string; w: number; h: number }> = {
-			'tv-guide': { title: 'TV Guide', w: 480, h: 560 },
+			welcome: { title: 'Welcome.app', w: 460, h: 540 },
+			'tv-guide': { title: 'TV Guide.app', w: 620, h: 540 },
 			pricing: { title: 'Pricing.txt', w: 460, h: 380 },
 			readme: { title: 'README.TXT', w: 380, h: 420 },
 			about: { title: 'About this Mac', w: 380, h: 420 },
 			error: { title: 'System Error', w: 420, h: 260 },
-			trash: { title: 'Trash', w: 380, h: 320 },
-			welcome: { title: 'Welcome.app', w: 460, h: 540 }
+			trash: { title: 'Trash', w: 380, h: 320 }
 		};
 		if (id.startsWith('chat-')) {
 			const botId = id.replace('chat-', '');
@@ -188,32 +188,18 @@
 
 	{#if !isMobile || windows.length === 0}
 		<div class="desktop-icons left">
-			<DesktopIcon label="TV Guide" ondblclick={() => openWindow('tv-guide')}>
-				<PixelIcon kind="guide" />
+			<DesktopIcon label="chatrbot HD" ondblclick={() => openWindow('welcome')}>
+				<PixelIcon kind="hd" />
 			</DesktopIcon>
-			{#each groups.filter((g) => g.active) as group}
-				{@const onAir = isOnAir(group, now, timezone)}
-				<DesktopIcon
-					label={group.name}
-					disabled={!onAir}
-					ondblclick={() => {
-						const groupBots = bots.filter((b) => b.group === group.slug);
-						if (groupBots.length > 0 && onAir) {
-							openChat(group, groupBots[0]);
-						} else {
-							openWindow('tv-guide');
-						}
-					}}
-				>
-					<PixelIcon kind="tv" color={getShowColors(group.slug)} />
-				</DesktopIcon>
-			{/each}
-		</div>
-
-		<div class="desktop-icons right">
+			<DesktopIcon label="TV Guide.app" ondblclick={() => openWindow('tv-guide')}>
+				<PixelIcon kind="tvguide" />
+			</DesktopIcon>
 			<DesktopIcon label="README.txt" ondblclick={() => openWindow('readme')}>
 				<PixelIcon kind="doc" />
 			</DesktopIcon>
+		</div>
+
+		<div class="desktop-icons right">
 			<DesktopIcon label="Pricing.txt" ondblclick={() => openWindow('pricing')}>
 				<PixelIcon kind="doc" accent />
 			</DesktopIcon>
@@ -250,7 +236,39 @@
 			onmove={moveWindow}
 			onresize={resizeWindow}
 		>
-			{#if w.id === 'tv-guide'}
+			{#if w.id === 'welcome'}
+				<div class="window-content welcome-content">
+					<h1 class="welcome-title">chatrbot<span class="accent">.ai</span><span class="blink-cursor"></span></h1>
+					<div class="lede">
+						<b>It's like a group chat,</b> except the group is Jerry, George, Kramer & Elaine.
+						Or Michael & the gang from Scranton. Or Picard on the bridge. You get it.
+					</div>
+					<p class="tagline">
+						We took ~6,000 episodes of TV nobody can shut up about, fed them to some very rude
+						language models, and built a desktop OS around them. You can text these people now.
+						They will text back. Mostly in character. Sometimes too in character.
+					</p>
+					<div class="btn-row">
+						<button class="btn primary" onclick={() => openWindow('tv-guide')}>OPEN TV GUIDE &rarr;</button>
+						<button class="btn" onclick={() => openWindow('about')}>What is this?</button>
+					</div>
+					<div class="logo-marquee">
+						<div class="logo-marquee-track">
+							<span>&#9733; AS SEEN ON: your roommate's TikTok</span>
+							<span>&#9733; FEATURED IN: a Reddit thread you'd be embarrassed by</span>
+							<span>&#9733; TRUSTED BY: 4 cousins and a guy named Doug</span>
+							<span>&#9733; ZERO (0) VENTURE FUNDING</span>
+							<span>&#9733; AS SEEN ON: your roommate's TikTok</span>
+							<span>&#9733; FEATURED IN: a Reddit thread you'd be embarrassed by</span>
+							<span>&#9733; TRUSTED BY: 4 cousins and a guy named Doug</span>
+							<span>&#9733; ZERO (0) VENTURE FUNDING</span>
+						</div>
+					</div>
+					<p class="muted" style="margin:0;">
+						&uarr; open windows by double-clicking the icons, dragging stuff around, or pretending it's 1994.
+					</p>
+				</div>
+			{:else if w.id === 'tv-guide'}
 				<TVGuide
 					{groups}
 					{bots}
@@ -600,6 +618,67 @@ A: That's nice. No.</pre>
 		display: flex;
 		gap: 8px;
 		flex-wrap: wrap;
+	}
+
+	/* Welcome window */
+	.welcome-content {
+		font-family: 'VT323', monospace;
+	}
+	.welcome-title {
+		font-family: 'Press Start 2P', monospace;
+		font-size: 28px;
+		line-height: 1.2;
+		margin: 0 0 14px;
+		letter-spacing: -1px;
+		font-weight: normal;
+	}
+	.welcome-title .accent {
+		color: var(--accent);
+	}
+	.blink-cursor {
+		display: inline-block;
+		width: 14px;
+		height: 24px;
+		background: var(--ink);
+		vertical-align: -4px;
+		margin-left: 4px;
+		animation: blink 1s steps(2, end) infinite;
+	}
+	.lede {
+		font-size: 20px;
+		line-height: 1.35;
+		margin: 0 0 16px;
+		background: var(--accent-2);
+		padding: 10px 12px;
+		border: 2px solid var(--ink);
+	}
+	.tagline {
+		font-size: 22px;
+		line-height: 1.3;
+		margin: 0 0 18px;
+	}
+	.btn-row {
+		display: flex;
+		gap: 10px;
+		flex-wrap: wrap;
+		margin-bottom: 14px;
+	}
+	.logo-marquee {
+		overflow: hidden;
+		border-top: 2px solid var(--ink);
+		border-bottom: 2px solid var(--ink);
+		background: var(--paper-soft);
+		padding: 10px 0;
+		margin: 14px 0;
+	}
+	.logo-marquee-track {
+		display: flex;
+		gap: 36px;
+		animation: scroll-marquee 22s linear infinite;
+		white-space: nowrap;
+		width: max-content;
+		font-family: 'Press Start 2P', monospace;
+		font-size: 11px;
 	}
 
 	@media (max-width: 767px) {

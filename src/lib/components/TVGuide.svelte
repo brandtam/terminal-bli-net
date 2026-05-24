@@ -2,7 +2,6 @@
 	import type { GroupMeta, Bot } from '$lib/types';
 	import {
 		isOnAir,
-		nextOnAir,
 		minutesRemaining,
 		formatTimeUntil,
 		formatSlotTime
@@ -23,7 +22,6 @@
 	} = $props();
 
 	let now = $state(new Date());
-	let selectedDay = $state<number | null>(null);
 
 	$effect(() => {
 		const t = setInterval(() => {
@@ -32,263 +30,323 @@
 		return () => clearInterval(t);
 	});
 
-	const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-	const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+	const channelMap: Record<string, { ch: string; net: string }> = {
+		mash: { ch: '02', net: 'CBS' },
+		seinfeld: { ch: '04', net: 'NBC' },
+		office: { ch: '06', net: 'NBC' },
+		'arrested-development': { ch: '08', net: 'FOX' },
+		'star-trek-tng': { ch: '10', net: 'SYN' },
+		'parks-and-rec': { ch: '12', net: 'NBC' }
+	};
 
 	function getGroupBots(group: GroupMeta): Bot[] {
 		return bots.filter((b) => b.group === group.slug);
 	}
+
+	function getActiveSlots(group: GroupMeta) {
+		return group.schedule.slice(0, 4);
+	}
+
+	function formatGuideDate(d: Date): string {
+		const day = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()];
+		const mon = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getMonth()];
+		let h = d.getHours();
+		const m = String(d.getMinutes()).padStart(2, '0');
+		const ampm = h >= 12 ? 'PM' : 'AM';
+		h = ((h + 11) % 12) + 1;
+		return `${day} ${mon} ${d.getDate()} · ${h}:${m} ${ampm}`;
+	}
+
+	$effect(() => {
+		const t = setInterval(() => {
+			now = new Date();
+		}, 1000);
+		return () => clearInterval(t);
+	});
 </script>
 
-<div class="tv-guide">
-	<div class="guide-header">
-		<span class="title">TV GUIDE</span>
-		<span class="subtitle">chatrbot.ai programming schedule</span>
+<div class="tvguide">
+	<div class="tvg-header">
+		<div class="tvg-date">
+			{formatGuideDate(now)}
+			<span class="tvg-primetime">
+				{#if groups.some((g) => isOnAir(g, now, timezone))}
+					● ON AIR
+				{:else}
+					○ OFF AIR
+				{/if}
+			</span>
+		</div>
+		<div class="tvg-marquee">
+			<div class="tvg-marquee-track">
+				{#each groups.filter((g) => isOnAir(g, now, timezone)) as group}
+					<span>● {group.name.toUpperCase()} — on now</span>
+				{/each}
+				{#each groups.filter((g) => !isOnAir(g, now, timezone)).slice(0, 3) as group}
+					<span>● {group.name.toUpperCase()} — coming soon</span>
+				{/each}
+				{#each groups.filter((g) => isOnAir(g, now, timezone)) as group}
+					<span>● {group.name.toUpperCase()} — on now</span>
+				{/each}
+				{#each groups.filter((g) => !isOnAir(g, now, timezone)).slice(0, 3) as group}
+					<span>● {group.name.toUpperCase()} — coming soon</span>
+				{/each}
+			</div>
+		</div>
 	</div>
 
-	<div class="now-section">
-		<h3>NOW ON AIR</h3>
-		{#each groups.filter((g) => isOnAir(g, now, timezone)) as group}
+	<div class="tvg-grid">
+		<div class="tvg-row tvg-row-head">
+			<div class="tvg-cell tvg-cell-ch">CH</div>
+			<div class="tvg-cell tvg-cell-info">SHOW</div>
+			<div class="tvg-cell tvg-cell-status">STATUS</div>
+			<div class="tvg-cell tvg-cell-chars">CHARACTERS</div>
+		</div>
+
+		{#each groups.filter((g) => g.active) as group}
+			{@const onAir = isOnAir(group, now, timezone)}
 			{@const remaining = minutesRemaining(group, now, timezone)}
-			<div class="now-card">
-				<div class="now-info">
-					<span class="show-name">{group.name}</span>
-					<span class="era">{group.setting} · {group.era}</span>
-					{#if remaining !== null}
-						<span class="remaining">{formatTimeUntil(remaining)} remaining</span>
+			{@const ch = channelMap[group.slug] || { ch: '??', net: '???' }}
+			{@const groupBots = getGroupBots(group)}
+
+			<div class="tvg-row" class:tvg-row-live={onAir}>
+				<div class="tvg-cell tvg-cell-ch">
+					<div class="ch-num">{ch.ch}</div>
+					<div class="ch-net">{ch.net}</div>
+				</div>
+				<div class="tvg-cell tvg-cell-info">
+					<div class="ep-show">{group.name.toUpperCase()}</div>
+					<div class="ep-desc">{group.setting} · {group.era}</div>
+				</div>
+				<div class="tvg-cell tvg-cell-status">
+					{#if onAir}
+						<span class="status-live">
+							<span class="now-dot">●</span> LIVE
+						</span>
+						{#if remaining !== null}
+							<span class="status-time">{formatTimeUntil(remaining)} left</span>
+						{/if}
+					{:else}
+						<span class="status-off">OFF AIR</span>
+						<button class="btn-notify" onclick={() => onSubscribe(group)}>
+							notify me
+						</button>
 					{/if}
 				</div>
-				<div class="now-bots">
-					{#each getGroupBots(group) as bot}
-						<button class="bot-chip" onclick={() => onOpenChat(group, bot)}>
-							{bot.name}
+				<div class="tvg-cell tvg-cell-chars">
+					{#each groupBots as bot}
+						<button
+							class="bot-chip"
+							disabled={!onAir}
+							onclick={() => onOpenChat(group, bot)}
+						>
+							{bot.name.split(' ')[0]}
 						</button>
 					{/each}
 				</div>
 			</div>
-		{:else}
-			<p class="nothing">Nothing on air right now. Check the schedule below.</p>
 		{/each}
 	</div>
 
-	<div class="upcoming-section">
-		<h3>UP NEXT</h3>
-		{#each groups
-			.filter((g) => !isOnAir(g, now, timezone))
-			.map((g) => ({ group: g, next: nextOnAir(g, now, timezone) }))
-			.filter((x) => x.next)
-			.sort((a, b) => (a.next?.minutesUntil ?? 0) - (b.next?.minutesUntil ?? 0))
-			.slice(0, 3) as { group, next }}
-			<div class="upcoming-card">
-				<span class="show-name">{group.name}</span>
-				<span class="next-time">
-					in {formatTimeUntil(next?.minutesUntil ?? 0)} ·
-					{next?.day.toUpperCase()} {next?.start}
-				</span>
-				<button class="btn-notify" onclick={() => onSubscribe(group)}>
-					notify me
-				</button>
-			</div>
-		{/each}
-	</div>
-
-	<div class="schedule-section">
-		<h3>WEEKLY SCHEDULE</h3>
-		<div class="day-tabs">
-			{#each days as day, i}
-				<button
-					class="day-tab"
-					class:active={selectedDay === i}
-					onclick={() => (selectedDay = selectedDay === i ? null : i)}
-				>
-					{day}
-				</button>
-			{/each}
-		</div>
-
-		{#each groups as group}
-			{@const daySlots =
-				selectedDay !== null
-					? group.schedule.filter((s) => s.day === dayKeys[selectedDay as number])
-					: group.schedule}
-			{#if daySlots.length > 0}
-				<div class="schedule-row">
-					<span class="schedule-show">{group.name}</span>
-					<div class="schedule-slots">
-						{#each daySlots as slot}
-							<span class="slot">
-								{slot.day.toUpperCase()} {formatSlotTime(slot.start, slot.duration)}
-							</span>
-						{/each}
-					</div>
-				</div>
-			{/if}
-		{/each}
-	</div>
-
-	<div class="guide-footer">
-		<p>Shows broadcast in your local timezone. All characters are AI-generated parodies.</p>
+	<div class="tvg-footer">
+		Click a character name to start a chat · Shows broadcast in your local timezone
 	</div>
 </div>
 
 <style>
-	.tv-guide {
-		padding: 0;
-		font-family: 'VT323', monospace;
-		font-size: 18px;
-	}
-	.guide-header {
-		padding: 10px 12px;
-		border-bottom: 2px solid var(--ink);
-		background: #2b6cb0;
-		color: white;
-	}
-	.title {
-		font-family: 'Press Start 2P', monospace;
-		font-size: 14px;
-		display: block;
-	}
-	.subtitle {
-		font-size: 15px;
-		opacity: 0.8;
-		display: block;
-		margin-top: 4px;
-	}
-	.now-section,
-	.upcoming-section,
-	.schedule-section {
-		padding: 12px;
-		border-bottom: 2px solid var(--ink);
-	}
-	h3 {
-		font-family: 'Press Start 2P', monospace;
-		font-size: 10px;
-		margin: 0 0 10px;
-		font-weight: normal;
-	}
-	.now-card {
-		border: 2px solid var(--ink);
-		padding: 10px;
-		margin-bottom: 8px;
-		background: var(--accent-2);
-	}
-	.now-info {
+	.tvguide {
+		font-family: 'Pixelify Sans', sans-serif;
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
-		margin-bottom: 8px;
+		height: 100%;
+		background: #0000aa;
+		color: #ffffff;
 	}
-	.show-name {
+	.tvg-header {
+		border-bottom: 2px solid #ffffff;
+		background: #0000aa;
+		color: #f9bd2b;
+	}
+	.tvg-date {
+		padding: 8px 12px;
 		font-family: 'Press Start 2P', monospace;
 		font-size: 11px;
-	}
-	.era {
-		font-size: 15px;
-		opacity: 0.75;
-	}
-	.remaining {
-		font-size: 15px;
-		color: var(--accent);
-		font-weight: bold;
-	}
-	.now-bots {
+		letter-spacing: 0.02em;
+		border-bottom: 1px solid #4d4dcc;
 		display: flex;
-		gap: 6px;
+		justify-content: space-between;
+		align-items: center;
+	}
+	.tvg-primetime {
+		margin-left: 12px;
+		opacity: 0.85;
+	}
+	.tvg-marquee {
+		overflow: hidden;
+		background: #ffffff;
+		color: #0000aa;
+		padding: 4px 0;
+		border-bottom: 2px solid var(--ink);
+	}
+	.tvg-marquee-track {
+		display: inline-flex;
+		gap: 36px;
+		white-space: nowrap;
+		font-family: 'VT323', monospace;
+		font-size: 18px;
+		animation: tvg-scroll 38s linear infinite;
+		font-weight: 700;
+	}
+	@keyframes tvg-scroll {
+		from {
+			transform: translateX(0);
+		}
+		to {
+			transform: translateX(-50%);
+		}
+	}
+	.tvg-grid {
+		flex: 1;
+		overflow: auto;
+		display: flex;
+		flex-direction: column;
+	}
+	.tvg-row {
+		display: grid;
+		grid-template-columns: 56px 1fr 100px 1fr;
+		border-bottom: 1px solid #4d4dcc;
+		min-height: 56px;
+	}
+	.tvg-row:last-child {
+		border-bottom: none;
+	}
+	.tvg-row-head {
+		background: #000066;
+		min-height: 28px;
+		position: sticky;
+		top: 0;
+		z-index: 1;
+	}
+	.tvg-row-head .tvg-cell {
+		font-family: 'Press Start 2P', monospace;
+		font-size: 8px;
+		color: #f9bd2b;
+		align-items: center;
+	}
+	.tvg-row-live {
+		background: rgba(249, 189, 43, 0.12);
+	}
+	.tvg-cell {
+		padding: 6px 8px;
+		font-family: 'VT323', monospace;
+		font-size: 17px;
+		line-height: 1.15;
+		border-right: 1px solid #4d4dcc;
+		color: #ffffff;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		overflow: hidden;
+	}
+	.tvg-cell:last-child {
+		border-right: none;
+	}
+	.tvg-cell-ch {
+		background: #000066;
+		color: #f9bd2b;
+		align-items: center;
+		text-align: center;
+		font-family: 'Press Start 2P', monospace;
+		font-size: 11px;
+		gap: 4px;
+	}
+	.ch-num {
+		font-size: 14px;
+		color: #ffffff;
+	}
+	.ch-net {
+		font-size: 8px;
+		color: #a6f000;
+	}
+	.ep-show {
+		font-family: 'Press Start 2P', monospace;
+		font-size: 9px;
+		color: #f9bd2b;
+		letter-spacing: 0.02em;
+		margin-bottom: 4px;
+	}
+	.ep-desc {
+		font-family: 'VT323', monospace;
+		font-size: 15px;
+		color: #cccccc;
+	}
+	.tvg-cell-status {
+		align-items: center;
+		gap: 4px;
+	}
+	.status-live {
+		font-family: 'Press Start 2P', monospace;
+		font-size: 8px;
+		color: #a6f000;
+	}
+	.status-time {
+		font-family: 'VT323', monospace;
+		font-size: 15px;
+		color: #f9bd2b;
+	}
+	.status-off {
+		font-family: 'Press Start 2P', monospace;
+		font-size: 8px;
+		color: #888888;
+	}
+	.now-dot {
+		display: inline-block;
+		margin-right: 4px;
+		color: #f54e00;
+		animation: blink 1.4s steps(2, end) infinite;
+	}
+	.tvg-cell-chars {
+		flex-direction: row;
 		flex-wrap: wrap;
+		gap: 4px;
+		align-items: center;
 	}
 	.bot-chip {
 		font-family: 'Pixelify Sans', sans-serif;
-		font-size: 13px;
-		padding: 4px 8px;
-		border: 2px solid var(--ink);
-		background: var(--paper);
+		font-size: 12px;
+		padding: 2px 6px;
+		border: 1px solid #4d4dcc;
+		background: transparent;
+		color: #ffffff;
 		cursor: pointer;
 	}
-	.bot-chip:hover {
-		background: var(--ink);
-		color: var(--paper);
+	.bot-chip:hover:not(:disabled) {
+		background: #2929cc;
+		color: #a6f000;
 	}
-	.nothing {
-		font-style: italic;
-		opacity: 0.6;
-		margin: 0;
-	}
-	.upcoming-card {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 6px 0;
-		border-bottom: 1px dotted var(--ink);
-	}
-	.upcoming-card:last-child {
-		border-bottom: none;
-	}
-	.next-time {
-		font-size: 15px;
-		opacity: 0.7;
-		flex: 1;
+	.bot-chip:disabled {
+		opacity: 0.4;
+		cursor: default;
 	}
 	.btn-notify {
 		font-family: 'Pixelify Sans', sans-serif;
-		font-size: 12px;
-		padding: 3px 8px;
-		border: 2px solid var(--ink);
-		background: var(--paper);
+		font-size: 10px;
+		padding: 2px 6px;
+		border: 1px solid #4d4dcc;
+		background: transparent;
+		color: #f9bd2b;
 		cursor: pointer;
 	}
 	.btn-notify:hover {
-		background: var(--accent);
-		color: var(--paper);
+		background: #f9bd2b;
+		color: #0000aa;
 	}
-	.day-tabs {
-		display: flex;
-		gap: 4px;
-		margin-bottom: 10px;
-	}
-	.day-tab {
-		font-family: 'Press Start 2P', monospace;
-		font-size: 8px;
-		padding: 4px 6px;
-		border: 2px solid var(--ink);
-		background: var(--paper);
-		cursor: pointer;
-		flex: 1;
-	}
-	.day-tab.active {
-		background: var(--ink);
-		color: var(--paper);
-	}
-	.day-tab:hover:not(.active) {
-		background: var(--accent-2);
-	}
-	.schedule-row {
-		display: flex;
-		gap: 10px;
-		padding: 6px 0;
-		border-bottom: 1px dotted var(--ink);
-		align-items: flex-start;
-	}
-	.schedule-show {
-		font-family: 'Press Start 2P', monospace;
-		font-size: 9px;
-		min-width: 100px;
-		padding-top: 2px;
-	}
-	.schedule-slots {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
-	}
-	.slot {
-		font-size: 14px;
-		padding: 2px 6px;
-		background: var(--paper-soft);
-		border: 1px solid var(--ink);
-	}
-	.guide-footer {
-		padding: 10px 12px;
-		font-size: 14px;
-		opacity: 0.6;
-		font-style: italic;
+	.tvg-footer {
+		padding: 8px 12px;
+		background: #000066;
+		color: #ffffff;
+		font-family: 'VT323', monospace;
+		font-size: 16px;
+		border-top: 2px solid #ffffff;
 	}
 </style>

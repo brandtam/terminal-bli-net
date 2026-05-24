@@ -51,7 +51,9 @@
 			{ label: 'About this Mac', action: () => onopen('about') },
 			{ label: 'Hide everything', disabled: true }
 		],
-		Cast: [],
+		Shows: [
+			{ label: 'Open TV Guide', shortcut: '⌘G', action: () => onopen('tv-guide') }
+		],
 		Special: [
 			{ label: 'Empty Trash', disabled: true },
 			{ label: 'Restart', action: () => onopen('error') },
