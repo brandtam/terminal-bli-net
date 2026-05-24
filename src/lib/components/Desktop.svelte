@@ -64,6 +64,7 @@
 		const saved = loadWindows();
 		if (saved.length > 0) {
 			windows = saved;
+			zCounter = Math.max(zCounter, ...saved.map((w) => w.z));
 		} else if (isFirstVisit()) {
 			openWindow('tv-guide');
 		}
