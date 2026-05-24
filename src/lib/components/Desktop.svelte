@@ -69,7 +69,7 @@
 		}
 
 		const hash = window.location.hash.slice(1);
-		if (hash) {
+		if (hash && isKnownWindowId(hash)) {
 			openWindow(hash);
 		}
 
@@ -133,6 +133,16 @@
 		saveWindows(windows);
 	});
 
+	const KNOWN_WINDOW_IDS = new Set([
+		'welcome', 'tv-guide', 'terminal-prefs', 'tvguide-prefs', 'chatrbot-prefs',
+		'pricing', 'readme', 'about', 'about-chatrbot', 'about-tvguide',
+		'about-textedit', 'about-stats', 'stats', 'error', 'trash'
+	]);
+
+	function isKnownWindowId(id: string): boolean {
+		return KNOWN_WINDOW_IDS.has(id) || id.startsWith('chat-');
+	}
+
 	function getWindowDef(id: string): { title: string; w: number; h: number } {
 		const defs: Record<string, { title: string; w: number; h: number }> = {
 			welcome: { title: 'Welcome.app', w: 460, h: 540 },
@@ -161,7 +171,7 @@
 				h: 560
 			};
 		}
-		return defs[id] || { title: id, w: 380, h: 320 };
+		return defs[id] || { title: 'Unknown', w: 380, h: 320 };
 	}
 
 	function focusWindow(id: string) {
