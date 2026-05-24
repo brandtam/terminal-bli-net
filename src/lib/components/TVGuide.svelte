@@ -1,11 +1,12 @@
 <script lang="ts">
-	import type { GroupMeta, Bot } from '$lib/types';
-	import { isOnAir, minutesRemaining } from '$lib/schedule';
+	import type { GroupMeta, Bot, Channel, ChannelSlot } from '$lib/types';
+	import { getSlotIndex, getCurrentSlot, isShowOnAir } from '$lib/schedule';
 	import { onMount } from 'svelte';
 
 	let {
 		groups,
 		bots,
+		channels,
 		timezone,
 		now,
 		activeChatGroupSlug = null,
@@ -18,6 +19,7 @@
 	}: {
 		groups: GroupMeta[];
 		bots: Bot[];
+		channels: Channel[];
 		timezone?: string;
 		now: Date;
 		activeChatGroupSlug?: string | null;
@@ -34,152 +36,50 @@
 	const COLUMN_WIDTH_PX = 140;
 	const CHANNEL_COL_PX = 72;
 
-	const channelMap: Record<string, { ch: string; net: string }> = {
-		mash: { ch: '02', net: 'CBS' },
-		seinfeld: { ch: '04', net: 'NBC' },
-		office: { ch: '06', net: 'NBC' },
-		'arrested-development': { ch: '08', net: 'FOX' },
-		'star-trek-tng': { ch: '10', net: 'SYN' },
-		'parks-and-rec': { ch: '12', net: 'NBC' }
-	};
-
-	const EPISODE_LIBRARY: Record<string, Array<{ title: string; year: string }>> = {
-		seinfeld: [
-			{ title: 'The Parking Garage', year: '1991' },
-			{ title: 'The Marble Rye', year: '1996' },
-			{ title: 'The Soup Nazi', year: '1995' },
-			{ title: 'The Contest', year: '1992' },
-			{ title: 'The Chinese Restaurant', year: '1991' },
-			{ title: 'The Junior Mint', year: '1993' },
-			{ title: 'The Puffy Shirt', year: '1993' },
-			{ title: 'The Yada Yada', year: '1997' },
-			{ title: 'The Limo', year: '1992' },
-			{ title: 'The Hamptons', year: '1994' },
-			{ title: 'The Outing', year: '1993' },
-			{ title: 'The Jacket', year: '1991' }
-		],
-		office: [
-			{ title: 'Dinner Party', year: '2008' },
-			{ title: 'Stress Relief', year: '2009' },
-			{ title: 'Casino Night', year: '2006' },
-			{ title: 'The Injury', year: '2006' },
-			{ title: 'Office Olympics', year: '2005' },
-			{ title: 'Beach Games', year: '2007' },
-			{ title: 'Niagara', year: '2009' },
-			{ title: 'Goodbye, Michael', year: '2011' },
-			{ title: 'Threat Level Mid.', year: '2011' },
-			{ title: 'Pretzel Day', year: '2006' },
-			{ title: 'The Dundies', year: '2005' },
-			{ title: 'Diwali', year: '2006' }
-		],
-		'arrested-development': [
-			{ title: 'Pier Pressure', year: '2004' },
-			{ title: 'Afternoon Delight', year: '2004' },
-			{ title: 'Top Banana', year: '2003' },
-			{ title: 'Sword of Destiny', year: '2005' },
-			{ title: 'Mr. F', year: '2005' },
-			{ title: 'Motherboy XXX', year: '2005' },
-			{ title: 'Marta Complex', year: '2004' },
-			{ title: 'Good Grief', year: '2005' },
-			{ title: 'Meat the Veals', year: '2005' },
-			{ title: 'Making a Stand', year: '2006' },
-			{ title: 'Spring Breakout', year: '2005' },
-			{ title: 'Righteous Brothers', year: '2005' }
-		],
-		mash: [
-			{ title: 'Goodbye, Farewell', year: '1983' },
-			{ title: 'The Interview', year: '1976' },
-			{ title: 'Abyssinia, Henry', year: '1975' },
-			{ title: 'Dear Sigmund', year: '1976' },
-			{ title: 'The Bus', year: '1976' },
-			{ title: 'Point of View', year: '1978' },
-			{ title: 'Dreams', year: '1980' },
-			{ title: 'Tuttle', year: '1973' },
-			{ title: 'The Joker Is Wild', year: '1979' },
-			{ title: 'Death Takes a Holiday', year: '1980' },
-			{ title: 'Old Soldiers', year: '1981' },
-			{ title: 'Heal Thyself', year: '1982' }
-		],
-		'star-trek-tng': [
-			{ title: 'Best of Both Worlds', year: '1990' },
-			{ title: 'Inner Light', year: '1992' },
-			{ title: 'Yesterday\'s Enterprise', year: '1990' },
-			{ title: 'Darmok', year: '1991' },
-			{ title: 'Chain of Command', year: '1992' },
-			{ title: 'Measure of a Man', year: '1989' },
-			{ title: 'All Good Things', year: '1994' },
-			{ title: 'Tapestry', year: '1993' },
-			{ title: 'Cause and Effect', year: '1992' },
-			{ title: 'The Offspring', year: '1990' },
-			{ title: 'Frame of Mind', year: '1993' },
-			{ title: 'Lower Decks', year: '1994' }
-		],
-		'parks-and-rec': [
-			{ title: 'Halloween Surprise', year: '2012' },
-			{ title: 'Flu Season', year: '2011' },
-			{ title: 'Treat Yo Self', year: '2011' },
-			{ title: 'Pawnee Zoo', year: '2009' },
-			{ title: 'Hunting Trip', year: '2010' },
-			{ title: 'Trial of Leslie K.', year: '2011' },
-			{ title: 'Win, Lose or Draw', year: '2012' },
-			{ title: 'Galentine\'s Day', year: '2010' },
-			{ title: 'Sister City', year: '2009' },
-			{ title: 'Bowling for Votes', year: '2012' },
-			{ title: 'Sweet Sixteen', year: '2010' },
-			{ title: 'Article Two', year: '2014' }
-		]
-	};
-
-	const PREVIEW_LINES: Record<string, string> = {
-		seinfeld: "What is this — a chat? A chat with me? Alright. What do you want.",
-		office: "Hey, hey, hey — welcome to the Scranton branch group chat. Boss vibes only.",
-		'arrested-development': "I've made a huge mistake. Actually no — this chat is going great.",
-		mash: "Attention all personnel: incoming message from... you, apparently.",
-		'star-trek-tng': "Make it so. State your message, number one.",
-		'parks-and-rec': "Leslie Knope, deputy director, official welcomer of new chat-friends."
-	};
-
 	interface TimeSlot {
 		label: string;
 		hour24: number;
 		minute: number;
 		isNow: boolean;
 		isDayBoundary: boolean;
+		slotIndex: number;
 	}
 
-	interface EpisodeCell {
-		start: number;
+	interface MergedCell {
+		startSlot: number;
 		span: number;
+		showSlug: string;
+		season: number;
+		episode: number;
 		title: string;
 		year: string;
 		isLive: boolean;
-		encore: boolean;
-		runtime?: string;
 	}
 
 	interface FeaturedShow {
-		groupSlug: string;
+		channelSlug: string;
+		showSlug: string;
 		title: string;
 		year: string;
-		ch: string;
+		ch: number;
 		net: string;
-		runtime?: string;
 		isLive: boolean;
 	}
 
-	function buildTimeSlots(date: Date, tz?: string): TimeSlot[] {
-		const opts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hour12: false };
-		if (tz) opts.timeZone = tz;
-		const parts = new Intl.DateTimeFormat('en-US', opts).formatToParts(date);
-		const hour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0');
-		const minute = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0');
+	function getEpisodeInfo(slot: ChannelSlot): { title: string; year: string } | null {
+		const show = groups.find(g => g.slug === slot.showSlug);
+		const ep = show?.episodes?.find(e => e.season === slot.season && e.episode === slot.episode);
+		return ep ? { title: ep.title, year: ep.year } : null;
+	}
 
-		const startMin = hour * 60 + (minute >= 30 ? 30 : 0);
+	function buildTimeSlots(date: Date, tz?: string): TimeSlot[] {
+		const currentSlotIdx = getSlotIndex(date, tz);
 		const slots: TimeSlot[] = [];
+
 		for (let i = 0; i < DAY_SLOTS; i++) {
-			const total = startMin + i * SLOT_MINUTES;
-			const h24 = Math.floor(total / 60) % 24;
-			const m = total % 60;
+			const slotIdx = (currentSlotIdx + i) % DAY_SLOTS;
+			const h24 = Math.floor(slotIdx / 2);
+			const m = (slotIdx % 2) * 30;
 			const h12 = h24 % 12 || 12;
 			const ampm = h24 >= 12 ? 'PM' : 'AM';
 			slots.push({
@@ -187,57 +87,60 @@
 				hour24: h24,
 				minute: m,
 				isNow: i === 0,
-				isDayBoundary: i > 0 && h24 === 0 && m === 0
+				isDayBoundary: i > 0 && slotIdx === 0,
+				slotIndex: slotIdx
 			});
 		}
 		return slots;
 	}
 
-	function isSlotOnAir(group: GroupMeta, slotIndex: number, baseDate: Date, tz?: string): boolean {
-		const slotDate = new Date(baseDate.getTime() + slotIndex * SLOT_MINUTES * 60 * 1000);
-		return isOnAir(group, slotDate, tz);
-	}
+	function buildMergedCells(channel: Channel, slotOrder: TimeSlot[], currentSlotIdx: number): MergedCell[] {
+		const cells: MergedCell[] = [];
+		let i = 0;
 
-	function spanFor(chIdx: number, slot: number): number {
-		return ((slot + chIdx * 3) % 5 === 2) ? 2 : 1;
-	}
+		while (i < slotOrder.length) {
+			const slotIdx = slotOrder[i].slotIndex;
+			const channelSlot = channel.schedule[slotIdx] ?? null;
 
-	function buildChannelSchedule(group: GroupMeta, chIdx: number, baseDate: Date, tz?: string): EpisodeCell[] {
-		const library = EPISODE_LIBRARY[group.slug] || [];
-		if (library.length === 0) return [];
+			if (!channelSlot) {
+				i++;
+				continue;
+			}
 
-		const cells: EpisodeCell[] = [];
-		const taken = new Array(DAY_SLOTS).fill(false);
-		let epIdx = 0;
-		let slot = 0;
+			const epInfo = getEpisodeInfo(channelSlot);
+			let span = 1;
 
-		while (slot < DAY_SLOTS) {
-			if (taken[slot]) { slot++; continue; }
+			// Merge consecutive slots with the same show+episode
+			while (i + span < slotOrder.length) {
+				const nextSlotIdx = slotOrder[i + span].slotIndex;
+				const nextSlot = channel.schedule[nextSlotIdx] ?? null;
+				if (
+					nextSlot &&
+					nextSlot.showSlug === channelSlot.showSlug &&
+					nextSlot.season === channelSlot.season &&
+					nextSlot.episode === channelSlot.episode
+				) {
+					span++;
+				} else {
+					break;
+				}
+			}
 
-			const isLive = isSlotOnAir(group, slot, baseDate, tz);
-			let span = spanFor(chIdx, slot);
-
-			while (span > 1 && (slot + span > DAY_SLOTS || taken[slot + span - 1])) span--;
-
-			const nextSlotLive = span > 1 ? isSlotOnAir(group, slot + 1, baseDate, tz) : isLive;
-			if (span > 1 && isLive !== nextSlotLive) span = 1;
-
-			const ep = library[epIdx % library.length];
-			const encore = epIdx >= library.length;
+			// A cell is live if any of its slot indices equals the current slot
+			const isLive = slotOrder.slice(i, i + span).some(s => s.slotIndex === currentSlotIdx);
 
 			cells.push({
-				start: slot,
+				startSlot: i,
 				span,
-				title: ep.title,
-				year: ep.year,
-				isLive,
-				encore,
-				runtime: span > 1 ? '1HR' : undefined
+				showSlug: channelSlot.showSlug,
+				season: channelSlot.season,
+				episode: channelSlot.episode,
+				title: epInfo?.title ?? `S${channelSlot.season}E${channelSlot.episode}`,
+				year: epInfo?.year ?? '',
+				isLive
 			});
 
-			for (let k = slot; k < slot + span; k++) taken[k] = true;
-			slot += span;
-			epIdx++;
+			i += span;
 		}
 		return cells;
 	}
@@ -268,49 +171,52 @@
 	let featured = $state<FeaturedShow | null>(null);
 
 	let slots = $derived(buildTimeSlots(now, timezone));
+	let currentSlotIdx = $derived(getSlotIndex(now, timezone));
 
-	let activeGroups = $derived(
-		groups
-			.filter((g) => g.active)
-			.sort((a, b) => {
-				const chA = channelMap[a.slug]?.ch ?? '99';
-				const chB = channelMap[b.slug]?.ch ?? '99';
-				return chA.localeCompare(chB);
-			})
+	let sortedChannels = $derived(
+		[...channels].sort((a, b) => a.number - b.number)
 	);
 
 	let schedule = $derived.by(() => {
-		return activeGroups.map((group, idx) => ({
-			group,
-			ch: channelMap[group.slug] || { ch: '??', net: '???' },
-			items: buildChannelSchedule(group, idx, now, timezone)
+		return sortedChannels.map((channel) => ({
+			channel,
+			cells: buildMergedCells(channel, slots, currentSlotIdx)
 		}));
 	});
 
 	let marqueeText = $derived.by(() => {
-		return activeGroups
-			.filter((g) => isOnAir(g, now, timezone))
-			.map((g) => {
-				const remaining = minutesRemaining(g, now, timezone);
-				const timeStr = remaining ? `${remaining} min left` : '';
-				return `● ${g.name.toUpperCase()} — ON NOW${timeStr ? ` (${timeStr})` : ''}`;
-			})
-			.join('   ✦   ') || '● ALL SHOWS — check the schedule for upcoming broadcasts';
+		const nowPlaying: string[] = [];
+		for (const channel of sortedChannels) {
+			const slot = getCurrentSlot(channel, now, timezone);
+			if (slot) {
+				const show = groups.find(g => g.slug === slot.showSlug);
+				const epInfo = getEpisodeInfo(slot);
+				const showName = show?.name ?? slot.showSlug;
+				const epTitle = epInfo ? ` — "${epInfo.title}"` : '';
+				nowPlaying.push(`● CH${channel.number} ${showName.toUpperCase()}${epTitle}`);
+			}
+		}
+		return nowPlaying.join('   ✦   ') || '● ALL CHANNELS — check the schedule for upcoming broadcasts';
 	});
 
 	$effect(() => {
 		if (!featured && schedule.length > 0) {
-			const firstLive = schedule.find((s) => s.items.some((i) => i.isLive));
+			const firstLive = schedule.find((s) => s.cells.some((c) => c.isLive));
 			if (firstLive) {
-				const liveItem = firstLive.items.find((i) => i.isLive);
-				if (liveItem) {
+				const liveCell = firstLive.cells.find((c) => c.isLive);
+				if (liveCell) {
+					const epInfo = getEpisodeInfo({
+						showSlug: liveCell.showSlug,
+						season: liveCell.season,
+						episode: liveCell.episode
+					});
 					featured = {
-						groupSlug: firstLive.group.slug,
-						title: liveItem.title,
-						year: liveItem.year,
-						ch: firstLive.ch.ch,
-						net: firstLive.ch.net,
-						runtime: liveItem.runtime,
+						channelSlug: firstLive.channel.slug,
+						showSlug: liveCell.showSlug,
+						title: epInfo?.title ?? liveCell.title,
+						year: epInfo?.year ?? liveCell.year,
+						ch: firstLive.channel.number,
+						net: firstLive.channel.network,
 						isLive: true
 					};
 				}
@@ -354,21 +260,53 @@
 		return () => cancelAnimationFrame(raf);
 	});
 
-	function selectFeatured(group: GroupMeta, item: EpisodeCell) {
-		const ch = channelMap[group.slug] || { ch: '??', net: '???' };
+	function selectFeaturedFromChannel(channel: Channel) {
+		const slot = getCurrentSlot(channel, now, timezone);
+		if (slot) {
+			const epInfo = getEpisodeInfo(slot);
+			featured = {
+				channelSlug: channel.slug,
+				showSlug: slot.showSlug,
+				title: epInfo?.title ?? `S${slot.season}E${slot.episode}`,
+				year: epInfo?.year ?? '',
+				ch: channel.number,
+				net: channel.network,
+				isLive: true
+			};
+		} else {
+			// Find first non-null slot on this channel
+			const firstSlot = channel.schedule.find((s): s is ChannelSlot => s !== null);
+			if (firstSlot) {
+				const epInfo = getEpisodeInfo(firstSlot);
+				featured = {
+					channelSlug: channel.slug,
+					showSlug: firstSlot.showSlug,
+					title: epInfo?.title ?? `S${firstSlot.season}E${firstSlot.episode}`,
+					year: epInfo?.year ?? '',
+					ch: channel.number,
+					net: channel.network,
+					isLive: false
+				};
+			}
+		}
+	}
+
+	function selectFeaturedFromCell(channel: Channel, cell: MergedCell) {
 		featured = {
-			groupSlug: group.slug,
-			title: item.title,
-			year: item.year,
-			ch: ch.ch,
-			net: ch.net,
-			runtime: item.runtime,
-			isLive: item.isLive
+			channelSlug: channel.slug,
+			showSlug: cell.showSlug,
+			title: cell.title,
+			year: cell.year,
+			ch: channel.number,
+			net: channel.network,
+			isLive: cell.isLive
 		};
 	}
 
-	function handleCellDblClick(group: GroupMeta) {
-		if (!isOnAir(group, now, timezone)) return;
+	function handleCellDblClick(cell: MergedCell) {
+		if (!isShowOnAir(cell.showSlug, channels, now, timezone)) return;
+		const group = groups.find(g => g.slug === cell.showSlug);
+		if (!group) return;
 		const groupBots = getGroupBots(group);
 		if (groupBots.length > 0) {
 			onOpenChat(group, groupBots[0]);
@@ -380,30 +318,29 @@
 	<!-- Preview Pane -->
 	{#if featured}
 		{@const feat = featured}
-		{@const featuredGroup = groups.find((g) => g.slug === feat.groupSlug)}
+		{@const featuredGroup = groups.find((g) => g.slug === feat.showSlug)}
 		{@const featuredBots = featuredGroup ? getGroupBots(featuredGroup) : []}
-		{@const liveNow = featuredGroup ? isOnAir(featuredGroup, now, timezone) : false}
+		{@const liveNow = isShowOnAir(feat.showSlug, channels, now, timezone)}
 		<div class="tvg-preview">
 			<div class="tvg-preview-bar">
 				<span class="tvg-preview-net">{feat.net} · CHANNEL {feat.ch}</span>
 				<span class="tvg-preview-time">
 					{#if liveNow}ON NOW{:else}UPCOMING{/if}
-					{#if feat.runtime}<span class="tvg-preview-runtime">· {feat.runtime}</span>{/if}
 				</span>
 			</div>
 			<div class="tvg-preview-main">
 				<div class="tvg-preview-text">
 					<div class="tvg-preview-titleline">
 						<span class="tvg-preview-title">"{feat.title}"</span>
-						<span class="tvg-preview-year">({feat.year})</span>
+						{#if feat.year}<span class="tvg-preview-year">({feat.year})</span>{/if}
 					</div>
 					<div class="tvg-preview-showname">
-						{featuredGroup?.name ?? feat.groupSlug}
+						{featuredGroup?.name ?? feat.showSlug}
 						{#if featuredGroup}<span class="tvg-preview-era"> · {featuredGroup.era}</span>{/if}
 					</div>
 					<div class="tvg-preview-dialogue">
 						<span class="tvg-preview-who">{featuredBots[0]?.name.toUpperCase() ?? '—'}:</span>
-						<span class="tvg-preview-line">"{PREVIEW_LINES[feat.groupSlug] || '...'}"</span>
+						<span class="tvg-preview-line">"{featuredBots[0]?.greeting ?? '...'}"</span>
 					</div>
 				</div>
 				{#if liveNow && featuredGroup}
@@ -434,7 +371,7 @@
 	<div class="tvg-datebar">
 		<span class="tvg-datebar-date">{formatGuideDate(now, timezone)}</span>
 		<span class="tvg-datebar-live">
-			{#if activeGroups.some((g) => isOnAir(g, now, timezone))}
+			{#if sortedChannels.some((ch) => getCurrentSlot(ch, now, timezone) !== null)}
 				<span class="tvg-now-dot live">●</span>LIVE @ {formatLiveClock(now, timezone)}
 			{:else}
 				<span class="tvg-now-dot">●</span>OFF AIR · {formatLiveClock(now, timezone)}
@@ -470,51 +407,49 @@
 			{/each}
 
 			<!-- Channel rows -->
-			{#each schedule as { group, ch, items }, chIdx}
+			{#each schedule as { channel, cells }, chIdx}
 				{@const isAlt = chIdx % 2 === 1}
+				{@const currentShowSlug = getCurrentSlot(channel, now, timezone)?.showSlug ?? null}
 				<!-- svelte-ignore a11y_click_events_have_key_events -->
 				<div
 					class="tvg-cell tvg-ch-cell"
 					class:alt={isAlt}
-					class:current={group.slug === activeChatGroupSlug}
+					class:current={currentShowSlug === activeChatGroupSlug && activeChatGroupSlug !== null}
 					style="grid-column: 1; grid-row: {chIdx + 2}; cursor: pointer;"
-					onclick={() => {
-						const nowItem = items.find((it) => it.start === 0);
-						if (nowItem) selectFeatured(group, nowItem);
-					}}
+					onclick={() => selectFeaturedFromChannel(channel)}
 				>
-					<div class="ch-num">{ch.ch}</div>
-					<div class="ch-net">{ch.net}</div>
-					{#if group.slug === activeChatGroupSlug}
+					<div class="ch-num">{String(channel.number).padStart(2, '0')}</div>
+					<div class="ch-net">{channel.network}</div>
+					{#if currentShowSlug === activeChatGroupSlug && activeChatGroupSlug !== null}
 						<button
 							class="ch-open"
-							onclick={(e) => { e.stopPropagation(); onFocusChat(group.slug); }}
+							onclick={(e) => { e.stopPropagation(); if (activeChatGroupSlug) onFocusChat(activeChatGroupSlug); }}
 							title="Bring chat window to front"
 						>● open</button>
 					{/if}
 				</div>
 
-				{#each items as item, i}
-					{@const isFeatured = featured && featured.groupSlug === group.slug && featured.title === item.title && featured.isLive === item.isLive}
+				{#each cells as cell}
+					{@const showGroup = groups.find(g => g.slug === cell.showSlug)}
+					{@const isFeatured = featured && featured.channelSlug === channel.slug && featured.showSlug === cell.showSlug && featured.title === cell.title}
 					<div
 						class="tvg-cell tvg-ep-cell"
-						class:now={item.start === 0 && item.isLive}
-						class:live={item.isLive}
-						class:off-air={!item.isLive}
+						class:now={cell.isLive && cell.startSlot === 0}
+						class:live={cell.isLive}
+						class:off-air={!cell.isLive}
 						class:featured={isFeatured}
 						class:alt={isAlt}
-						style="grid-column: {item.start + 2} / span {item.span}; grid-row: {chIdx + 2};"
-						onclick={() => selectFeatured(group, item)}
-						ondblclick={() => handleCellDblClick(group)}
-						title={item.isLive ? `Click to preview · double-click to chat` : `Off air — click to preview`}
+						style="grid-column: {cell.startSlot + 2} / span {cell.span}; grid-row: {chIdx + 2};"
+						onclick={() => selectFeaturedFromCell(channel, cell)}
+						ondblclick={() => handleCellDblClick(cell)}
+						title={cell.isLive ? `Click to preview · double-click to chat` : `Off air — click to preview`}
 					>
 						<div class="ep-show">
-							<span class="ep-show-name">{group.name.toUpperCase()}</span>
-							{#if item.runtime}<span class="ep-runtime">{item.runtime}</span>{/if}
-							{#if item.encore && item.isLive}<span class="ep-encore">ENCORE</span>{/if}
-							{#if !item.isLive}<span class="ep-off">OFF AIR</span>{/if}
+							<span class="ep-show-name">{(showGroup?.name ?? cell.showSlug).toUpperCase()}</span>
+							{#if cell.span > 1}<span class="ep-runtime">{cell.span * 30}MIN</span>{/if}
+							{#if !cell.isLive}<span class="ep-off">OFF AIR</span>{/if}
 						</div>
-						<div class="ep-title">"{item.title}" <span class="ep-year">({item.year})</span></div>
+						<div class="ep-title">"{cell.title}" {#if cell.year}<span class="ep-year">({cell.year})</span>{/if}</div>
 					</div>
 				{/each}
 			{/each}
@@ -559,7 +494,6 @@
 		border-bottom: 1px solid #4d4dcc;
 	}
 	.tvg-preview-net { letter-spacing: 0.04em; }
-	.tvg-preview-runtime { color: #a6f000; margin-left: 6px; }
 	.tvg-preview-main {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
@@ -796,13 +730,6 @@
 		border: 1px solid #a6f000;
 		padding: 1px 3px;
 		letter-spacing: 0.02em;
-	}
-	.ep-encore {
-		font-size: 7px;
-		color: rgba(255, 255, 255, 0.65);
-		border: 1px solid rgba(255, 255, 255, 0.3);
-		padding: 1px 3px;
-		letter-spacing: 0.04em;
 	}
 	.ep-off {
 		font-size: 7px;
