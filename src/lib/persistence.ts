@@ -32,7 +32,6 @@ function isTweaksState(v: unknown): v is TweaksState {
 const KEYS = {
 	windows: 'terminal.os.windows',
 	tweaks: 'terminal.os.tweaks',
-	aliases: 'terminal.os.aliases',
 	conversations: 'terminal.app.chatrbot.conversations',
 	timezone: 'terminal.os.timezone',
 	sessionId: 'terminal.os.session',
@@ -102,46 +101,6 @@ export function loadTweaks(): TweaksState {
 
 export function saveTweaks(tweaks: TweaksState): void {
 	set(KEYS.tweaks, tweaks);
-}
-
-export interface DesktopAlias {
-	id: string;
-	label: string;
-	appId: string;
-	icon: string;
-}
-
-function isDesktopAlias(v: unknown): v is DesktopAlias {
-	if (typeof v !== 'object' || v === null) return false;
-	const o = v as Record<string, unknown>;
-	return (
-		typeof o.id === 'string' &&
-		typeof o.label === 'string' &&
-		typeof o.appId === 'string' &&
-		typeof o.icon === 'string'
-	);
-}
-
-function isDesktopAliasArray(v: unknown): v is DesktopAlias[] {
-	return Array.isArray(v) && v.every(isDesktopAlias);
-}
-
-const DEFAULT_ALIASES: DesktopAlias[] = [
-	{ id: 'alias-tvguide', label: 'TV Guide.app', appId: 'tvguide', icon: 'tvguide' },
-	{ id: 'alias-stickies', label: 'Stickies', appId: 'stickies', icon: 'stickies' },
-	{ id: 'alias-recorder', label: 'Camera.app', appId: 'recorder', icon: 'tv' },
-	{ id: 'alias-stats', label: 'Stats.app', appId: 'stats', icon: 'calc' },
-	{ id: 'alias-error', label: 'DO_NOT_OPEN', appId: 'error', icon: 'floppy' }
-];
-
-export function loadAliases(): DesktopAlias[] {
-	const raw = get<unknown>(KEYS.aliases, null);
-	if (raw === null) return [...DEFAULT_ALIASES];
-	return isDesktopAliasArray(raw) ? raw : [...DEFAULT_ALIASES];
-}
-
-export function saveAliases(aliases: DesktopAlias[]): void {
-	set(KEYS.aliases, aliases);
 }
 
 export function loadConversations(): Record<string, Conversation> {

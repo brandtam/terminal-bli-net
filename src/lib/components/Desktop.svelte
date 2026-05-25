@@ -13,11 +13,8 @@
 		loadTimezone,
 		saveTimezone,
 		isFirstVisit,
-		appRead,
-		loadAliases,
-		saveAliases
+		appRead
 	} from '$lib/persistence';
-	import type { DesktopAlias } from '$lib/persistence';
 	import Window from './Window.svelte';
 	import MenuBar from './MenuBar.svelte';
 	import DesktopIcon from './DesktopIcon.svelte';
@@ -34,9 +31,13 @@
 		createFile,
 		writeFile,
 		deleteNode,
-		DOCS_ID
+		list,
+		resolveAlias,
+		onFsChange,
+		DOCS_ID,
+		DESKTOP_ID
 	} from '$lib/os/filesystem';
-	import type { FSFile } from '$lib/os/filesystem';
+	import type { FSFile, FSNode } from '$lib/os/filesystem';
 	import StatsWindow from '$lib/apps/stats/StatsWindow.svelte';
 	import ErrorDialog from '$lib/apps/finder/ErrorDialog.svelte';
 	import TrashWindow from '$lib/apps/finder/TrashWindow.svelte';
@@ -150,7 +151,8 @@
 	let selectedIconId = $state<string | null>(null);
 
 	let stickyNotes = $state<StickyNote[]>([]);
-	let aliases = $state<DesktopAlias[]>([]);
+	let desktopItems = $state<FSNode[]>([]);
+	let desktopFsRev = $state(0);
 
 	function stickyFromFile(f: FSFile): StickyNote {
 		try {
@@ -240,22 +242,43 @@
 		updateStickyNote({ ...note, color });
 	}
 
-	function createAlias(name: string, appId: string, icon: string) {
-		if (aliases.some((a) => a.appId === appId)) return;
-		const id = `alias-${appId}-${Date.now()}`;
-		aliases = [...aliases, { id, label: name, appId, icon }];
-		saveAliases(aliases);
+	function openDesktopNode(node: FSNode) {
+		if (node.type === 'alias') {
+			const target = resolveAlias(node);
+			if (target) openDesktopNode(target);
+			return;
+		}
+		if (node.type === 'file') {
+			const file = node as FSFile;
+			if (file.appId === 'tvguide') openWindow('tv-guide');
+			else if (file.appId === 'stickies') createStickyNote();
+			else if (file.appId === 'recorder') openWindow('recorder');
+			else if (file.appId === 'stats') openWindow('stats');
+			else if (file.appId === 'error') openWindow('error');
+			else if (file.appId === 'system-prefs') os.openSystemPreferences();
+			else if (file.appId === 'about-terminal') os.openAbout(null);
+			else openWindow(file.id);
+		}
 	}
 
-	function openAlias(alias: DesktopAlias) {
-		if (alias.appId === 'tvguide') openWindow('tv-guide');
-		else if (alias.appId === 'stickies') createStickyNote();
-		else if (alias.appId === 'recorder') openWindow('recorder');
-		else if (alias.appId === 'stats') openWindow('stats');
-		else if (alias.appId === 'error') openWindow('error');
-		else if (alias.appId === 'system-prefs') os.openSystemPreferences();
-		else if (alias.appId === 'about-terminal') os.openAbout(null);
-		else openWindow(alias.appId);
+	function desktopIconKind(node: FSNode): string {
+		if (node.type === 'alias') {
+			const target = resolveAlias(node);
+			if (target) return desktopIconKind(target);
+			return 'doc';
+		}
+		if (node.type === 'file') {
+			const file = node as FSFile;
+			if (file.appId === 'tvguide') return 'tvguide';
+			if (file.appId === 'stickies') return 'stickies';
+			if (file.appId === 'recorder') return 'tv';
+			if (file.appId === 'stats') return 'calc';
+			if (file.appId === 'error') return 'floppy';
+			if (file.appId === 'system-prefs') return 'hd';
+			if (file.appId === 'about-terminal') return 'doc';
+			return 'doc';
+		}
+		return 'doc';
 	}
 
 	onMount(() => {
@@ -264,7 +287,7 @@
 		isMobile = window.innerWidth < 720;
 		seedFilesystem(); // seed filesystem default files
 		stickyNotes = loadStickyNotes();
-		aliases = loadAliases();
+		desktopItems = list(DESKTOP_ID);
 
 		fetch('/api/data')
 			.then((res) => (res.ok ? res.json() : null))
@@ -360,6 +383,17 @@
 		const snapshot = windows;
 		const tid = setTimeout(() => saveWindows(snapshot), 300);
 		return () => clearTimeout(tid);
+	});
+
+	$effect(() =>
+		onFsChange(() => {
+			desktopFsRev++;
+		})
+	);
+
+	$effect(() => {
+		desktopFsRev;
+		if (mounted) desktopItems = list(DESKTOP_ID);
 	});
 
 	const KNOWN_WINDOW_IDS = new Set([
@@ -779,17 +813,17 @@
 			</div>
 
 			<div class="desktop-icons right">
-				{#each aliases as a (a.id)}
+				{#each desktopItems as node (node.id)}
 					<DesktopIcon
-						label={a.label}
-						alias
-						selected={selectedIconId === a.id}
+						label={node.name}
+						alias={node.type === 'alias'}
+						selected={selectedIconId === node.id}
 						onselect={() => {
-							selectedIconId = a.id;
+							selectedIconId = node.id;
 						}}
-						ondblclick={() => openAlias(a)}
+						ondblclick={() => openDesktopNode(node)}
 					>
-						<PixelIcon kind={a.icon} />
+						<PixelIcon kind={desktopIconKind(node)} />
 					</DesktopIcon>
 				{/each}
 				<DesktopIcon
@@ -899,7 +933,7 @@
 						<StickiesNote {note} ondelete={deleteStickyNote} onupdate={updateStickyNote} />
 					{/if}
 				{:else if w.id === 'finder'}
-					<FinderWindow {os} onmakealias={createAlias} />
+					<FinderWindow {os} />
 				{:else}
 					<div class="window-content">
 						<p>Coming soon...</p>
