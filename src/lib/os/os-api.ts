@@ -117,6 +117,7 @@ export interface AlertSpec {
 export const WINDOW_APP_MAP: Record<string, string> = {
 	'terminal-prefs': 'finder',
 	welcome: 'finder',
+	finder: 'finder',
 	'tv-guide': 'tvguide',
 	'tvguide-prefs': 'tvguide',
 	pricing: 'textedit',

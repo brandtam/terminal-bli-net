@@ -1,0 +1,239 @@
+const STORAGE_KEY = 'terminal.fs';
+
+export interface FSFolder {
+	id: string;
+	name: string;
+	type: 'folder';
+	parentId: string | null;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export interface FSFile {
+	id: string;
+	name: string;
+	type: 'file';
+	parentId: string;
+	appId: string;
+	data: string;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export type FSNode = FSFolder | FSFile;
+
+export const ROOT_ID = 'root';
+export const SYSTEM_ID = 'system';
+export const APPS_ID = 'applications';
+export const DOCS_ID = 'documents';
+export const RECORDINGS_ID = 'recordings';
+export const TRASH_ID = 'trash';
+
+function uid(): string {
+	return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function seed(): Record<string, FSNode> {
+	const now = Date.now();
+	const f = (id: string, name: string, parentId: string | null): FSFolder => ({
+		id, name, type: 'folder', parentId, createdAt: now, updatedAt: now,
+	});
+	const store: Record<string, FSNode> = {
+		[ROOT_ID]: f(ROOT_ID, 'Terminal HD', null),
+		[SYSTEM_ID]: f(SYSTEM_ID, 'System', ROOT_ID),
+		[APPS_ID]: f(APPS_ID, 'Applications', ROOT_ID),
+		[DOCS_ID]: f(DOCS_ID, 'Documents', ROOT_ID),
+		[RECORDINGS_ID]: f(RECORDINGS_ID, 'Recordings', ROOT_ID),
+		[TRASH_ID]: f(TRASH_ID, 'Trash', ROOT_ID),
+	};
+	return store;
+}
+
+// ---------------------------------------------------------------------------
+// Storage
+// ---------------------------------------------------------------------------
+
+function load(): Record<string, FSNode> {
+	try {
+		const raw = localStorage.getItem(STORAGE_KEY);
+		if (!raw) return seed();
+		const parsed = JSON.parse(raw) as Record<string, FSNode>;
+		if (!parsed[ROOT_ID]) return seed();
+		return parsed;
+	} catch {
+		return seed();
+	}
+}
+
+function save(store: Record<string, FSNode>): void {
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+}
+
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
+
+export function getNode(id: string): FSNode | null {
+	return load()[id] ?? null;
+}
+
+export function list(parentId: string): FSNode[] {
+	const store = load();
+	return Object.values(store)
+		.filter((n) => n.parentId === parentId)
+		.sort((a, b) => {
+			if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+			return a.name.localeCompare(b.name);
+		});
+}
+
+export function getPath(id: string): string {
+	const store = load();
+	const parts: string[] = [];
+	let current: FSNode | undefined = store[id];
+	while (current) {
+		parts.unshift(current.name);
+		current = current.parentId ? store[current.parentId] : undefined;
+	}
+	return parts.join('/');
+}
+
+export function exists(parentId: string, name: string): boolean {
+	return list(parentId).some((n) => n.name === name);
+}
+
+export function findByApp(appId: string, parentId?: string): FSFile[] {
+	const store = load();
+	return Object.values(store).filter(
+		(n): n is FSFile =>
+			n.type === 'file' &&
+			n.appId === appId &&
+			(parentId === undefined || n.parentId === parentId)
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Mutations
+// ---------------------------------------------------------------------------
+
+export function createFolder(parentId: string, name: string): FSFolder {
+	const store = load();
+	if (!store[parentId] || store[parentId].type !== 'folder') {
+		throw new Error(`Parent "${parentId}" is not a folder`);
+	}
+	if (exists(parentId, name)) {
+		throw new Error(`"${name}" already exists in this folder`);
+	}
+	const now = Date.now();
+	const folder: FSFolder = {
+		id: uid(), name, type: 'folder', parentId, createdAt: now, updatedAt: now,
+	};
+	store[folder.id] = folder;
+	save(store);
+	return folder;
+}
+
+export function createFile(parentId: string, name: string, appId: string, data: string = ''): FSFile {
+	const store = load();
+	if (!store[parentId] || store[parentId].type !== 'folder') {
+		throw new Error(`Parent "${parentId}" is not a folder`);
+	}
+	if (exists(parentId, name)) {
+		throw new Error(`"${name}" already exists in this folder`);
+	}
+	const now = Date.now();
+	const file: FSFile = {
+		id: uid(), name, type: 'file', parentId, appId, data, createdAt: now, updatedAt: now,
+	};
+	store[file.id] = file;
+	save(store);
+	return file;
+}
+
+export function readFile(id: string): FSFile | null {
+	const node = getNode(id);
+	return node?.type === 'file' ? node as FSFile : null;
+}
+
+export function writeFile(id: string, data: string): void {
+	const store = load();
+	const node = store[id];
+	if (!node || node.type !== 'file') throw new Error(`"${id}" is not a file`);
+	(node as FSFile).data = data;
+	node.updatedAt = Date.now();
+	save(store);
+}
+
+export function rename(id: string, newName: string): void {
+	const store = load();
+	const node = store[id];
+	if (!node) throw new Error(`Node "${id}" not found`);
+	if (node.parentId !== null) {
+		const siblings = Object.values(store).filter(
+			(n) => n.parentId === node.parentId && n.id !== id
+		);
+		if (siblings.some((s) => s.name === newName)) {
+			throw new Error(`"${newName}" already exists in this folder`);
+		}
+	}
+	node.name = newName;
+	node.updatedAt = Date.now();
+	save(store);
+}
+
+export function moveNode(id: string, newParentId: string): void {
+	const store = load();
+	const node = store[id];
+	if (!node) throw new Error(`Node "${id}" not found`);
+	const parent = store[newParentId];
+	if (!parent || parent.type !== 'folder') throw new Error(`"${newParentId}" is not a folder`);
+	if (exists(newParentId, node.name)) {
+		throw new Error(`"${node.name}" already exists in "${parent.name}"`);
+	}
+	node.parentId = newParentId;
+	node.updatedAt = Date.now();
+	save(store);
+}
+
+export function deleteNode(id: string): void {
+	const store = load();
+	if (!store[id]) return;
+	const toDelete = [id];
+	// Collect descendants for folders
+	const queue = [id];
+	while (queue.length > 0) {
+		const current = queue.shift()!;
+		for (const node of Object.values(store)) {
+			if (node.parentId === current && !toDelete.includes(node.id)) {
+				toDelete.push(node.id);
+				queue.push(node.id);
+			}
+		}
+	}
+	for (const nid of toDelete) delete store[nid];
+	save(store);
+}
+
+export function trash(id: string): void {
+	moveNode(id, TRASH_ID);
+}
+
+export function emptyTrash(): void {
+	const trashContents = list(TRASH_ID);
+	const store = load();
+	for (const node of trashContents) {
+		const toDelete = [node.id];
+		const queue = [node.id];
+		while (queue.length > 0) {
+			const current = queue.shift()!;
+			for (const n of Object.values(store)) {
+				if (n.parentId === current && !toDelete.includes(n.id)) {
+					toDelete.push(n.id);
+					queue.push(n.id);
+				}
+			}
+		}
+		for (const nid of toDelete) delete store[nid];
+	}
+	save(store);
+}
