@@ -1,0 +1,95 @@
+/* Terminal — System 7 chrome theme
+   Overrides --chrome-* for the System 7 look.
+   See Chrome System Spec §4. */
+
+[data-os-theme="system7"] {
+  /* ── Window ── */
+  --chrome-window-bg:           var(--brand-color-paper);
+  --chrome-window-border:       2px solid var(--brand-color-ink);
+  --chrome-window-border-color: var(--brand-color-ink);
+  --chrome-window-shadow:       4px 4px 0 rgba(0, 0, 0, 0.35);
+  --chrome-window-radius:       0;
+  --chrome-window-padding:      0;
+
+  /* ── Title bar ── */
+  --chrome-titlebar-bg: repeating-linear-gradient(
+    0deg,
+    var(--brand-color-ink) 0 1px,
+    var(--brand-color-paper) 1px 3px
+  );
+  --chrome-titlebar-bg-inactive: var(--brand-color-paper);
+  --chrome-titlebar-fg:          var(--brand-color-ink);
+  --chrome-titlebar-height:      22px;
+  --chrome-titlebar-font:        600 14px var(--brand-font-ui);
+  --chrome-titlebar-align:       center;
+
+  /* ── Window buttons ── */
+  --chrome-wbtn-size:            14px;
+  --chrome-wbtn-style:           flat;
+  --chrome-wbtn-close-position:  left;
+  --chrome-wbtn-close-glyph:     "×";
+  --chrome-wbtn-close-bg:        var(--brand-color-paper);
+  --chrome-wbtn-close-fg:        var(--brand-color-ink);
+
+  /* ── Resize handles ── */
+  --chrome-resize-visible:       1;
+  --chrome-resize-glyph:         dots;
+  --chrome-resize-edge-grab:     0px;
+
+  /* ── Menu bar ── */
+  --chrome-menubar-location:     global;
+  --chrome-menubar-bg:           var(--brand-color-paper);
+  --chrome-menubar-fg:           var(--brand-color-ink);
+  --chrome-menubar-hover-bg:     var(--brand-color-ink);
+  --chrome-menubar-hover-fg:     var(--brand-color-paper);
+  --chrome-menubar-font:         16px var(--brand-font-ui);
+  --chrome-menubar-height:       28px;
+
+  /* ── Scrollbar ── */
+  --chrome-scroll-width:         14px;
+  --chrome-scroll-track-bg:      var(--brand-color-paper);
+  --chrome-scroll-thumb-bg:      var(--brand-color-ink);
+  --chrome-scroll-arrows:        none;
+
+  /* ── Button ── */
+  --chrome-btn-style:            flat;
+  --chrome-btn-shadow:           3px 3px 0 var(--brand-color-ink);
+  --chrome-btn-pressed-style:    translate;
+
+  /* ── Input ── */
+  --chrome-input-style:          flat;
+  --chrome-input-bg:             var(--brand-color-paper);
+  --chrome-input-border:         2px solid var(--brand-color-ink);
+  --chrome-input-focus-style:    none;
+
+  /* ── Dock ── */
+  --chrome-dock-position:        bottom-center;
+  --chrome-dock-bg:              var(--brand-color-paper);
+  --chrome-dock-shape:           floating;
+
+  /* ── Desktop ── */
+  --chrome-desktop-pattern:      dither;
+  --chrome-desktop-pattern-density: 4px;
+
+  /* ── Dialog ── */
+  --chrome-dialog-shadow:        4px 4px 0 rgba(0, 0, 0, 0.35);
+  --chrome-dialog-button-row-align: left;
+
+  /* ── Tooltip ── */
+  --chrome-tooltip-bg:           var(--brand-color-ink);
+  --chrome-tooltip-fg:           var(--brand-color-paper);
+  --chrome-tooltip-font:         8px var(--brand-font-display);
+  --chrome-tooltip-border:       none;
+
+  /* ── Cursor ── */
+  --chrome-cursor-default:       default;
+  --chrome-cursor-pointer:       pointer;
+  --chrome-cursor-resize:        nwse-resize;
+
+  /* ── Motion ── */
+  --chrome-anim-window-open:     none;
+  --chrome-anim-duration:        0ms;
+
+  /* ── Density ── */
+  --chrome-density:              regular;
+}

@@ -1,0 +1,6 @@
+allowBuilds:
+  '@sveltejs/kit': set this to true or false
+  esbuild: true
+  sharp: true
+  svelte-preprocess: set this to true or false
+  workerd: true

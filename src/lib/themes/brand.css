@@ -1,0 +1,61 @@
+/* Terminal — brand constants
+   Defined once at :root. Never overridden by a theme.
+   See Chrome System Spec §3. */
+
+:root {
+  /* ── Palette ── */
+  --brand-color-teal:    #008080;
+  --brand-color-cream:   #faf7f0;
+  --brand-color-orange:  #f54e00;
+  --brand-color-yellow:  #f9bd2b;
+  --brand-color-pink:    #ff79c6;
+  --brand-color-green:   #a6f000;
+  --brand-color-prevue:      #0000aa;
+  --brand-color-prevue-dark: #000066;
+  --brand-color-prevue-mid:  #4d4dcc;
+  --brand-color-ink:     #0a0a0a;
+  --brand-color-paper:   #ffffff;
+  --brand-color-paper-soft: #e9e8df;
+
+  /* ── Show colors ── */
+  --brand-show-seinfeld:   #f9bd2b;
+  --brand-show-office:     #2b6cb0;
+  --brand-show-mash:       #6b8e23;
+  --brand-show-friends:    #ff79c6;
+  --brand-show-always:     #f54e00;
+  --brand-show-succession: #0a0a0a;
+
+  /* ── Type ── */
+  --brand-font-display: 'Press Start 2P', monospace;
+  --brand-font-body:    'VT323', monospace;
+  --brand-font-ui:      'Pixelify Sans', sans-serif;
+
+  /* ── Size scale ── */
+  --brand-text-xs:      8px;
+  --brand-text-sm:      10px;
+  --brand-text-md:      14px;
+  --brand-text-lg:      18px;
+  --brand-text-xl:      22px;
+  --brand-text-display: 28px;
+
+  /* ── Spacing (4px base) ── */
+  --brand-space-1:   4px;
+  --brand-space-2:   8px;
+  --brand-space-3:  12px;
+  --brand-space-4:  16px;
+  --brand-space-5:  20px;
+  --brand-space-6:  24px;
+  --brand-space-7:  28px;
+  --brand-space-8:  32px;
+  --brand-space-9:  36px;
+  --brand-space-10: 40px;
+  --brand-space-11: 44px;
+  --brand-space-12: 48px;
+
+  /* ── Radius ── */
+  --brand-radius-none: 0;
+
+  /* ── Motion ── */
+  --brand-easing-snap: linear;
+  --brand-easing-pop:  cubic-bezier(0.34, 1.56, 0.64, 1);
+}

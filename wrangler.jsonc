@@ -1,0 +1,40 @@
+{
+	"name": "terminal-bli-net",
+	"compatibility_date": "2024-12-30",
+	"compatibility_flags": ["nodejs_compat"],
+	"pages_build_output_dir": ".svelte-kit/cloudflare",
+
+	// For production: replace PLACEHOLDER_KV_ID with a real namespace ID from
+	// `wrangler kv namespace create KV`, or bind via the Pages dashboard.
+	// The placeholder works for local dev (miniflare creates an in-memory KV).
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "PLACEHOLDER_KV_ID"
+		}
+	],
+
+	// ReminderAgent DO + send_email are a future feature.
+	// Cloudflare Pages (adapter-cloudflare) can't export DO classes from _worker.js,
+	// so these must be deployed as a separate Worker when ready.
+	// Commented out to eliminate startup warnings.
+	//
+	// "durable_objects": {
+	// 	"bindings": [{ "name": "REMINDER_AGENT", "class_name": "ReminderAgent" }]
+	// },
+	// "migrations": [
+	// 	{ "tag": "v1", "new_sqlite_classes": ["ReminderAgent"] }
+	// ],
+	// "send_email": [{ "name": "SEND_EMAIL" }],
+
+	// Secrets (set via `wrangler secret put`):
+	// ANTHROPIC_API_KEY
+	// OPENAI_API_KEY (optional)
+
+	"vars": {
+		"PROVIDER": "claude",
+		"MONTHLY_SPEND_CAP": "50",
+		"RATE_LIMIT_PER_HOUR": "30",
+		"SESSION_MESSAGE_CAP": "50"
+	}
+}

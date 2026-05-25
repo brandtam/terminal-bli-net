@@ -1,3 +1,140 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+:root {
+	/* Bridge: old var names → brand tokens.
+	   Existing components use --ink, --paper, etc.
+	   These aliases let them keep working during migration. */
+	--bg: var(--brand-color-teal);
+	--ink: var(--brand-color-ink);
+	--paper: var(--brand-color-paper);
+	--paper-soft: var(--brand-color-paper-soft);
+	--accent: var(--brand-color-orange);
+	--accent-2: var(--brand-color-yellow);
+	--shadow: rgba(0, 0, 0, 0.35);
+	--dither: linear-gradient(45deg, #5e8585 25%, transparent 25%, transparent 75%, #5e8585 75%),
+		linear-gradient(45deg, #5e8585 25%, transparent 25%, transparent 75%, #5e8585 75%);
+	--dither-size: 4px 4px, 4px 4px;
+	--dither-pos: 0 0, 2px 2px;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	font-family: 'Pixelify Sans', 'VT323', monospace;
+	color: var(--ink);
+	background: var(--bg);
+	overflow: hidden;
+	-webkit-font-smoothing: none;
+	image-rendering: pixelated;
+}
+
+::-webkit-scrollbar {
+	width: 14px;
+	height: 14px;
+}
+::-webkit-scrollbar-track {
+	background: var(--paper);
+	border-left: 2px solid var(--ink);
+}
+::-webkit-scrollbar-thumb {
+	background: var(--ink);
+	border: 3px solid var(--paper);
+}
+
+@keyframes blink {
+	0%,
+	49% {
+		opacity: 1;
+	}
+	50%,
+	100% {
+		opacity: 0;
+	}
+}
+
+@keyframes scroll-marquee {
+	from {
+		transform: translateX(0);
+	}
+	to {
+		transform: translateX(-50%);
+	}
+}
+
+.btn {
+	font-family: 'Pixelify Sans', sans-serif;
+	font-size: 16px;
+	padding: 8px 14px;
+	background: var(--paper);
+	border: 2px solid var(--ink);
+	box-shadow: 3px 3px 0 var(--ink);
+	cursor: pointer;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	color: var(--ink);
+	text-decoration: none;
+	display: inline-block;
+	line-height: 1;
+}
+.btn:hover {
+	transform: translate(1px, 1px);
+	box-shadow: 2px 2px 0 var(--ink);
+}
+.btn:active {
+	transform: translate(3px, 3px);
+	box-shadow: 0 0 0 var(--ink);
+}
+.btn.primary {
+	background: var(--accent);
+	color: var(--paper);
+}
+.btn.yellow {
+	background: var(--accent-2);
+	color: var(--ink);
+}
+.btn.selected {
+	transform: translate(3px, 3px);
+	box-shadow: 0 0 0 var(--ink);
+}
+.btn-with-chip {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	font-size: 13px;
+}
+.btn-with-chip .btn-chip {
+	width: 12px;
+	height: 12px;
+	border: 1px solid var(--ink);
+	display: inline-block;
+	flex-shrink: 0;
+}
+.btn-swatch {
+	width: 28px;
+	height: 28px;
+	padding: 0;
+}
+.btn:active,
+.btn.selected {
+	transform: translate(3px, 3px);
+	box-shadow: 0 0 0 var(--ink);
+}
+
+.kbd {
+	font-family: 'VT323', monospace;
+	font-size: 15px;
+	padding: 1px 5px;
+	border: 1px solid var(--ink);
+	border-bottom-width: 2px;
+	border-right-width: 2px;
+	background: var(--paper);
+}
+
+.muted {
+	opacity: 0.7;
+}
