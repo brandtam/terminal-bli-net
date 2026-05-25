@@ -6,6 +6,7 @@
 		onFsChange,
 		createAlias,
 		resolveAlias,
+		trash,
 		ROOT_ID,
 		TRASH_ID,
 		SYSTEM_ID,
@@ -154,6 +155,18 @@
 		}
 		closeContextMenu();
 	}
+
+	const PROTECTED_IDS = new Set([ROOT_ID, SYSTEM_ID, APPS_ID, DESKTOP_ID, RECORDINGS_ID, TRASH_ID]);
+
+	function canTrash(node: FSNode): boolean {
+		return !PROTECTED_IDS.has(node.id);
+	}
+
+	function handleContextTrash() {
+		if (!contextMenuNode || !canTrash(contextMenuNode)) return;
+		trash(contextMenuNode.id);
+		closeContextMenu();
+	}
 </script>
 
 <svelte:window onclick={closeContextMenu} />
@@ -209,6 +222,11 @@
 				<div class="context-menu-sep"></div>
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div class="context-menu-item" onclick={handleContextMakeAlias}>Make Alias</div>
+			{/if}
+			{#if canTrash(contextMenuNode)}
+				<div class="context-menu-sep"></div>
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="context-menu-item" onclick={handleContextTrash}>Move to Trash</div>
 			{/if}
 		</div>
 	{/if}
