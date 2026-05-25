@@ -1,5 +1,30 @@
 import type { WindowState, TweaksState, Conversation } from './types';
 
+function isWindowState(v: unknown): v is WindowState {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return typeof o.id === 'string'
+		&& typeof o.x === 'number'
+		&& typeof o.y === 'number'
+		&& typeof o.w === 'number'
+		&& typeof o.h === 'number'
+		&& typeof o.z === 'number';
+}
+
+function isWindowStateArray(v: unknown): v is WindowState[] {
+	return Array.isArray(v) && v.every(isWindowState);
+}
+
+function isTweaksState(v: unknown): v is TweaksState {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return typeof o.wallpaper === 'string'
+		&& typeof o.accent === 'string'
+		&& typeof o.tvGridLoop === 'number'
+		&& typeof o.marqueeLoop === 'number'
+		&& typeof o.tvPauseOnHover === 'boolean';
+}
+
 const KEYS = {
 	windows: 'terminal.os.windows',
 	tweaks: 'terminal.os.tweaks',
@@ -49,21 +74,25 @@ function set<T>(key: string, value: T): void {
 }
 
 export function loadWindows(): WindowState[] {
-	return get<WindowState[]>(KEYS.windows, []);
+	const raw = get<unknown>(KEYS.windows, []);
+	return isWindowStateArray(raw) ? raw : [];
 }
 
 export function saveWindows(windows: WindowState[]): void {
 	set(KEYS.windows, windows);
 }
 
+const TWEAKS_DEFAULTS: TweaksState = {
+	wallpaper: 'teal',
+	accent: '#f54e00',
+	tvGridLoop: 400,
+	marqueeLoop: 100,
+	tvPauseOnHover: false
+};
+
 export function loadTweaks(): TweaksState {
-	return get<TweaksState>(KEYS.tweaks, {
-		wallpaper: 'teal',
-		accent: '#f54e00',
-		tvGridLoop: 400,
-		marqueeLoop: 100,
-		tvPauseOnHover: false
-	});
+	const raw = get<unknown>(KEYS.tweaks, TWEAKS_DEFAULTS);
+	return isTweaksState(raw) ? raw : TWEAKS_DEFAULTS;
 }
 
 export function saveTweaks(tweaks: TweaksState): void {

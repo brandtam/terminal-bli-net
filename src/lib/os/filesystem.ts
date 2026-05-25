@@ -53,20 +53,34 @@ function seed(): Record<string, FSNode> {
 // Storage
 // ---------------------------------------------------------------------------
 
+let _cache: Record<string, FSNode> | null = null;
+
 function load(): Record<string, FSNode> {
+	if (_cache) return _cache;
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) return seed();
+		if (!raw) { _cache = seed(); return _cache; }
 		const parsed = JSON.parse(raw) as Record<string, FSNode>;
-		if (!parsed[ROOT_ID]) return seed();
-		return parsed;
+		if (!parsed[ROOT_ID]) { _cache = seed(); return _cache; }
+		_cache = parsed;
+		return _cache;
 	} catch {
-		return seed();
+		_cache = seed();
+		return _cache;
 	}
 }
 
+let _changeListeners: (() => void)[] = [];
+
+export function onFsChange(fn: () => void): () => void {
+	_changeListeners.push(fn);
+	return () => { _changeListeners = _changeListeners.filter(l => l !== fn); };
+}
+
 function save(store: Record<string, FSNode>): void {
+	_cache = store;
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+	for (const fn of _changeListeners) fn();
 }
 
 // ---------------------------------------------------------------------------

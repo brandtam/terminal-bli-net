@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { GroupMeta, Bot, Channel, ChannelSlot } from '$lib/types';
 	import { getSlotIndex, getCurrentSlot, isShowOnAir } from '$lib/schedule';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 
 	let {
 		groups,
@@ -202,26 +202,26 @@
 	});
 
 	$effect(() => {
-		if (!featured && schedule.length > 0) {
-			const firstLive = schedule.find((s) => s.cells.some((c) => c.isLive));
-			if (firstLive) {
-				const liveCell = firstLive.cells.find((c) => c.isLive);
-				if (liveCell) {
-					const epInfo = getEpisodeInfo({
-						showSlug: liveCell.showSlug,
-						season: liveCell.season,
-						episode: liveCell.episode
-					});
-					featured = {
-						channelSlug: firstLive.channel.slug,
-						showSlug: liveCell.showSlug,
-						title: epInfo?.title ?? liveCell.title,
-						year: epInfo?.year ?? liveCell.year,
-						ch: firstLive.channel.number,
-						net: firstLive.channel.network,
-						isLive: true
-					};
-				}
+		if (schedule.length === 0) return;
+		if (untrack(() => featured)) return;
+		const firstLive = schedule.find((s) => s.cells.some((c) => c.isLive));
+		if (firstLive) {
+			const liveCell = firstLive.cells.find((c) => c.isLive);
+			if (liveCell) {
+				const epInfo = getEpisodeInfo({
+					showSlug: liveCell.showSlug,
+					season: liveCell.season,
+					episode: liveCell.episode
+				});
+				featured = {
+					channelSlug: firstLive.channel.slug,
+					showSlug: liveCell.showSlug,
+					title: epInfo?.title ?? liveCell.title,
+					year: epInfo?.year ?? liveCell.year,
+					ch: firstLive.channel.number,
+					net: firstLive.channel.network,
+					isLive: true
+				};
 			}
 		}
 	});
@@ -455,32 +455,49 @@
 
 <style>
 	.tvguide {
+		--tvg-bg: var(--brand-color-prevue);
+		--tvg-dark: var(--brand-color-prevue-dark);
+		--tvg-mid: var(--brand-color-prevue-mid);
+		--tvg-text: var(--brand-color-paper);
+		--tvg-gold: var(--brand-color-yellow);
+		--tvg-accent: var(--brand-color-orange);
+		--tvg-live: var(--brand-color-green);
+		--tvg-ink: var(--brand-color-ink);
+		--tvg-alt: #6b0000;
+		--tvg-alt-dark: #2a0000;
+		--tvg-alt-border: #aa2929;
+		--tvg-alt-dim: #3a0000;
+		--tvg-hover: #2929cc;
+		--tvg-off: #888;
+		--tvg-off-border: #555;
+		--tvg-paused: #ffd86b;
+
 		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		background: #0000aa;
-		color: #ffffff;
+		background: var(--tvg-bg);
+		color: var(--tvg-text);
 		min-height: 0;
 	}
 
 	/* ====== Preview pane ====== */
 	.tvg-preview {
-		background: #0000aa;
-		color: #fff;
-		border-bottom: 2px solid #ffffff;
+		background: var(--tvg-bg);
+		color: var(--tvg-text);
+		border-bottom: 2px solid var(--tvg-text);
 		flex-shrink: 0;
 	}
 	.tvg-preview-bar {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		background: #000066;
+		background: var(--tvg-dark);
 		padding: 5px 12px;
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
-		color: #f9bd2b;
-		border-bottom: 1px solid #4d4dcc;
+		color: var(--tvg-gold);
+		border-bottom: 1px solid var(--tvg-mid);
 	}
 	.tvg-preview-net { letter-spacing: 0.04em; }
 	.tvg-preview-main {
@@ -494,7 +511,7 @@
 	.tvg-preview-titleline {
 		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 22px;
-		color: #fff;
+		color: var(--tvg-text);
 		line-height: 1.15;
 	}
 	.tvg-preview-title { font-weight: 700; }
@@ -502,7 +519,7 @@
 	.tvg-preview-showname {
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
-		color: #f9bd2b;
+		color: var(--tvg-gold);
 		letter-spacing: 0.02em;
 		margin-top: 4px;
 	}
@@ -510,7 +527,7 @@
 	.tvg-preview-dialogue {
 		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 16px;
-		color: #fff;
+		color: var(--tvg-text);
 		margin-top: 6px;
 		line-height: 1.25;
 		display: flex;
@@ -519,7 +536,7 @@
 		flex-wrap: wrap;
 	}
 	.tvg-preview-who {
-		color: #a6f000;
+		color: var(--tvg-live);
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 8px;
 		letter-spacing: 0.02em;
@@ -529,9 +546,9 @@
 	.tvg-preview-cta {
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 10px;
-		background: #f54e00;
-		color: #fff;
-		border: 2px solid #fff;
+		background: var(--tvg-accent);
+		color: var(--tvg-text);
+		border: 2px solid var(--tvg-text);
 		padding: 12px 14px;
 		cursor: pointer;
 		letter-spacing: 0.05em;
@@ -540,14 +557,14 @@
 		text-align: center;
 		align-self: stretch;
 	}
-	.tvg-preview-cta:hover { background: #fff; color: #f54e00; }
+	.tvg-preview-cta:hover { background: var(--tvg-text); color: var(--tvg-accent); }
 	.tvg-preview-cta:active { transform: translate(1px, 1px); }
 	.tvg-preview-cta.off {
-		background: #000066;
-		border-color: #f9bd2b;
-		color: #f9bd2b;
+		background: var(--tvg-dark);
+		border-color: var(--tvg-gold);
+		color: var(--tvg-gold);
 	}
-	.tvg-preview-cta.off:hover { background: #f9bd2b; color: #000066; }
+	.tvg-preview-cta.off:hover { background: var(--tvg-gold); color: var(--tvg-dark); }
 
 	/* ====== Date bar ====== */
 	.tvg-datebar {
@@ -555,22 +572,22 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 6px 12px;
-		background: #000066;
-		color: #f9bd2b;
+		background: var(--tvg-dark);
+		color: var(--tvg-gold);
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 10px;
 		letter-spacing: 0.02em;
-		border-bottom: 1px solid #4d4dcc;
+		border-bottom: 1px solid var(--tvg-mid);
 		flex-shrink: 0;
 	}
-	.tvg-datebar-live { color: #fff; display: flex; align-items: center; gap: 6px; }
+	.tvg-datebar-live { color: var(--tvg-text); display: flex; align-items: center; gap: 6px; }
 	.tvg-now-dot {
 		display: inline-block;
-		color: #f54e00;
+		color: var(--tvg-accent);
 		animation: blink 1.4s steps(2, end) infinite;
 	}
-	.tvg-now-dot.live { color: #a6f000; }
-	.tvg-paused { color: #ffd86b; font-style: italic; }
+	.tvg-now-dot.live { color: var(--tvg-live); }
+	.tvg-paused { color: var(--tvg-paused); font-style: italic; }
 
 	/* ====== Scrolling timeline grid ====== */
 	.tvg-scroller {
@@ -578,7 +595,7 @@
 		overflow-x: hidden;
 		overflow-y: auto;
 		min-height: 0;
-		background: #0000aa;
+		background: var(--tvg-bg);
 		position: relative;
 	}
 	.tvg-grid {
@@ -593,16 +610,16 @@
 		position: sticky;
 		left: 0;
 		z-index: 2;
-		background: #000066;
-		border-right: 2px solid #fff;
-		border-bottom: 1px solid #4d4dcc;
+		background: var(--tvg-dark);
+		border-right: 2px solid var(--tvg-text);
+		border-bottom: 1px solid var(--tvg-mid);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 11px;
-		color: #f9bd2b;
+		color: var(--tvg-gold);
 		gap: 3px;
 		padding: 4px;
 		text-align: center;
@@ -610,68 +627,68 @@
 	.tvg-ch-head {
 		z-index: 3;
 		font-size: 11px;
-		color: #f9bd2b;
+		color: var(--tvg-gold);
 	}
-	.tvg-ch-cell.alt { background: #2a0000; }
-	.tvg-ch-cell.current { box-shadow: inset 3px 0 0 #a6f000; }
-	.ch-num { font-size: 13px; color: #fff; }
-	.ch-net { font-size: 8px; color: #a6f000; }
+	.tvg-ch-cell.alt { background: var(--tvg-alt-dark); }
+	.tvg-ch-cell.current { box-shadow: inset 3px 0 0 var(--tvg-live); }
+	.ch-num { font-size: 13px; color: var(--tvg-text); }
+	.ch-net { font-size: 8px; color: var(--tvg-live); }
 	.ch-open {
 		margin-top: 2px;
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 7px;
-		color: #a6f000;
+		color: var(--tvg-live);
 		letter-spacing: 0.04em;
-		background: var(--brand-color-ink, #0a0a0a);
+		background: var(--tvg-ink);
 		padding: 2px 4px;
-		border: 1px solid #a6f000;
+		border: 1px solid var(--tvg-live);
 		border-radius: 0;
 		animation: blink 1.4s steps(2, end) infinite;
 		cursor: pointer;
 	}
 	.ch-open:hover {
 		animation: none;
-		background: #a6f000;
-		color: #0a0a0a;
-		border-color: #0a0a0a;
+		background: var(--tvg-live);
+		color: var(--tvg-ink);
+		border-color: var(--tvg-ink);
 	}
 
 	/* Time header */
 	.tvg-time-cell {
-		background: #000066;
+		background: var(--tvg-dark);
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
-		color: #f9bd2b;
+		color: var(--tvg-gold);
 		text-align: center;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-right: 1px solid #4d4dcc;
-		border-bottom: 2px solid #fff;
+		border-right: 1px solid var(--tvg-mid);
+		border-bottom: 2px solid var(--tvg-text);
 		white-space: nowrap;
 		z-index: 1;
 		gap: 4px;
 	}
 	.tvg-time-cell.now {
-		background: #f9bd2b;
-		color: #0a0a0a;
+		background: var(--tvg-gold);
+		color: var(--tvg-ink);
 		font-weight: 700;
 	}
 	.tvg-time-cell.day-boundary {
-		background: #4d4dcc;
-		color: #fff;
+		background: var(--tvg-mid);
+		color: var(--tvg-text);
 	}
-	.tvg-day-mark { color: #a6f000; font-size: 8px; }
+	.tvg-day-mark { color: var(--tvg-live); font-size: 8px; }
 
 	/* Episode cells */
 	.tvg-ep-cell {
-		background: #0000aa;
-		border-right: 1px solid #4d4dcc;
-		border-bottom: 1px solid #4d4dcc;
+		background: var(--tvg-bg);
+		border-right: 1px solid var(--tvg-mid);
+		border-bottom: 1px solid var(--tvg-mid);
 		padding: 6px 8px;
 		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 16px;
-		color: #fff;
+		color: var(--tvg-text);
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
@@ -680,30 +697,30 @@
 		min-width: 0;
 		position: relative;
 	}
-	.tvg-ep-cell.alt { background: #6b0000; border-right-color: #aa2929; }
+	.tvg-ep-cell.alt { background: var(--tvg-alt); border-right-color: var(--tvg-alt-border); }
 	.tvg-ep-cell.off-air { opacity: 0.45; }
-	.tvg-ep-cell.off-air.alt { background: #3a0000; }
+	.tvg-ep-cell.off-air.alt { background: var(--tvg-alt-dim); }
 
-	.tvg-ep-cell:hover { background: #2929cc; opacity: 1; }
-	.tvg-ep-cell.alt:hover { background: #aa2929; }
-	.tvg-ep-cell:hover .ep-title { color: #a6f000; }
+	.tvg-ep-cell:hover { background: var(--tvg-hover); opacity: 1; }
+	.tvg-ep-cell.alt:hover { background: var(--tvg-alt-border); }
+	.tvg-ep-cell:hover .ep-title { color: var(--tvg-live); }
 
 	.tvg-ep-cell.now {
 		background: rgba(249, 189, 43, 0.18);
-		box-shadow: inset 0 0 0 2px #f9bd2b;
+		box-shadow: inset 0 0 0 2px var(--tvg-gold);
 	}
 	.tvg-ep-cell.now.alt { background: rgba(249, 189, 43, 0.30); }
-	.tvg-ep-cell.now .ep-title { color: #f9bd2b; font-weight: 700; }
+	.tvg-ep-cell.now .ep-title { color: var(--tvg-gold); font-weight: 700; }
 
 	.tvg-ep-cell.featured {
-		box-shadow: inset 0 0 0 3px #a6f000;
+		box-shadow: inset 0 0 0 3px var(--tvg-live);
 	}
-	.tvg-ep-cell.featured .ep-show-name { color: #a6f000; }
+	.tvg-ep-cell.featured .ep-show-name { color: var(--tvg-live); }
 
 	.ep-show {
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 8px;
-		color: #f9bd2b;
+		color: var(--tvg-gold);
 		letter-spacing: 0.02em;
 		margin-bottom: 4px;
 		display: flex;
@@ -711,26 +728,26 @@
 		gap: 5px;
 		flex-wrap: wrap;
 	}
-	.ep-show-name { color: #f9bd2b; }
+	.ep-show-name { color: var(--tvg-gold); }
 	.ep-runtime {
 		font-size: 7px;
-		color: #a6f000;
+		color: var(--tvg-live);
 		background: rgba(166, 240, 0, 0.12);
-		border: 1px solid #a6f000;
+		border: 1px solid var(--tvg-live);
 		padding: 1px 3px;
 		letter-spacing: 0.02em;
 	}
 	.ep-off {
 		font-size: 7px;
-		color: #888;
-		border: 1px solid #555;
+		color: var(--tvg-off);
+		border: 1px solid var(--tvg-off-border);
 		padding: 1px 3px;
 		letter-spacing: 0.04em;
 	}
 	.ep-title {
 		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 16px;
-		color: #fff;
+		color: var(--tvg-text);
 		line-height: 1.1;
 		white-space: nowrap;
 		overflow: hidden;
@@ -744,10 +761,10 @@
 	/* ====== Marquee ====== */
 	.tvg-marquee {
 		overflow: hidden;
-		background: #ffffff;
-		color: #0000aa;
+		background: var(--tvg-text);
+		color: var(--tvg-bg);
 		padding: 4px 0;
-		border-top: 2px solid #0a0a0a;
+		border-top: 2px solid var(--tvg-ink);
 		flex-shrink: 0;
 	}
 	.tvg-marquee-track {
