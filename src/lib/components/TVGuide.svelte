@@ -1,6 +1,15 @@
 <script lang="ts">
 	import type { GroupMeta, Bot, Channel, ChannelSlot } from '$lib/types';
 	import { getSlotIndex, getCurrentSlot, isShowOnAir } from '$lib/schedule';
+	import {
+		type TimeSlot,
+		type MergedCell,
+		getEpisodeInfo,
+		buildTimeSlots,
+		buildMergedCells,
+		formatGuideDate,
+		formatLiveClock
+	} from './tv-guide-utils';
 	import { onMount, untrack } from 'svelte';
 
 	let {
@@ -31,32 +40,10 @@
 		onFocusChat: (groupSlug: string) => void;
 	} = $props();
 
-	const SLOT_MINUTES = 30;
-	const DAY_SLOTS = 48;
 	const COLUMN_WIDTH_PX = 140;
 	const CHANNEL_COL_PX = 72;
 
 	let groupMap = $derived(new Map(groups.map((g) => [g.slug, g])));
-
-	interface TimeSlot {
-		label: string;
-		hour24: number;
-		minute: number;
-		isNow: boolean;
-		isDayBoundary: boolean;
-		slotIndex: number;
-	}
-
-	interface MergedCell {
-		startSlot: number;
-		span: number;
-		showSlug: string;
-		season: number;
-		episode: number;
-		title: string;
-		year: string;
-		isLive: boolean;
-	}
 
 	interface FeaturedShow {
 		channelSlug: string;
@@ -66,106 +53,6 @@
 		ch: number;
 		net: string;
 		isLive: boolean;
-	}
-
-	function getEpisodeInfo(slot: ChannelSlot): { title: string; year: string } | null {
-		const show = groupMap.get(slot.showSlug);
-		const ep = show?.episodes?.find((e) => e.season === slot.season && e.episode === slot.episode);
-		return ep ? { title: ep.title, year: ep.year } : null;
-	}
-
-	function buildTimeSlots(date: Date, tz?: string): TimeSlot[] {
-		const currentSlotIdx = getSlotIndex(date, tz);
-		const slots: TimeSlot[] = [];
-
-		for (let i = 0; i < DAY_SLOTS; i++) {
-			const slotIdx = (currentSlotIdx + i) % DAY_SLOTS;
-			const h24 = Math.floor(slotIdx / 2);
-			const m = (slotIdx % 2) * 30;
-			const h12 = h24 % 12 || 12;
-			const ampm = h24 >= 12 ? 'PM' : 'AM';
-			slots.push({
-				label: `${h12}:${String(m).padStart(2, '0')} ${ampm}`,
-				hour24: h24,
-				minute: m,
-				isNow: i === 0,
-				isDayBoundary: i > 0 && slotIdx === 0,
-				slotIndex: slotIdx
-			});
-		}
-		return slots;
-	}
-
-	function buildMergedCells(
-		channel: Channel,
-		slotOrder: TimeSlot[],
-		currentSlotIdx: number
-	): MergedCell[] {
-		const cells: MergedCell[] = [];
-		let i = 0;
-
-		while (i < slotOrder.length) {
-			const slotIdx = slotOrder[i].slotIndex;
-			const channelSlot = channel.schedule[slotIdx] ?? null;
-
-			if (!channelSlot) {
-				i++;
-				continue;
-			}
-
-			const epInfo = getEpisodeInfo(channelSlot);
-			let span = 1;
-
-			// Merge consecutive slots with the same show+episode
-			while (i + span < slotOrder.length) {
-				const nextSlotIdx = slotOrder[i + span].slotIndex;
-				const nextSlot = channel.schedule[nextSlotIdx] ?? null;
-				if (
-					nextSlot &&
-					nextSlot.showSlug === channelSlot.showSlug &&
-					nextSlot.season === channelSlot.season &&
-					nextSlot.episode === channelSlot.episode
-				) {
-					span++;
-				} else {
-					break;
-				}
-			}
-
-			// A cell is live if any of its slot indices equals the current slot
-			const isLive = slotOrder.slice(i, i + span).some((s) => s.slotIndex === currentSlotIdx);
-
-			cells.push({
-				startSlot: i,
-				span,
-				showSlug: channelSlot.showSlug,
-				season: channelSlot.season,
-				episode: channelSlot.episode,
-				title: epInfo?.title ?? `S${channelSlot.season}E${channelSlot.episode}`,
-				year: epInfo?.year ?? '',
-				isLive
-			});
-
-			i += span;
-		}
-		return cells;
-	}
-
-	function formatGuideDate(d: Date, tz?: string): string {
-		const opts: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-		if (tz) opts.timeZone = tz;
-		return new Intl.DateTimeFormat('en-US', opts).format(d).toUpperCase();
-	}
-
-	function formatLiveClock(d: Date, tz?: string): string {
-		const opts: Intl.DateTimeFormatOptions = {
-			hour: 'numeric',
-			minute: '2-digit',
-			second: '2-digit',
-			hour12: true
-		};
-		if (tz) opts.timeZone = tz;
-		return new Intl.DateTimeFormat('en-US', opts).format(d);
 	}
 
 	function getGroupBots(group: GroupMeta): Bot[] {
@@ -184,7 +71,7 @@
 	let schedule = $derived.by(() => {
 		return sortedChannels.map((channel) => ({
 			channel,
-			cells: buildMergedCells(channel, slots, currentSlotIdx)
+			cells: buildMergedCells(channel, slots, currentSlotIdx, groupMap)
 		}));
 	});
 
@@ -194,7 +81,7 @@
 			const slot = getCurrentSlot(channel, slotNow, timezone);
 			if (slot) {
 				const show = groupMap.get(slot.showSlug);
-				const epInfo = getEpisodeInfo(slot);
+				const epInfo = getEpisodeInfo(slot, groupMap);
 				const showName = show?.name ?? slot.showSlug;
 				const epTitle = epInfo ? ` — "${epInfo.title}"` : '';
 				nowPlaying.push(`● CH${channel.number} ${showName.toUpperCase()}${epTitle}`);
@@ -212,11 +99,14 @@
 		if (firstLive) {
 			const liveCell = firstLive.cells.find((c) => c.isLive);
 			if (liveCell) {
-				const epInfo = getEpisodeInfo({
-					showSlug: liveCell.showSlug,
-					season: liveCell.season,
-					episode: liveCell.episode
-				});
+				const epInfo = getEpisodeInfo(
+					{
+						showSlug: liveCell.showSlug,
+						season: liveCell.season,
+						episode: liveCell.episode
+					},
+					groupMap
+				);
 				featured = {
 					channelSlug: firstLive.channel.slug,
 					showSlug: liveCell.showSlug,
@@ -279,7 +169,7 @@
 	function selectFeaturedFromChannel(channel: Channel) {
 		const slot = getCurrentSlot(channel, slotNow, timezone);
 		if (slot) {
-			const epInfo = getEpisodeInfo(slot);
+			const epInfo = getEpisodeInfo(slot, groupMap);
 			featured = {
 				channelSlug: channel.slug,
 				showSlug: slot.showSlug,
@@ -293,7 +183,7 @@
 			// Find first non-null slot on this channel
 			const firstSlot = channel.schedule.find((s): s is ChannelSlot => s !== null);
 			if (firstSlot) {
-				const epInfo = getEpisodeInfo(firstSlot);
+				const epInfo = getEpisodeInfo(firstSlot, groupMap);
 				featured = {
 					channelSlug: channel.slug,
 					showSlug: firstSlot.showSlug,
