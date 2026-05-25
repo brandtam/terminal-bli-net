@@ -425,9 +425,7 @@
 
 	const activeChatGroupSlug = $derived.by(() => {
 		if (!activeId?.startsWith('chat-')) return null;
-		const botId = activeId.replace('chat-', '');
-		const bot = bots.find((b) => b.id === botId);
-		return bot?.group ?? null;
+		return activeId.replace('chat-', '');
 	});
 
 	function setTimezone(tz: string) {

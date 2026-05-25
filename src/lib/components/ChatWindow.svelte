@@ -180,7 +180,8 @@
 
 				for (const line of lines) {
 					if (!line.startsWith('data: ')) continue;
-					const chunk: TextChunk = JSON.parse(line.slice(6));
+					let chunk: TextChunk;
+					try { chunk = JSON.parse(line.slice(6)); } catch { continue; }
 					if (chunk.type === 'text' && chunk.text) {
 						streamingText += chunk.text;
 					} else if (chunk.type === 'done') {
@@ -338,7 +339,7 @@
 		height: 36px;
 		border: 2px solid var(--ink);
 		background: var(--accent-2);
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 10px;
 		display: flex;
 		align-items: center;
@@ -346,14 +347,14 @@
 		flex-shrink: 0;
 	}
 	.who {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 10px;
 		line-height: 1.4;
 		min-width: 0;
 	}
 	.who small {
 		display: block;
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 15px;
 		margin-top: 4px;
 		opacity: 0.75;
@@ -367,7 +368,7 @@
 		flex-shrink: 0;
 	}
 	.countdown {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 8px;
 		color: var(--accent);
 	}
@@ -379,7 +380,7 @@
 		flex-direction: column;
 		gap: 10px;
 		background: var(--paper);
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 19px;
 		line-height: 1.3;
 	}
@@ -398,7 +399,7 @@
 	}
 	.who-label {
 		display: block;
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 8px;
 		margin-bottom: 4px;
 		opacity: 0.7;
@@ -421,7 +422,7 @@
 		font-size: 16px;
 	}
 	.bubble.typing {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 10px;
 	}
 	@keyframes blink {
@@ -449,7 +450,7 @@
 		border: none;
 		background: var(--paper);
 		padding: 10px 12px;
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 19px;
 		outline: none;
 	}
@@ -459,7 +460,7 @@
 		background: var(--accent);
 		color: var(--paper);
 		padding: 0 16px;
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 10px;
 		cursor: pointer;
 		letter-spacing: 1px;
@@ -476,7 +477,7 @@
 		padding: 8px 12px;
 		background: var(--ink);
 		color: var(--accent-2);
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
 		letter-spacing: 0.03em;
 		line-height: 1.4;

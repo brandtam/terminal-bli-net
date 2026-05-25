@@ -93,8 +93,11 @@
 					createFile(RECORDINGS_ID, name, 'recorder', dataUrl);
 					refreshRecordings();
 					playbackUrl = dataUrl;
-				} catch {
-					error = 'Storage full — delete old recordings to free space.';
+				} catch (e) {
+					const msg = e instanceof Error ? e.message : '';
+					error = msg.includes('already exists')
+						? 'A recording with that name already exists.'
+						: 'Storage full — delete old recordings to free space.';
 				}
 			};
 			reader.readAsDataURL(blob);
