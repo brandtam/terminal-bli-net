@@ -25,7 +25,8 @@
 	import TVGuide from './TVGuide.svelte';
 	import WelcomeWindow from '$lib/apps/welcome/WelcomeWindow.svelte';
 	import TextEditWindow from '$lib/apps/textedit/TextEditWindow.svelte';
-	import { loadDocs, getDoc } from '$lib/apps/textedit/textedit-docs';
+	import { findDocByName } from '$lib/apps/textedit/textedit-docs';
+	import { readFile } from '$lib/os/filesystem';
 	import StatsWindow from '$lib/apps/stats/StatsWindow.svelte';
 	import ErrorDialog from '$lib/apps/finder/ErrorDialog.svelte';
 	import TrashWindow from '$lib/apps/finder/TrashWindow.svelte';
@@ -33,6 +34,8 @@
 	import RecorderWindow from '$lib/apps/recorder/RecorderWindow.svelte';
 	import StickiesNote from '$lib/apps/stickies/StickiesNote.svelte';
 	import type { StickyNote } from '$lib/apps/stickies/StickiesNote.svelte';
+	import FinderWindow from '$lib/apps/finder/FinderWindow.svelte';
+	import { seedFilesystem } from '$lib/os/filesystem-seed';
 
 	let groups = $state<GroupMeta[]>([]);
 	let bots = $state<Bot[]>([]);
@@ -104,7 +107,7 @@
 		timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 		isMobile = window.innerWidth < 720;
 		stickyNotes = loadStickyNotes();
-		loadDocs(); // seed default documents if none exist
+		seedFilesystem(); // seed filesystem default files
 
 		fetch('/api/data')
 			.then((res) => (res.ok ? res.json() : null))
@@ -192,9 +195,9 @@
 
 	const KNOWN_WINDOW_IDS = new Set([
 		'welcome', 'tv-guide', 'terminal-prefs', 'tvguide-prefs', 'chatrbot-prefs',
-		'pricing', 'readme', 'about', 'about-chatrbot', 'about-tvguide',
+		'about', 'about-chatrbot', 'about-tvguide',
 		'about-textedit', 'about-stats', 'about-stickies', 'about-recorder',
-		'stats', 'error', 'trash', 'recorder'
+		'stats', 'error', 'trash', 'recorder', 'finder'
 	]);
 
 	function isKnownWindowId(id: string): boolean {
@@ -208,8 +211,6 @@
 			'terminal-prefs': { title: 'Terminal Preferences', w: 380, h: 360 },
 			'tvguide-prefs': { title: 'TV Guide Preferences', w: 360, h: 360 },
 			'chatrbot-prefs': { title: 'chatrbot Preferences', w: 360, h: 280 },
-			pricing: { title: 'Pricing.txt', w: 460, h: 380 },
-			readme: { title: 'README.TXT', w: 380, h: 420 },
 			about: { title: 'About Terminal', w: 420, h: 480 },
 			'about-chatrbot': { title: 'About chatrbot', w: 420, h: 460 },
 			'about-tvguide': { title: 'About TV Guide', w: 420, h: 460 },
@@ -220,7 +221,8 @@
 			error: { title: 'System Error', w: 420, h: 260 },
 			trash: { title: 'Trash — empty', w: 380, h: 320 },
 			recorder: { title: 'Camera.app', w: 360, h: 480 },
-			'about-recorder': { title: 'About Recorder', w: 420, h: 360 }
+			'about-recorder': { title: 'About Recorder', w: 420, h: 360 },
+			finder: { title: 'Terminal HD', w: 480, h: 420 }
 		};
 		if (id.startsWith('chat-')) {
 			const showSlug = id.replace('chat-', '');
@@ -232,10 +234,10 @@
 			};
 		}
 		if (id.startsWith('textedit-')) {
-			const docId = id.replace('textedit-', '');
-			const doc = getDoc(docId);
+			const fileId = id.replace('textedit-', '');
+			const file = readFile(fileId);
 			return {
-				title: doc?.name || 'Untitled.txt',
+				title: file?.name || 'Untitled.txt',
 				w: 420,
 				h: 400
 			};
@@ -320,6 +322,11 @@
 		// TODO: open email opt-in
 	}
 
+	function openTextEditFile(name: string) {
+		const file = findDocByName(name);
+		if (file) openWindow(`textedit-${file.id}`);
+	}
+
 	let cameraRecording = $state(false);
 
 	const activeChatGroupSlug = $derived.by(() => {
@@ -352,9 +359,12 @@
 				return;
 			}
 			if (appId === 'textedit') {
-				if (payload?.open === 'README.txt') return openWindow('readme');
-				if (payload?.open === 'Pricing.txt') return openWindow('pricing');
-				return openWindow('readme');
+				if (payload?.open) {
+					openTextEditFile(payload.open as string);
+					return;
+				}
+				openTextEditFile('README.TXT');
+				return;
 			}
 			if (appId === 'stickies') {
 				if (payload?.action === 'new') {
@@ -468,19 +478,19 @@
 
 	{#if !isMobile || windows.length === 0}
 		<div class="desktop-icons left">
-			<DesktopIcon label="Terminal HD" ondblclick={() => openWindow('welcome')}>
+			<DesktopIcon label="Terminal HD" ondblclick={() => openWindow('finder')}>
 				<PixelIcon kind="hd" />
 			</DesktopIcon>
 			<DesktopIcon label="TV Guide.app" ondblclick={() => openWindow('tv-guide')}>
 				<PixelIcon kind="tvguide" />
 			</DesktopIcon>
-			<DesktopIcon label="README.txt" ondblclick={() => openWindow('readme')}>
+			<DesktopIcon label="README.txt" ondblclick={() => openTextEditFile('README.TXT')}>
 				<PixelIcon kind="doc" />
 			</DesktopIcon>
 		</div>
 
 		<div class="desktop-icons right">
-			<DesktopIcon label="Pricing.txt" ondblclick={() => openWindow('pricing')}>
+			<DesktopIcon label="Pricing.txt" ondblclick={() => openTextEditFile('Pricing.txt')}>
 				<PixelIcon kind="doc" accent />
 			</DesktopIcon>
 			<DesktopIcon label="Stickies" ondblclick={() => createStickyNote()}>
@@ -638,9 +648,9 @@
 						Coming later: typing speed, sound effects, default opener.
 					</p>
 				</div>
-			{:else if w.id === 'pricing' || w.id === 'readme' || w.id.startsWith('textedit-')}
-				{@const texteditDocId = w.id.startsWith('textedit-') ? w.id.replace('textedit-', '') : w.id}
-				<TextEditWindow docId={texteditDocId} />
+			{:else if w.id.startsWith('textedit-')}
+				{@const fileId = w.id.replace('textedit-', '')}
+				<TextEditWindow docId={fileId} />
 			{:else if w.id === 'about' || w.id.startsWith('about-')}
 				{@const aboutAppId = w.id === 'about' ? 'finder' : w.id.replace('about-', '')}
 				{@const aboutApp = APPS[aboutAppId]}
@@ -665,6 +675,8 @@
 						onupdate={updateStickyNote}
 					/>
 				{/if}
+			{:else if w.id === 'finder'}
+				<FinderWindow {os} />
 			{:else}
 				<div class="window-content">
 					<p>Coming soon...</p>
