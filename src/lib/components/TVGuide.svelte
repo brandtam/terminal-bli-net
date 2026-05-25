@@ -60,6 +60,7 @@
 	}
 
 	let scrollerEl = $state<HTMLDivElement | null>(null);
+	let fixedEl = $state<HTMLDivElement | null>(null);
 	let paused = $state(false);
 	let featured = $state<FeaturedShow | null>(null);
 
@@ -218,6 +219,58 @@
 </script>
 
 <div class="tvguide">
+	{#snippet epCell(
+		channel: Channel,
+		cell: MergedCell,
+		chIdx: number,
+		isAlt: boolean,
+		colStart: number,
+		colSpan: number,
+		pinned: boolean
+	)}
+		{@const showGroup = groupMap.get(cell.showSlug)}
+		{@const isFeatured =
+			featured &&
+			featured.channelSlug === channel.slug &&
+			featured.showSlug === cell.showSlug &&
+			featured.title === cell.title}
+		<div
+			class="tvg-cell tvg-ep-cell"
+			class:now={cell.isLive && pinned}
+			class:live={cell.isLive}
+			class:featured={isFeatured}
+			class:alt={isAlt}
+			class:tvg-now-col={pinned}
+			style="grid-column: {colStart} / span {colSpan}; grid-row: {chIdx + 2};"
+			role="button"
+			tabindex="0"
+			aria-label="{showGroup?.name ?? cell.showSlug} - {cell.title}{cell.isLive
+				? ' (live)'
+				: ' (off air)'}"
+			onclick={() => selectFeaturedFromCell(channel, cell)}
+			ondblclick={() => handleCellDblClick(cell)}
+			onkeydown={(e) => {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					if (cell.isLive) handleCellDblClick(cell);
+					else selectFeaturedFromCell(channel, cell);
+				} else if (e.key === ' ') {
+					e.preventDefault();
+					selectFeaturedFromCell(channel, cell);
+				}
+			}}
+			title={cell.isLive ? 'Click to preview · double-click to chat' : 'Off air — click to preview'}
+		>
+			<div class="ep-show">
+				<span class="ep-show-name">{(showGroup?.name ?? cell.showSlug).toUpperCase()}</span>
+				{#if colSpan > 1}<span class="ep-runtime">{colSpan * 30}MIN</span>{/if}
+			</div>
+			<div class="ep-title">
+				"{cell.title}" {#if cell.year}<span class="ep-year">({cell.year})</span>{/if}
+			</div>
+		</div>
+	{/snippet}
+
 	<!-- Preview Pane -->
 	{#if featured}
 		{@const feat = featured}
@@ -282,10 +335,9 @@
 		</button>
 	</div>
 
-	<!-- Scrolling Timeline Grid -->
+	<!-- Timeline Grid: fixed left (CH + NOW) + scrolling right -->
 	<div
-		class="tvg-scroller"
-		bind:this={scrollerEl}
+		class="tvg-schedule"
 		onmouseenter={pauseOnHover
 			? () => {
 					paused = true;
@@ -297,102 +349,107 @@
 				}
 			: undefined}
 	>
-		<div
-			class="tvg-grid"
-			style="grid-template-columns: {CHANNEL_COL_PX}px repeat({slots.length}, {COLUMN_WIDTH_PX}px);"
-		>
-			<!-- Header row: CH + time slots -->
-			<div class="tvg-cell tvg-ch-cell tvg-ch-head" style="grid-column: 1; grid-row: 1;">CH</div>
-			{#each slots as s, i}
-				<div
-					class="tvg-cell tvg-time-cell"
-					class:now={s.isNow}
-					class:day-boundary={s.isDayBoundary}
-					style="grid-column: {i + 2}; grid-row: 1;"
-				>
-					{#if s.isNow}<span class="tvg-now-dot">●</span>{/if}
-					{#if s.isDayBoundary}<span class="tvg-day-mark">→ </span>{/if}
-					{s.label}
-				</div>
-			{/each}
-
-			<!-- Channel rows -->
-			{#each schedule as { channel, cells }, chIdx}
-				{@const isAlt = chIdx % 2 === 1}
-				{@const currentShowSlug = getCurrentSlot(channel, slotNow, timezone)?.showSlug ?? null}
-				<div
-					class="tvg-cell tvg-ch-cell"
-					class:alt={isAlt}
-					class:current={currentShowSlug === activeChatGroupSlug && activeChatGroupSlug !== null}
-					style="grid-column: 1; grid-row: {chIdx + 2}; cursor: pointer;"
-					role="button"
-					tabindex="0"
-					onclick={() => selectFeaturedFromChannel(channel)}
-					onkeydown={(e) => {
-						if (e.key === 'Enter' || e.key === ' ') {
-							e.preventDefault();
-							selectFeaturedFromChannel(channel);
-						}
-					}}
-				>
-					<div class="ch-num">{String(channel.number).padStart(2, '0')}</div>
-					<div class="ch-net">{channel.network}</div>
-					{#if currentShowSlug === activeChatGroupSlug && activeChatGroupSlug !== null}
-						<button
-							class="ch-open"
-							onclick={(e) => {
-								e.stopPropagation();
-								if (activeChatGroupSlug) onFocusChat(activeChatGroupSlug);
-							}}
-							title="Bring chat window to front">● open</button
-						>
-					{/if}
+		<!-- Fixed panel: CH + NOW -->
+		<div class="tvg-fixed" bind:this={fixedEl}>
+			<div
+				class="tvg-fixed-grid"
+				style="grid-template-columns: {CHANNEL_COL_PX}px {COLUMN_WIDTH_PX}px;"
+			>
+				<div class="tvg-cell tvg-ch-cell tvg-ch-head" style="grid-column: 1; grid-row: 1;">CH</div>
+				<div class="tvg-cell tvg-time-cell now" style="grid-column: 2; grid-row: 1;">
+					<span class="tvg-now-dot">●</span>
+					{slots[0].label}
 				</div>
 
-				{#each cells as cell}
-					{@const showGroup = groupMap.get(cell.showSlug)}
-					{@const isFeatured =
-						featured &&
-						featured.channelSlug === channel.slug &&
-						featured.showSlug === cell.showSlug &&
-						featured.title === cell.title}
+				{#each schedule as { channel, cells }, chIdx}
+					{@const isAlt = chIdx % 2 === 1}
+					{@const currentShowSlug = getCurrentSlot(channel, slotNow, timezone)?.showSlug ?? null}
+					{@const nowCell = cells.find((c) => c.startSlot === 0)}
 					<div
-						class="tvg-cell tvg-ep-cell"
-						class:now={cell.isLive && cell.startSlot === 0}
-						class:live={cell.isLive}
-						class:featured={isFeatured}
+						class="tvg-cell tvg-ch-cell"
 						class:alt={isAlt}
-						style="grid-column: {cell.startSlot + 2} / span {cell.span}; grid-row: {chIdx + 2};"
+						class:current={currentShowSlug === activeChatGroupSlug && activeChatGroupSlug !== null}
+						style="grid-column: 1; grid-row: {chIdx + 2}; cursor: pointer;"
 						role="button"
 						tabindex="0"
-						aria-label="{groupMap.get(cell.showSlug)?.name ??
-							cell.showSlug} - {cell.title}{cell.isLive ? ' (live)' : ' (off air)'}"
-						onclick={() => selectFeaturedFromCell(channel, cell)}
-						ondblclick={() => handleCellDblClick(cell)}
+						onclick={() => selectFeaturedFromChannel(channel)}
 						onkeydown={(e) => {
-							if (e.key === 'Enter') {
+							if (e.key === 'Enter' || e.key === ' ') {
 								e.preventDefault();
-								if (cell.isLive) handleCellDblClick(cell);
-								else selectFeaturedFromCell(channel, cell);
-							} else if (e.key === ' ') {
-								e.preventDefault();
-								selectFeaturedFromCell(channel, cell);
+								selectFeaturedFromChannel(channel);
 							}
 						}}
-						title={cell.isLive
-							? `Click to preview · double-click to chat`
-							: `Off air — click to preview`}
 					>
-						<div class="ep-show">
-							<span class="ep-show-name">{(showGroup?.name ?? cell.showSlug).toUpperCase()}</span>
-							{#if cell.span > 1}<span class="ep-runtime">{cell.span * 30}MIN</span>{/if}
-						</div>
-						<div class="ep-title">
-							"{cell.title}" {#if cell.year}<span class="ep-year">({cell.year})</span>{/if}
-						</div>
+						<div class="ch-num">{String(channel.number).padStart(2, '0')}</div>
+						<div class="ch-net">{channel.network}</div>
+						{#if currentShowSlug === activeChatGroupSlug && activeChatGroupSlug !== null}
+							<button
+								class="ch-open"
+								onclick={(e) => {
+									e.stopPropagation();
+									if (activeChatGroupSlug) onFocusChat(activeChatGroupSlug);
+								}}
+								title="Bring chat window to front">● open</button
+							>
+						{/if}
 					</div>
+
+					<!-- NOW cell -->
+					{#if nowCell}
+						{@render epCell(channel, nowCell, chIdx, isAlt, 2, 1, true)}
+					{:else}
+						<div
+							class="tvg-cell tvg-ep-cell tvg-now-col off-air"
+							class:alt={isAlt}
+							style="grid-column: 2; grid-row: {chIdx + 2};"
+						>
+							<div class="ep-show"><span class="ep-show-name">OFF AIR</span></div>
+						</div>
+					{/if}
 				{/each}
-			{/each}
+			</div>
+		</div>
+
+		<!-- Scrollable panel: remaining time slots -->
+		<div
+			class="tvg-scroller"
+			bind:this={scrollerEl}
+			onscroll={() => {
+				if (fixedEl && scrollerEl) fixedEl.scrollTop = scrollerEl.scrollTop;
+			}}
+		>
+			<div
+				class="tvg-scroll-grid"
+				style="grid-template-columns: repeat({slots.length - 1}, {COLUMN_WIDTH_PX}px);"
+			>
+				{#each slots as s, i}
+					{#if i > 0}
+						<div
+							class="tvg-cell tvg-time-cell"
+							class:day-boundary={s.isDayBoundary}
+							style="grid-column: {i}; grid-row: 1;"
+						>
+							{#if s.isDayBoundary}<span class="tvg-day-mark">→ </span>{/if}
+							{s.label}
+						</div>
+					{/if}
+				{/each}
+
+				{#each schedule as { channel, cells }, chIdx}
+					{@const isAlt = chIdx % 2 === 1}
+					{@const nowCell = cells.find((c) => c.startSlot === 0)}
+
+					{#if nowCell && nowCell.span > 1}
+						{@render epCell(channel, nowCell, chIdx, isAlt, 1, nowCell.span - 1, false)}
+					{/if}
+
+					{#each cells as cell}
+						{#if cell.startSlot > 0}
+							{@render epCell(channel, cell, chIdx, isAlt, cell.startSlot, cell.span, false)}
+						{/if}
+					{/each}
+				{/each}
+			</div>
 		</div>
 	</div>
 
@@ -551,27 +608,43 @@
 		font-style: italic;
 	}
 
-	/* ====== Scrolling timeline grid ====== */
+	/* ====== Two-panel timeline grid ====== */
+	.tvg-schedule {
+		display: flex;
+		flex: 1;
+		min-height: 0;
+	}
+	.tvg-fixed {
+		flex-shrink: 0;
+		overflow-y: auto;
+		background: var(--tvg-bg);
+		border-right: 2px solid var(--tvg-gold);
+		scrollbar-width: none;
+	}
+	.tvg-fixed::-webkit-scrollbar {
+		display: none;
+	}
+	.tvg-fixed-grid {
+		display: grid;
+		grid-auto-rows: 64px;
+	}
 	.tvg-scroller {
 		flex: 1;
 		overflow-x: hidden;
 		overflow-y: auto;
+		min-width: 0;
 		min-height: 0;
 		background: var(--tvg-bg);
-		position: relative;
 	}
-	.tvg-grid {
+	.tvg-scroll-grid {
 		display: grid;
 		grid-auto-rows: 64px;
 		width: max-content;
 		min-width: 100%;
 	}
 
-	/* Sticky channel column */
+	/* Channel column */
 	.tvg-ch-cell {
-		position: sticky;
-		left: 0;
-		z-index: 2;
 		background: var(--tvg-dark);
 		border-right: 2px solid var(--tvg-text);
 		border-bottom: 1px solid var(--tvg-mid);
@@ -587,7 +660,6 @@
 		text-align: center;
 	}
 	.tvg-ch-head {
-		z-index: 3;
 		font-size: 11px;
 		color: var(--tvg-gold);
 	}
@@ -623,6 +695,15 @@
 		background: var(--tvg-live);
 		color: var(--tvg-ink);
 		border-color: var(--tvg-ink);
+	}
+
+	/* NOW column */
+	.tvg-now-col.off-air {
+		background: var(--tvg-dark);
+		cursor: default;
+	}
+	.tvg-now-col.off-air.alt {
+		background: var(--tvg-alt-dark);
 	}
 
 	/* Time header */
