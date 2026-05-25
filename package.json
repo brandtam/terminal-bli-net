@@ -14,7 +14,8 @@
 		"test:unit:watch": "vitest",
 		"lint": "prettier --check . && eslint .",
 		"lint:bots": "node scripts/lint-bots.js",
-		"format": "prettier --write ."
+		"format": "prettier --write .",
+		"prepare": "husky"
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.39.0",
@@ -26,6 +27,7 @@
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20241230.0",
+		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.49.0",
 		"@sveltejs/adapter-cloudflare": "^4.1.0",
 		"@sveltejs/kit": "^2.8.0",
@@ -35,6 +37,8 @@
 		"eslint": "^9.16.0",
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-svelte": "^2.46.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^17.0.5",
 		"prettier": "^3.4.0",
 		"prettier-plugin-svelte": "^3.3.0",
 		"svelte": "^5.12.0",
@@ -44,5 +48,13 @@
 		"vite": "^5.4.0",
 		"vitest": "^2.1.0",
 		"wrangler": "^3.99.0"
+	},
+	"lint-staged": {
+		"*.{ts,svelte,js,css,json}": [
+			"prettier --write"
+		],
+		"*.{ts,svelte,js}": [
+			"eslint --fix"
+		]
 	}
 }
