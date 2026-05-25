@@ -51,17 +51,22 @@
 		{ tz: 'Asia/Tokyo', label: 'Tokyo (UTC+9)' },
 		{ tz: 'Australia/Sydney', label: 'Sydney (UTC+10)' },
 		{ tz: 'Pacific/Noumea', label: 'Noumea (UTC+11)' },
-		{ tz: 'Pacific/Auckland', label: 'Auckland (UTC+12)' },
+		{ tz: 'Pacific/Auckland', label: 'Auckland (UTC+12)' }
 	];
 
 	const osMenuItems: AppMenuItem[] = [
 		{ type: 'action', label: 'About Terminal', action: (os) => os.openAbout(null) },
 		{ type: 'action', label: 'Welcome', action: (os) => os.openWindow('welcome') },
 		{ type: 'separator' },
-		{ type: 'action', label: 'Tweaks…', shortcut: '⌘,', action: (os) => os.openTweaks() },
+		{
+			type: 'action',
+			label: 'System Preferences…',
+			shortcut: '⌘,',
+			action: (os) => os.openSystemPreferences()
+		},
 		{ type: 'separator' },
 		{ type: 'action', label: 'Restart', action: (os) => os.openWindow('error') },
-		{ type: 'action', label: "Shut Down (don't)", action: (os) => os.openWindow('error') },
+		{ type: 'action', label: "Shut Down (don't)", action: (os) => os.openWindow('error') }
 	];
 
 	let appMenus = $derived(app.menus(os));
@@ -120,7 +125,10 @@
 	function handleMenuItemClick(item: AppMenuItem) {
 		if (item.type === 'separator') return;
 		openMenu = null;
-		if (item.type === 'check') { item.toggle(os); return; }
+		if (item.type === 'check') {
+			item.toggle(os);
+			return;
+		}
 		if (item.type === 'action' && !item.disabled && item.action) item.action(os);
 	}
 
@@ -140,12 +148,17 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="menubar" onmouseleave={() => (openMenu = null)}>
 	<!-- ● Apple menu — OS-owned, always present -->
-	<div class="menu-wrapper" onmouseenter={() => { if (openMenu) openMenu = '__os'; }}>
+	<div
+		class="menu-wrapper"
+		onmouseenter={() => {
+			if (openMenu) openMenu = '__os';
+		}}
+	>
 		<span
 			class="apple menu-item"
 			class:open={openMenu === '__os'}
-			onclick={() => (openMenu = openMenu === '__os' ? null : '__os')}
-		>●</span>
+			onclick={() => (openMenu = openMenu === '__os' ? null : '__os')}>●</span
+		>
 		{#if openMenu === '__os'}
 			<div class="dropdown">
 				{#each osMenuItems as it}
@@ -158,7 +171,9 @@
 							class:disabled={'disabled' in it && it.disabled}
 							onclick={() => handleMenuItemClick(it)}
 						>
-							<span>{it.type === 'check' ? `${it.checked ? '✓ ' : '  '}${it.label}` : it.label}</span>
+							<span
+								>{it.type === 'check' ? `${it.checked ? '✓ ' : '  '}${it.label}` : it.label}</span
+							>
 							{#if 'shortcut' in it && it.shortcut}<span class="shortcut">{it.shortcut}</span>{/if}
 						</div>
 					{/if}
@@ -172,12 +187,17 @@
 
 	<!-- App-defined menus from the registry -->
 	{#each appMenus as menu}
-		<div class="menu-wrapper" onmouseenter={() => { if (openMenu) openMenu = menu.label; }}>
+		<div
+			class="menu-wrapper"
+			onmouseenter={() => {
+				if (openMenu) openMenu = menu.label;
+			}}
+		>
 			<span
 				class="menu-item"
 				class:open={openMenu === menu.label}
-				onclick={() => (openMenu = openMenu === menu.label ? null : menu.label)}
-			>{menu.label}</span>
+				onclick={() => (openMenu = openMenu === menu.label ? null : menu.label)}>{menu.label}</span
+			>
 			{#if openMenu === menu.label}
 				<div class="dropdown">
 					{#each menu.items as it}
@@ -196,7 +216,8 @@
 									{/if}
 									{it.label}
 								</span>
-								{#if 'shortcut' in it && it.shortcut}<span class="shortcut">{it.shortcut}</span>{/if}
+								{#if 'shortcut' in it && it.shortcut}<span class="shortcut">{it.shortcut}</span
+									>{/if}
 							</div>
 						{/if}
 					{/each}
@@ -224,7 +245,11 @@
 		<div
 			class="clock-wrap"
 			class:open={tzOpen}
-			onclick={(e) => { e.stopPropagation(); tzOpen = !tzOpen; openMenu = null; }}
+			onclick={(e) => {
+				e.stopPropagation();
+				tzOpen = !tzOpen;
+				openMenu = null;
+			}}
 			title="Click to change time zone"
 		>
 			<span class="clock">{clock}</span>
@@ -239,7 +264,10 @@
 						<div
 							class="tz-item"
 							class:selected
-							onclick={() => { onSetTimezone?.(opt.tz); tzOpen = false; }}
+							onclick={() => {
+								onSetTimezone?.(opt.tz);
+								tzOpen = false;
+							}}
 						>
 							<span class="tz-check">{selected ? '✓' : ''}</span>
 							<span class="tz-item-label">{opt.label}</span>
@@ -270,7 +298,10 @@
 		letter-spacing: 0.02em;
 		color: var(--chrome-menubar-fg, var(--ink));
 	}
-	.apple { font-size: 18px; line-height: 1; }
+	.apple {
+		font-size: 18px;
+		line-height: 1;
+	}
 	.menu-item {
 		cursor: pointer;
 		padding: 2px 6px;
@@ -282,8 +313,12 @@
 		background: var(--chrome-menubar-hover-bg, var(--ink));
 		color: var(--chrome-menubar-hover-fg, var(--paper));
 	}
-	.app-name { font-weight: 600; }
-	.menu-wrapper { position: relative; }
+	.app-name {
+		font-weight: 600;
+	}
+	.menu-wrapper {
+		position: relative;
+	}
 	.dropdown {
 		position: absolute;
 		top: 22px;
@@ -305,7 +340,10 @@
 		cursor: pointer;
 		align-items: center;
 	}
-	.dropdown-item.disabled { opacity: 0.4; cursor: default; }
+	.dropdown-item.disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
 	.dropdown-item:not(.disabled):hover {
 		background: var(--chrome-menubar-hover-bg, var(--ink));
 		color: var(--chrome-menubar-hover-fg, var(--paper));
@@ -333,7 +371,9 @@
 		align-items: center;
 		font-size: 14px;
 	}
-	.info { font-family: var(--brand-font-body, 'VT323', monospace); }
+	.info {
+		font-family: var(--brand-font-body, 'VT323', monospace);
+	}
 	.context-info {
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 8px;
@@ -351,14 +391,26 @@
 		background: var(--ink);
 		color: var(--paper);
 	}
-	.status-extra.status-live { color: var(--accent-2); }
+	.status-extra.status-live {
+		color: var(--accent-2);
+	}
 	.status-dot {
 		font-size: 7px;
 		color: var(--accent);
 		animation: blink 1.4s steps(2, end) infinite;
 	}
-	.rec { display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 2px 6px; border-radius: 0; }
-	.rec:hover { background: var(--chrome-menubar-hover-bg, var(--ink)); color: var(--chrome-menubar-hover-fg, var(--paper)); }
+	.rec {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		cursor: pointer;
+		padding: 2px 6px;
+		border-radius: 0;
+	}
+	.rec:hover {
+		background: var(--chrome-menubar-hover-bg, var(--ink));
+		color: var(--chrome-menubar-hover-fg, var(--paper));
+	}
 	.rec-dot {
 		display: inline-block;
 		width: 8px;
@@ -386,7 +438,10 @@
 		color: var(--chrome-menubar-hover-fg, var(--paper));
 		border-color: var(--chrome-menubar-hover-bg, var(--ink));
 	}
-	.clock { letter-spacing: 0.02em; white-space: nowrap; }
+	.clock {
+		letter-spacing: 0.02em;
+		white-space: nowrap;
+	}
 	.tz-badge {
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 8px;
@@ -395,7 +450,9 @@
 		letter-spacing: 0.04em;
 	}
 	.clock-wrap:hover .tz-badge,
-	.clock-wrap.open .tz-badge { opacity: 0.8; }
+	.clock-wrap.open .tz-badge {
+		opacity: 0.8;
+	}
 	.tz-picker {
 		position: absolute;
 		top: 26px;
@@ -427,18 +484,34 @@
 		cursor: pointer;
 		border-bottom: 1px solid var(--paper-soft);
 	}
-	.tz-item:last-child { border-bottom: none; }
+	.tz-item:last-child {
+		border-bottom: none;
+	}
 	.tz-item:hover {
 		background: var(--chrome-menubar-hover-bg, var(--ink));
 		color: var(--chrome-menubar-hover-fg, var(--paper));
 	}
-	.tz-item.selected { background: var(--accent-2); color: var(--ink); }
+	.tz-item.selected {
+		background: var(--accent-2);
+		color: var(--ink);
+	}
 	.tz-item.selected:hover {
 		background: var(--chrome-menubar-hover-bg, var(--ink));
 		color: var(--chrome-menubar-hover-fg, var(--paper));
 	}
-	.tz-check { font-family: var(--brand-font-display, 'Press Start 2P', monospace); font-size: 10px; }
-	.tz-item-label { font-size: 14px; }
-	.tz-time { font-family: var(--brand-font-body, 'VT323', monospace); font-size: 15px; opacity: 0.75; }
-	.tz-item:hover .tz-time { opacity: 0.85; }
+	.tz-check {
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
+		font-size: 10px;
+	}
+	.tz-item-label {
+		font-size: 14px;
+	}
+	.tz-time {
+		font-family: var(--brand-font-body, 'VT323', monospace);
+		font-size: 15px;
+		opacity: 0.75;
+	}
+	.tz-item:hover .tz-time {
+		opacity: 0.85;
+	}
 </style>

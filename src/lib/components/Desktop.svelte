@@ -306,7 +306,7 @@
 				const appId = activeId ? windowAppId(activeId) : 'finder';
 				const app = APPS[appId];
 				if (app?.preferences) os.openPreferences(appId);
-				else os.openTweaks();
+				else os.openSystemPreferences();
 			}
 		};
 		window.addEventListener('keydown', handleKeydown);
@@ -371,7 +371,7 @@
 		const defs: Record<string, { title: string; w: number; h: number }> = {
 			welcome: { title: 'Welcome.app', w: 460, h: 540 },
 			'tv-guide': { title: 'TV Guide.app', w: 660, h: 700 },
-			'terminal-prefs': { title: 'Terminal Preferences', w: 380, h: 360 },
+			'terminal-prefs': { title: 'System Preferences', w: 380, h: 360 },
 			'tvguide-prefs': { title: 'TV Guide Preferences', w: 360, h: 360 },
 			'chatrbot-prefs': { title: 'chatrbot Preferences', w: 360, h: 280 },
 			about: { title: 'About Terminal', w: 420, h: 480 },
@@ -592,7 +592,7 @@
 		closeWindow,
 		focusWindow,
 		openWindow,
-		openTweaks: () => openWindow('terminal-prefs'),
+		openSystemPreferences: () => openWindow('terminal-prefs'),
 		openPreferences: (appId) => {
 			const a = APPS[appId];
 			if (a?.preferences) openWindow(a.preferences);

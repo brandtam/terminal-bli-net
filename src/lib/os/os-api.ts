@@ -16,7 +16,16 @@ export interface AboutSpec {
 }
 
 export type PrefField =
-	| { kind: 'slider'; key: string; label: string; min: number; max: number; step: number; unit?: string; hint?: string }
+	| {
+			kind: 'slider';
+			key: string;
+			label: string;
+			min: number;
+			max: number;
+			step: number;
+			unit?: string;
+			hint?: string;
+	  }
 	| { kind: 'toggle'; key: string; label: string; hint?: string }
 	| { kind: 'select'; key: string; label: string; options: { value: string; label: string }[] }
 	| { kind: 'text'; key: string; label: string; placeholder?: string };
@@ -84,7 +93,7 @@ export interface OsApi {
 	focusWindow: (windowId: string) => void;
 	openWindow: (windowId: string) => void;
 
-	openTweaks: () => void;
+	openSystemPreferences: () => void;
 	openPreferences: (appId: string) => void;
 	openAbout: (appId: string | null) => void;
 
