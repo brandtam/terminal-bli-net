@@ -1,4 +1,5 @@
 import type { AppDef, OsApi, AppMenuSpec } from './os-api';
+import { createDoc, listDocs } from '$lib/apps/textedit/textedit-docs';
 
 export const APPS: Record<string, AppDef> = {
 	finder: {
@@ -24,7 +25,10 @@ export const APPS: Record<string, AppDef> = {
 		menus: (os) => [
 			{ label: 'File', items: [
 				{ type: 'action', label: 'New Folder', shortcut: '⌘N', disabled: true },
-				{ type: 'action', label: 'New Text Document', shortcut: '⌘T', action: () => os.openWindow('readme') },
+				{ type: 'action', label: 'New Text Document', shortcut: '⌘T', action: () => {
+					const doc = createDoc();
+					os.openWindow(`textedit-${doc.id}`);
+				}},
 				{ type: 'separator' },
 				{ type: 'action', label: 'Get Info', disabled: true },
 				{ type: 'action', label: 'Sleep (good luck)', disabled: true },
@@ -188,6 +192,72 @@ export const APPS: Record<string, AppDef> = {
 		statusExtra: () => null,
 	},
 
+	stickies: {
+		id: 'stickies',
+		name: 'Stickies',
+		filename: 'Stickies',
+		about: {
+			title: 'Stickies',
+			version: 'v1.0',
+			tagline: 'desktop sticky notes',
+			glyph: '▤',
+			glyphBg: '#f9bd2b',
+			glyphFg: '#0a0a0a',
+			sections: [
+				{ h: 'WHAT IT IS', body: 'Post-it notes that live on your desktop. Write a thought, close the window, find it right where you left it next time.' },
+				{ h: 'COLORS', body: 'Yellow, pink, green, blue, orange. Pick one from the Color menu.' },
+				{ h: 'CREDITS', body: "Apple's Stickies from System 7.5 (1994). The real Post-it note, invented by accident." },
+			],
+		},
+		preferences: null,
+		menus: (os) => [
+			{ label: 'File', items: [
+				{ type: 'action', label: 'New Note', shortcut: '⌘N', action: () => os.launchApp('stickies', { action: 'new' }) },
+				{ type: 'action', label: 'Close Note', shortcut: '⌘W', action: () => os.closeFocused() },
+			]},
+			{ label: 'Color', items: [
+				{ type: 'action', label: '● Yellow', action: () => os.launchApp('stickies', { action: 'color', color: '#f9bd2b' }) },
+				{ type: 'action', label: '● Pink', action: () => os.launchApp('stickies', { action: 'color', color: '#ee63b3' }) },
+				{ type: 'action', label: '● Green', action: () => os.launchApp('stickies', { action: 'color', color: '#a6f000' }) },
+				{ type: 'action', label: '● Blue', action: () => os.launchApp('stickies', { action: 'color', color: '#6bb5ff' }) },
+				{ type: 'action', label: '● Orange', action: () => os.launchApp('stickies', { action: 'color', color: '#f54e00' }) },
+			]},
+			{ label: 'Help', items: [
+				{ type: 'action', label: 'About Stickies', action: () => os.openAbout('stickies') },
+			]},
+		],
+		statusExtra: () => null,
+	},
+
+	recorder: {
+		id: 'recorder',
+		name: 'Recorder',
+		filename: 'Recorder.app',
+		about: {
+			title: 'Recorder',
+			version: 'v1.0',
+			tagline: 'record short clips from your webcam',
+			glyph: 'REC',
+			glyphBg: 'var(--accent)',
+			glyphFg: 'var(--paper)',
+			sections: [
+				{ h: 'WHAT IT IS', body: 'A camcorder in your menu bar. Click REC, look at the camera, record up to 10 seconds. Clips are saved locally in your browser.' },
+				{ h: 'LIMITS', body: 'Max 10 seconds per clip. Max 5 clips stored. Everything lives in localStorage so keep it short.' },
+			],
+		},
+		preferences: null,
+		menus: (os) => [
+			{ label: 'File', items: [
+				{ type: 'action', label: 'New Recording', shortcut: '⌘N', action: () => os.openWindow('recorder') },
+				{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() },
+			]},
+			{ label: 'Help', items: [
+				{ type: 'action', label: 'About Recorder', action: () => os.openAbout('recorder') },
+			]},
+		],
+		statusExtra: () => null,
+	},
+
 	textedit: {
 		id: 'textedit',
 		name: 'TextEdit',
@@ -207,11 +277,27 @@ export const APPS: Record<string, AppDef> = {
 		preferences: null,
 		menus: (os) => [
 			{ label: 'File', items: [
-				{ type: 'action', label: 'New', shortcut: '⌘N', disabled: true },
-				{ type: 'action', label: 'Open…', shortcut: '⌘O', disabled: true },
+				{ type: 'action', label: 'New', shortcut: '⌘N', action: () => {
+					const doc = createDoc();
+					os.openWindow(`textedit-${doc.id}`);
+				}},
+				{ type: 'action', label: 'Open…', shortcut: '⌘O', action: () => {
+					const docs = listDocs();
+					const buttons = docs.map((d) => ({
+						label: d.name,
+						action: () => {
+							const winId = (d.id === 'readme' || d.id === 'pricing') ? d.id : `textedit-${d.id}`;
+							os.openWindow(winId);
+						},
+					}));
+					os.alert({
+						title: 'Open Document',
+						body: docs.length > 0 ? 'Choose a document to open:' : 'No documents found.',
+						buttons: [...buttons, { label: 'Cancel', primary: true }],
+					});
+				}},
 				{ type: 'separator' },
-				{ type: 'action', label: 'Save', shortcut: '⌘S', disabled: true },
-				{ type: 'action', label: 'Save As…', disabled: true },
+				{ type: 'action', label: 'Save', shortcut: '⌘S' },
 				{ type: 'separator' },
 				{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() },
 			]},

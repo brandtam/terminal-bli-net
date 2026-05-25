@@ -4,7 +4,7 @@
 	import type { OsApi, AlertSpec } from '$lib/os/os-api';
 	import { windowAppId } from '$lib/os/os-api';
 	import { APPS } from '$lib/os/app-registry';
-	import { isShowOnAir, getSlotIndex, getCurrentSlot } from '$lib/schedule';
+	import { isShowOnAir, getSlotIndex } from '$lib/schedule';
 	import {
 		loadWindows,
 		saveWindows,
@@ -12,7 +12,9 @@
 		saveTweaks,
 		loadTimezone,
 		saveTimezone,
-		isFirstVisit
+		isFirstVisit,
+		appRead,
+		appWrite
 	} from '$lib/persistence';
 	import Window from './Window.svelte';
 	import MenuBar from './MenuBar.svelte';
@@ -22,12 +24,15 @@
 	import ChatWindow from './ChatWindow.svelte';
 	import TVGuide from './TVGuide.svelte';
 	import WelcomeWindow from '$lib/apps/welcome/WelcomeWindow.svelte';
-	import PricingContent from '$lib/apps/textedit/PricingContent.svelte';
-	import ReadmeContent from '$lib/apps/textedit/ReadmeContent.svelte';
+	import TextEditWindow from '$lib/apps/textedit/TextEditWindow.svelte';
+	import { loadDocs, getDoc } from '$lib/apps/textedit/textedit-docs';
 	import StatsWindow from '$lib/apps/stats/StatsWindow.svelte';
 	import ErrorDialog from '$lib/apps/finder/ErrorDialog.svelte';
 	import TrashWindow from '$lib/apps/finder/TrashWindow.svelte';
 	import AboutAppWindow from '$lib/apps/finder/AboutAppWindow.svelte';
+	import RecorderWindow from '$lib/apps/recorder/RecorderWindow.svelte';
+	import StickiesNote from '$lib/apps/stickies/StickiesNote.svelte';
+	import type { StickyNote } from '$lib/apps/stickies/StickiesNote.svelte';
 
 	let groups = $state<GroupMeta[]>([]);
 	let bots = $state<Bot[]>([]);
@@ -47,10 +52,59 @@
 	let now = $state(new Date());
 	let isMobile = $state(false);
 
+	const DEFAULT_NOTES: StickyNote[] = [
+		{
+			id: 'default-1',
+			title: 'v1 launch — todo',
+			body: '☑ ship Seinfeld\n☑ ship The Office\n☒ get sued\n☐ teach Kramer to type\n☐ figure out Joey/Phoebe\n☐ "try Succession?"',
+			color: '#f9bd2b'
+		}
+	];
+
+	let stickyNotes = $state<StickyNote[]>([]);
+
+	function loadStickyNotes(): StickyNote[] {
+		return appRead<StickyNote[]>('stickies', 'notes', DEFAULT_NOTES);
+	}
+
+	function saveStickyNotes() {
+		appWrite('stickies', 'notes', stickyNotes);
+	}
+
+	function createStickyNote() {
+		const note: StickyNote = {
+			id: `sticky-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+			title: '',
+			body: '',
+			color: '#f9bd2b'
+		};
+		stickyNotes = [...stickyNotes, note];
+		saveStickyNotes();
+		openWindow(`sticky-${note.id}`);
+	}
+
+	function deleteStickyNote(id: string) {
+		stickyNotes = stickyNotes.filter(n => n.id !== id);
+		saveStickyNotes();
+		closeWindow(`sticky-${id}`);
+	}
+
+	function updateStickyNote(updated: StickyNote) {
+		stickyNotes = stickyNotes.map(n => n.id === updated.id ? updated : n);
+		saveStickyNotes();
+	}
+
+	function colorStickyNote(noteId: string, color: string) {
+		stickyNotes = stickyNotes.map(n => n.id === noteId ? { ...n, color } : n);
+		saveStickyNotes();
+	}
+
 	onMount(() => {
 		tweaks = loadTweaks();
 		timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 		isMobile = window.innerWidth < 720;
+		stickyNotes = loadStickyNotes();
+		loadDocs(); // seed default documents if none exist
 
 		fetch('/api/data')
 			.then((res) => (res.ok ? res.json() : null))
@@ -139,11 +193,12 @@
 	const KNOWN_WINDOW_IDS = new Set([
 		'welcome', 'tv-guide', 'terminal-prefs', 'tvguide-prefs', 'chatrbot-prefs',
 		'pricing', 'readme', 'about', 'about-chatrbot', 'about-tvguide',
-		'about-textedit', 'about-stats', 'stats', 'error', 'trash'
+		'about-textedit', 'about-stats', 'about-stickies', 'about-recorder',
+		'stats', 'error', 'trash', 'recorder'
 	]);
 
 	function isKnownWindowId(id: string): boolean {
-		return KNOWN_WINDOW_IDS.has(id) || id.startsWith('chat-');
+		return KNOWN_WINDOW_IDS.has(id) || id.startsWith('chat-') || id.startsWith('sticky-') || id.startsWith('textedit-');
 	}
 
 	function getWindowDef(id: string): { title: string; w: number; h: number } {
@@ -160,9 +215,12 @@
 			'about-tvguide': { title: 'About TV Guide', w: 420, h: 460 },
 			'about-textedit': { title: 'About TextEdit', w: 420, h: 380 },
 			'about-stats': { title: 'About Stats', w: 420, h: 360 },
+			'about-stickies': { title: 'About Stickies', w: 420, h: 380 },
 			stats: { title: 'Stats.app', w: 360, h: 360 },
 			error: { title: 'System Error', w: 420, h: 260 },
-			trash: { title: 'Trash — empty', w: 380, h: 320 }
+			trash: { title: 'Trash — empty', w: 380, h: 320 },
+			recorder: { title: 'Recorder.app', w: 360, h: 480 },
+			'about-recorder': { title: 'About Recorder', w: 420, h: 360 }
 		};
 		if (id.startsWith('chat-')) {
 			const showSlug = id.replace('chat-', '');
@@ -171,6 +229,24 @@
 				title: group ? `chatrbot - ${group.name}` : 'Chat',
 				w: 440,
 				h: 560
+			};
+		}
+		if (id.startsWith('textedit-')) {
+			const docId = id.replace('textedit-', '');
+			const doc = getDoc(docId);
+			return {
+				title: doc?.name || 'Untitled.txt',
+				w: 420,
+				h: 400
+			};
+		}
+		if (id.startsWith('sticky-')) {
+			const noteId = id.replace('sticky-', '');
+			const note = stickyNotes.find((n) => n.id === noteId);
+			return {
+				title: note?.title || 'Stickies',
+				w: 240,
+				h: 220
 			};
 		}
 		return defs[id] || { title: 'Unknown', w: 380, h: 320 };
@@ -244,7 +320,9 @@
 		// TODO: open email opt-in
 	}
 
-	const isRecording = $derived(channels.some(ch => getCurrentSlot(ch, now, timezone) !== null));
+	function handleRecClick() {
+		openWindow('recorder');
+	}
 
 	const activeChatGroupSlug = $derived.by(() => {
 		const chatWindow = windows.find((w) => w.id.startsWith('chat-'));
@@ -280,6 +358,24 @@
 				if (payload?.open === 'Pricing.txt') return openWindow('pricing');
 				return openWindow('readme');
 			}
+			if (appId === 'stickies') {
+				if (payload?.action === 'new') {
+					createStickyNote();
+					return;
+				}
+				if (payload?.action === 'color' && payload?.color) {
+					// Color the currently focused sticky note
+					if (activeId?.startsWith('sticky-')) {
+						const noteId = activeId.replace('sticky-', '');
+						colorStickyNote(noteId, payload.color as string);
+					}
+					return;
+				}
+				// Default: open a new note
+				createStickyNote();
+				return;
+			}
+			if (appId === 'recorder') return openWindow('recorder');
 			if (appId === 'stats') return openWindow('stats');
 			if (appId === 'error') return openWindow('error');
 			if (appId === 'welcome') return openWindow('welcome');
@@ -298,6 +394,8 @@
 			if (appId === 'tvguide') return openWindow('about-tvguide');
 			if (appId === 'textedit') return openWindow('about-textedit');
 			if (appId === 'stats') return openWindow('about-stats');
+			if (appId === 'stickies') return openWindow('about-stickies');
+			if (appId === 'recorder') return openWindow('about-recorder');
 			return openWindow('about');
 		},
 		get now() { return now; },
@@ -363,7 +461,7 @@
 		app={activeApp}
 		{os}
 		openWindows={windows.length}
-		{isRecording}
+		onRecClick={handleRecClick}
 		contextInfo={chatContextInfo}
 		{now}
 		{timezone}
@@ -387,6 +485,9 @@
 			<DesktopIcon label="Pricing.txt" ondblclick={() => openWindow('pricing')}>
 				<PixelIcon kind="doc" accent />
 			</DesktopIcon>
+			<DesktopIcon label="Stickies" ondblclick={() => createStickyNote()}>
+				<PixelIcon kind="stickies" />
+			</DesktopIcon>
 			<DesktopIcon label="Stats.app" ondblclick={() => openWindow('stats')}>
 				<PixelIcon kind="calc" />
 			</DesktopIcon>
@@ -396,18 +497,6 @@
 			<DesktopIcon label="Trash" ondblclick={() => openWindow('trash')}>
 				<PixelIcon kind="trash" />
 			</DesktopIcon>
-		</div>
-
-		<div class="sticky">
-			<h4>v1 launch — todo</h4>
-			<div class="sticky-body">
-				☑ ship Seinfeld<br />
-				☑ ship The Office<br />
-				☒ get sued<br />
-				☐ teach Kramer to type<br />
-				☐ figure out Joey/Phoebe<br />
-				☐ <i>"try Succession?"</i>
-			</div>
 		</div>
 	{/if}
 
@@ -548,10 +637,9 @@
 						Coming later: typing speed, sound effects, default opener.
 					</p>
 				</div>
-			{:else if w.id === 'pricing'}
-				<PricingContent />
-			{:else if w.id === 'readme'}
-				<ReadmeContent />
+			{:else if w.id === 'pricing' || w.id === 'readme' || w.id.startsWith('textedit-')}
+				{@const texteditDocId = w.id.startsWith('textedit-') ? w.id.replace('textedit-', '') : w.id}
+				<TextEditWindow docId={texteditDocId} />
 			{:else if w.id === 'about' || w.id.startsWith('about-')}
 				{@const aboutAppId = w.id === 'about' ? 'finder' : w.id.replace('about-', '')}
 				{@const aboutApp = APPS[aboutAppId]}
@@ -564,6 +652,18 @@
 				<ErrorDialog onclose={() => closeWindow('error')} />
 			{:else if w.id === 'trash'}
 				<TrashWindow />
+			{:else if w.id === 'recorder'}
+				<RecorderWindow />
+			{:else if w.id.startsWith('sticky-')}
+				{@const noteId = w.id.replace('sticky-', '')}
+				{@const note = stickyNotes.find((n) => n.id === noteId)}
+				{#if note}
+					<StickiesNote
+						{note}
+						ondelete={deleteStickyNote}
+						onupdate={updateStickyNote}
+					/>
+				{/if}
 			{:else}
 				<div class="window-content">
 					<p>Coming soon...</p>
@@ -732,32 +832,6 @@
 	.desktop-icons.right {
 		right: 16px;
 	}
-	.sticky {
-		background: #fff39a;
-		border: 2px solid var(--ink);
-		padding: 14px;
-		font-family: 'Pixelify Sans', sans-serif;
-		font-size: 15px;
-		line-height: 1.3;
-		transform: rotate(-1.5deg);
-		position: absolute;
-		right: 116px;
-		bottom: 80px;
-		width: 220px;
-		box-shadow: 4px 4px 0 var(--shadow);
-		z-index: 1;
-	}
-	.sticky h4 {
-		font-family: 'Press Start 2P', monospace;
-		font-size: 10px;
-		margin: 0 0 8px;
-		font-weight: normal;
-	}
-	.sticky-body {
-		font-family: 'VT323', monospace;
-		font-size: 17px;
-		line-height: 1.3;
-	}
 	.window-content {
 		padding: 14px;
 		font-family: 'VT323', monospace;
@@ -819,9 +893,6 @@
 		}
 		.desktop-icons.right {
 			padding-top: 0;
-		}
-		.sticky {
-			display: none;
 		}
 	}
 </style>
