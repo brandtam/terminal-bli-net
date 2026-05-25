@@ -36,6 +36,8 @@
 	const COLUMN_WIDTH_PX = 140;
 	const CHANNEL_COL_PX = 72;
 
+	let groupMap = $derived(new Map(groups.map(g => [g.slug, g])));
+
 	interface TimeSlot {
 		label: string;
 		hour24: number;
@@ -67,7 +69,7 @@
 	}
 
 	function getEpisodeInfo(slot: ChannelSlot): { title: string; year: string } | null {
-		const show = groups.find(g => g.slug === slot.showSlug);
+		const show = groupMap.get(slot.showSlug);
 		const ep = show?.episodes?.find(e => e.season === slot.season && e.episode === slot.episode);
 		return ep ? { title: ep.title, year: ep.year } : null;
 	}
@@ -189,7 +191,7 @@
 		for (const channel of sortedChannels) {
 			const slot = getCurrentSlot(channel, slotNow, timezone);
 			if (slot) {
-				const show = groups.find(g => g.slug === slot.showSlug);
+				const show = groupMap.get(slot.showSlug);
 				const epInfo = getEpisodeInfo(slot);
 				const showName = show?.name ?? slot.showSlug;
 				const epTitle = epInfo ? ` — "${epInfo.title}"` : '';
@@ -305,7 +307,7 @@
 
 	function handleCellDblClick(cell: MergedCell) {
 		if (!isShowOnAir(cell.showSlug, channels, slotNow, timezone)) return;
-		const group = groups.find(g => g.slug === cell.showSlug);
+		const group = groupMap.get(cell.showSlug);
 		if (!group) return;
 		onOpenChat(group);
 	}
@@ -315,7 +317,7 @@
 	<!-- Preview Pane -->
 	{#if featured}
 		{@const feat = featured}
-		{@const featuredGroup = groups.find((g) => g.slug === feat.showSlug)}
+		{@const featuredGroup = groupMap.get(feat.showSlug)}
 		{@const featuredBots = featuredGroup ? getGroupBots(featuredGroup) : []}
 		{@const liveNow = isShowOnAir(feat.showSlug, channels, slotNow, timezone)}
 		<div class="tvg-preview">
@@ -417,7 +419,7 @@
 				</div>
 
 				{#each cells as cell}
-					{@const showGroup = groups.find(g => g.slug === cell.showSlug)}
+					{@const showGroup = groupMap.get(cell.showSlug)}
 					{@const isFeatured = featured && featured.channelSlug === channel.slug && featured.showSlug === cell.showSlug && featured.title === cell.title}
 					<div
 						class="tvg-cell tvg-ep-cell"
