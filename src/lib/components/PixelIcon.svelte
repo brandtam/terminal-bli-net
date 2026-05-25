@@ -84,6 +84,17 @@
 		<rect x="3" y="8" width="10" height="5" fill="#fff" stroke="#0a0a0a" />
 		<rect x="4" y="9" width="4" height="1" fill="#f54e00" />
 		<rect x="4" y="11" width="6" height="1" fill="#0a0a0a" />
+	{:else if kind === 'stickies'}
+		<rect x="2" y="14" width="12" height="1" fill="rgba(0,0,0,0.25)" />
+		<!-- back note (pink) -->
+		<rect x="5" y="2" width="9" height="9" fill="#ee63b3" stroke="#0a0a0a" />
+		<rect x="6" y="4" width="5" height="1" fill="#0a0a0a" />
+		<rect x="6" y="6" width="4" height="1" fill="#0a0a0a" />
+		<!-- front note (yellow) -->
+		<rect x="1" y="5" width="10" height="9" fill="#f9bd2b" stroke="#0a0a0a" />
+		<rect x="1" y="5" width="10" height="2" fill="#d4a020" stroke="#0a0a0a" />
+		<rect x="3" y="9" width="6" height="1" fill="#0a0a0a" />
+		<rect x="3" y="11" width="5" height="1" fill="#0a0a0a" />
 	{:else if kind === 'guide' || kind === 'tvguide'}
 		<rect x="2" y="14" width="11" height="1" fill="rgba(0,0,0,0.25)" />
 		<rect x="3" y="13" width="1" height="2" fill="#0a0a0a" />

@@ -6,20 +6,20 @@
 		app,
 		os,
 		openWindows = 0,
-		isRecording = false,
 		contextInfo,
 		now,
 		timezone,
-		onSetTimezone
+		onSetTimezone,
+		onRecClick
 	}: {
 		app: AppDef;
 		os: OsApi;
 		openWindows?: number;
-		isRecording?: boolean;
 		contextInfo?: string;
 		now: Date;
 		timezone?: string;
 		onSetTimezone?: (tz: string) => void;
+		onRecClick?: () => void;
 	} = $props();
 
 	let openMenu = $state<string | null>(null);
@@ -215,9 +215,8 @@
 			</span>
 		{/if}
 		<span class="muted info">{openWindows} window{openWindows === 1 ? '' : 's'} open</span>
-		{#if isRecording}
-			<span class="rec"><span class="rec-dot"></span>REC</span>
-		{/if}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<span class="rec" onclick={() => onRecClick?.()}><span class="rec-dot"></span>REC</span>
 
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
@@ -356,7 +355,8 @@
 		color: var(--accent);
 		animation: blink 1.4s steps(2, end) infinite;
 	}
-	.rec { display: flex; align-items: center; gap: 4px; }
+	.rec { display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 2px 6px; border-radius: 2px; }
+	.rec:hover { background: var(--chrome-menubar-hover-bg, var(--ink)); color: var(--chrome-menubar-hover-fg, var(--paper)); }
 	.rec-dot {
 		display: inline-block;
 		width: 8px;
