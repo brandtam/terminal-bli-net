@@ -455,7 +455,7 @@
 
 <style>
 	.tvguide {
-		font-family: 'Pixelify Sans', sans-serif;
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
 		display: flex;
 		flex-direction: column;
 		height: 100%;
@@ -477,7 +477,7 @@
 		align-items: center;
 		background: #000066;
 		padding: 5px 12px;
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
 		color: #f9bd2b;
 		border-bottom: 1px solid #4d4dcc;
@@ -492,7 +492,7 @@
 	}
 	.tvg-preview-text { min-width: 0; }
 	.tvg-preview-titleline {
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 22px;
 		color: #fff;
 		line-height: 1.15;
@@ -500,7 +500,7 @@
 	.tvg-preview-title { font-weight: 700; }
 	.tvg-preview-year { color: rgba(255, 255, 255, 0.55); font-size: 16px; margin-left: 4px; }
 	.tvg-preview-showname {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
 		color: #f9bd2b;
 		letter-spacing: 0.02em;
@@ -508,7 +508,7 @@
 	}
 	.tvg-preview-era { color: rgba(249, 189, 43, 0.6); }
 	.tvg-preview-dialogue {
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 16px;
 		color: #fff;
 		margin-top: 6px;
@@ -520,14 +520,14 @@
 	}
 	.tvg-preview-who {
 		color: #a6f000;
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 8px;
 		letter-spacing: 0.02em;
 		flex-shrink: 0;
 	}
 	.tvg-preview-line { font-style: italic; opacity: 0.95; min-width: 0; }
 	.tvg-preview-cta {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 10px;
 		background: #f54e00;
 		color: #fff;
@@ -557,7 +557,7 @@
 		padding: 6px 12px;
 		background: #000066;
 		color: #f9bd2b;
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 10px;
 		letter-spacing: 0.02em;
 		border-bottom: 1px solid #4d4dcc;
@@ -600,7 +600,7 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 11px;
 		color: #f9bd2b;
 		gap: 3px;
@@ -618,14 +618,14 @@
 	.ch-net { font-size: 8px; color: #a6f000; }
 	.ch-open {
 		margin-top: 2px;
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 7px;
 		color: #a6f000;
 		letter-spacing: 0.04em;
-		background: #0a0a0a;
+		background: var(--brand-color-ink, #0a0a0a);
 		padding: 2px 4px;
 		border: 1px solid #a6f000;
-		border-radius: 1px;
+		border-radius: 0;
 		animation: blink 1.4s steps(2, end) infinite;
 		cursor: pointer;
 	}
@@ -639,7 +639,7 @@
 	/* Time header */
 	.tvg-time-cell {
 		background: #000066;
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
 		color: #f9bd2b;
 		text-align: center;
@@ -669,7 +669,7 @@
 		border-right: 1px solid #4d4dcc;
 		border-bottom: 1px solid #4d4dcc;
 		padding: 6px 8px;
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 16px;
 		color: #fff;
 		display: flex;
@@ -701,7 +701,7 @@
 	.tvg-ep-cell.featured .ep-show-name { color: #a6f000; }
 
 	.ep-show {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 8px;
 		color: #f9bd2b;
 		letter-spacing: 0.02em;
@@ -728,7 +728,7 @@
 		letter-spacing: 0.04em;
 	}
 	.ep-title {
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 16px;
 		color: #fff;
 		line-height: 1.1;
@@ -753,7 +753,7 @@
 	.tvg-marquee-track {
 		display: inline-block;
 		white-space: nowrap;
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 17px;
 		font-weight: 700;
 		animation: tvg-scroll linear infinite;

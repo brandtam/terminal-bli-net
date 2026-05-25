@@ -274,7 +274,7 @@
 	.menu-item {
 		cursor: pointer;
 		padding: 2px 6px;
-		border-radius: 2px;
+		border-radius: 0;
 		margin-right: 8px;
 	}
 	.menu-item:hover,
@@ -357,7 +357,7 @@
 		color: var(--accent);
 		animation: blink 1.4s steps(2, end) infinite;
 	}
-	.rec { display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 2px 6px; border-radius: 2px; }
+	.rec { display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 2px 6px; border-radius: 0; }
 	.rec:hover { background: var(--chrome-menubar-hover-bg, var(--ink)); color: var(--chrome-menubar-hover-fg, var(--paper)); }
 	.rec-dot {
 		display: inline-block;
