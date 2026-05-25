@@ -1,5 +1,6 @@
 import type { AppDef, OsApi, AppMenuSpec } from './os-api';
 import { createDoc, listDocs, findDocByName } from '$lib/apps/textedit/textedit-docs';
+import { emptyTrash } from '$lib/os/filesystem';
 
 export const APPS: Record<string, AppDef> = {
 	finder: {
@@ -79,7 +80,23 @@ export const APPS: Record<string, AppDef> = {
 			{
 				label: 'Special',
 				items: [
-					{ type: 'action', label: 'Empty Trash', disabled: true },
+					{
+						type: 'action',
+						label: 'Empty Trash',
+						action: () =>
+							os.alert({
+								title: 'Empty Trash',
+								body: 'Are you sure you want to permanently delete the items in the Trash?',
+								buttons: [
+									{ label: 'Cancel' },
+									{
+										label: 'Empty',
+										primary: true,
+										action: () => emptyTrash()
+									}
+								]
+							})
+					},
 					{ type: 'separator' },
 					{ type: 'action', label: 'Restart', action: () => os.openWindow('error') },
 					{ type: 'action', label: "Shut Down (don't)", action: () => os.openWindow('error') }
@@ -531,7 +548,12 @@ export const APPS: Record<string, AppDef> = {
 			{
 				label: 'Help',
 				items: [
-					{ type: 'action', label: 'Preferences…', shortcut: '⌘,', action: () => os.openTweaks() },
+					{
+						type: 'action',
+						label: 'Preferences…',
+						shortcut: '⌘,',
+						action: () => os.openSystemPreferences()
+					},
 					{ type: 'action', label: 'About TextEdit', action: () => os.openAbout('textedit') }
 				]
 			}

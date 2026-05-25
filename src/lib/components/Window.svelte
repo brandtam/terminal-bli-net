@@ -11,6 +11,7 @@
 		z = 1,
 		active = false,
 		resizable = true,
+		chromeless = false,
 		className = '',
 		onfocus,
 		onclose,
@@ -27,6 +28,7 @@
 		z: number;
 		active?: boolean;
 		resizable?: boolean;
+		chromeless?: boolean;
 		className?: string;
 		onfocus: (id: string) => void;
 		onclose: (id: string) => void;
@@ -39,8 +41,7 @@
 	const MIN_H = 140;
 
 	let dragState: { startX: number; startY: number; origX: number; origY: number } | null = null;
-	let resizeSEState: { startX: number; startY: number; origW: number; origH: number } | null =
-		null;
+	let resizeSEState: { startX: number; startY: number; origW: number; origH: number } | null = null;
 	let resizeNEState: {
 		startX: number;
 		startY: number;
@@ -51,7 +52,13 @@
 	} | null = null;
 
 	function onTitlePointerDown(e: PointerEvent) {
-		if ((e.target as HTMLElement).closest('.window-btn') || (e.target as HTMLElement).closest('.window-growbox-ne')) return;
+		if (
+			(e.target as HTMLElement).closest('.window-btn') ||
+			(e.target as HTMLElement).closest('.window-growbox-ne')
+		)
+			return;
+		// In chromeless mode, only drag from elements marked as drag handles
+		if (chromeless && !(e.target as HTMLElement).closest('[data-drag-handle]')) return;
 		onfocus(id);
 		dragState = { startX: e.clientX, startY: e.clientY, origX: x, origY: y };
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -62,7 +69,10 @@
 		if (!dragState) return;
 		const vw = window.innerWidth;
 		const vh = window.innerHeight;
-		const newX = Math.max(40 - width, Math.min(vw - 60, dragState.origX + e.clientX - dragState.startX));
+		const newX = Math.max(
+			40 - width,
+			Math.min(vw - 60, dragState.origX + e.clientX - dragState.startX)
+		);
 		const newY = Math.max(28, Math.min(vh - 40, dragState.origY + e.clientY - dragState.startY));
 		onmove(id, newX, newY);
 	}
@@ -70,7 +80,11 @@
 	function onTitlePointerUp(e: PointerEvent) {
 		dragState = null;
 		document.body.classList.remove('dragging');
-		try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+		try {
+			(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+		} catch {
+			/* pointer already released */
+		}
 	}
 
 	function onGrowSEDown(e: PointerEvent) {
@@ -91,15 +105,23 @@
 	function onGrowSEUp(e: PointerEvent) {
 		resizeSEState = null;
 		document.body.classList.remove('dragging');
-		try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+		try {
+			(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+		} catch {
+			/* pointer already released */
+		}
 	}
 
 	function onGrowNEDown(e: PointerEvent) {
 		e.stopPropagation();
 		onfocus(id);
 		resizeNEState = {
-			startX: e.clientX, startY: e.clientY,
-			origW: width, origH: height, origX: x, origY: y
+			startX: e.clientX,
+			startY: e.clientY,
+			origW: width,
+			origH: height,
+			origX: x,
+			origY: y
 		};
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 		document.body.classList.add('dragging');
@@ -121,67 +143,83 @@
 	function onGrowNEUp(e: PointerEvent) {
 		resizeNEState = null;
 		document.body.classList.remove('dragging');
-		try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+		try {
+			(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+		} catch {
+			/* pointer already released */
+		}
 	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="window {active ? '' : 'inactive'} {className}"
+	class:chromeless
 	style="left: {x}px; top: {y}px; width: {width}px; height: {height}px; z-index: {z};"
 	onmousedown={() => onfocus(id)}
 	role="dialog"
 	aria-label={title}
 	tabindex="-1"
 >
+	{#if !chromeless}
+		<div
+			class="window-titlebar"
+			onpointerdown={onTitlePointerDown}
+			onpointermove={onTitlePointerMove}
+			onpointerup={onTitlePointerUp}
+			onpointercancel={onTitlePointerUp}
+		>
+			<div class="btns">
+				<button
+					class="window-btn close"
+					onclick={(e) => {
+						e.stopPropagation();
+						onclose(id);
+					}}
+					aria-label="close"
+				></button>
+			</div>
+			<div class="title">{title}</div>
+			<div class="btns right">
+				{#if resizable}
+					<div
+						class="window-growbox-ne"
+						onpointerdown={onGrowNEDown}
+						onpointermove={onGrowNEMove}
+						onpointerup={onGrowNEUp}
+						onpointercancel={onGrowNEUp}
+						aria-label="resize"
+						title="resize"
+					>
+						<svg viewBox="0 0 11 11" width="11" height="11" shape-rendering="crispEdges">
+							<rect x="10" y="0" width="1" height="1" fill="currentColor" />
+							<rect x="10" y="2" width="1" height="1" fill="currentColor" />
+							<rect x="10" y="4" width="1" height="1" fill="currentColor" />
+							<rect x="10" y="6" width="1" height="1" fill="currentColor" />
+							<rect x="10" y="8" width="1" height="1" fill="currentColor" />
+							<rect x="8" y="0" width="1" height="1" fill="currentColor" />
+							<rect x="8" y="2" width="1" height="1" fill="currentColor" />
+							<rect x="8" y="4" width="1" height="1" fill="currentColor" />
+							<rect x="8" y="6" width="1" height="1" fill="currentColor" />
+							<rect x="6" y="0" width="1" height="1" fill="currentColor" />
+							<rect x="6" y="2" width="1" height="1" fill="currentColor" />
+							<rect x="6" y="4" width="1" height="1" fill="currentColor" />
+							<rect x="4" y="0" width="1" height="1" fill="currentColor" />
+							<rect x="4" y="2" width="1" height="1" fill="currentColor" />
+							<rect x="2" y="0" width="1" height="1" fill="currentColor" />
+						</svg>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 	<div
-		class="window-titlebar"
-		onpointerdown={onTitlePointerDown}
-		onpointermove={onTitlePointerMove}
-		onpointerup={onTitlePointerUp}
-		onpointercancel={onTitlePointerUp}
+		class="window-body"
+		onpointerdown={chromeless ? onTitlePointerDown : undefined}
+		onpointermove={chromeless ? onTitlePointerMove : undefined}
+		onpointerup={chromeless ? onTitlePointerUp : undefined}
+		onpointercancel={chromeless ? onTitlePointerUp : undefined}
 	>
-		<div class="btns">
-			<button
-				class="window-btn close"
-				onclick={(e) => { e.stopPropagation(); onclose(id); }}
-				aria-label="close"
-			></button>
-		</div>
-		<div class="title">{title}</div>
-		<div class="btns right">
-			{#if resizable}
-				<div
-					class="window-growbox-ne"
-					onpointerdown={onGrowNEDown}
-					onpointermove={onGrowNEMove}
-					onpointerup={onGrowNEUp}
-					onpointercancel={onGrowNEUp}
-					aria-label="resize"
-					title="resize"
-				>
-					<svg viewBox="0 0 11 11" width="11" height="11" shape-rendering="crispEdges">
-						<rect x="10" y="0" width="1" height="1" fill="currentColor"/>
-						<rect x="10" y="2" width="1" height="1" fill="currentColor"/>
-						<rect x="10" y="4" width="1" height="1" fill="currentColor"/>
-						<rect x="10" y="6" width="1" height="1" fill="currentColor"/>
-						<rect x="10" y="8" width="1" height="1" fill="currentColor"/>
-						<rect x="8" y="0" width="1" height="1" fill="currentColor"/>
-						<rect x="8" y="2" width="1" height="1" fill="currentColor"/>
-						<rect x="8" y="4" width="1" height="1" fill="currentColor"/>
-						<rect x="8" y="6" width="1" height="1" fill="currentColor"/>
-						<rect x="6" y="0" width="1" height="1" fill="currentColor"/>
-						<rect x="6" y="2" width="1" height="1" fill="currentColor"/>
-						<rect x="6" y="4" width="1" height="1" fill="currentColor"/>
-						<rect x="4" y="0" width="1" height="1" fill="currentColor"/>
-						<rect x="4" y="2" width="1" height="1" fill="currentColor"/>
-						<rect x="2" y="0" width="1" height="1" fill="currentColor"/>
-					</svg>
-				</div>
-			{/if}
-		</div>
-	</div>
-	<div class="window-body">
 		{@render children()}
 	</div>
 	{#if resizable}
@@ -231,6 +269,10 @@
 		color: var(--brand-color-ink, var(--ink));
 	}
 
+	.window.chromeless {
+		border-radius: 0;
+	}
+
 	.window-titlebar {
 		height: var(--chrome-titlebar-height, 22px);
 		border-bottom: 2px solid var(--chrome-window-border-color, var(--ink));
@@ -238,7 +280,10 @@
 		align-items: center;
 		padding: 0 6px;
 		gap: 6px;
-		background: var(--chrome-titlebar-bg, repeating-linear-gradient(0deg, var(--ink) 0 1px, var(--paper) 1px 3px));
+		background: var(
+			--chrome-titlebar-bg,
+			repeating-linear-gradient(0deg, var(--ink) 0 1px, var(--paper) 1px 3px)
+		);
 		cursor: grab;
 		position: relative;
 		flex-shrink: 0;
@@ -366,7 +411,8 @@
 		color: var(--brand-color-paper, var(--paper));
 	}
 
-	.window-growbox-ne svg, .window-growbox svg {
+	.window-growbox-ne svg,
+	.window-growbox svg {
 		display: block;
 	}
 </style>

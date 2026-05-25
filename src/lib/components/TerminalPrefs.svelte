@@ -13,7 +13,7 @@
 </script>
 
 <div class="window-content prefs-content">
-	<h3 class="prefs-heading">TERMINAL PREFERENCES</h3>
+	<h3 class="prefs-heading">SYSTEM PREFERENCES</h3>
 	<div class="pref-row">
 		<div class="pref-label">WALLPAPER</div>
 		<div class="pref-sublabel">Classic</div>

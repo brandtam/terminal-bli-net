@@ -1,6 +1,20 @@
 <script lang="ts">
 	import type { OsApi } from '$lib/os/os-api';
-	import { list, getNode, onFsChange, ROOT_ID, TRASH_ID, SYSTEM_ID, APPS_ID, RECORDINGS_ID } from '$lib/os/filesystem';
+	import {
+		list,
+		getNode,
+		onFsChange,
+		createAlias,
+		resolveAlias,
+		trash,
+		deleteNode,
+		ROOT_ID,
+		TRASH_ID,
+		SYSTEM_ID,
+		APPS_ID,
+		DESKTOP_ID,
+		RECORDINGS_ID
+	} from '$lib/os/filesystem';
 	import type { FSNode, FSFile } from '$lib/os/filesystem';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 
@@ -16,7 +30,11 @@
 	let selectedId = $state<string | null>(null);
 	let fsRev = $state(0);
 
-	$effect(() => onFsChange(() => { fsRev++; }));
+	$effect(() =>
+		onFsChange(() => {
+			fsRev++;
+		})
+	);
 
 	const items = $derived.by(() => {
 		fsRev;
@@ -33,17 +51,27 @@
 	});
 
 	function iconKind(node: FSNode): string {
+		if (node.type === 'alias') {
+			const target = resolveAlias(node);
+			if (target) return iconKind(target);
+			return 'doc';
+		}
 		if (node.type === 'folder') {
 			if (node.id === TRASH_ID) return 'trash';
 			if (node.id === SYSTEM_ID) return 'hd';
 			if (node.id === APPS_ID) return 'folder';
+			if (node.id === DESKTOP_ID) return 'folder';
 			if (node.id === RECORDINGS_ID) return 'floppy';
 			return 'folder';
 		}
-		// File
 		const file = node as FSFile;
-		if (file.appId === 'recorder') return 'floppy';
+		if (file.appId === 'recorder') return 'tv';
 		if (file.appId === 'stickies') return 'stickies';
+		if (file.appId === 'tvguide') return 'tvguide';
+		if (file.appId === 'stats') return 'calc';
+		if (file.appId === 'error') return 'floppy';
+		if (file.appId === 'system-prefs') return 'hd';
+		if (file.appId === 'about-terminal') return 'doc';
 		return 'doc';
 	}
 
@@ -65,14 +93,28 @@
 			selectedId = null;
 			return;
 		}
-		// File - open in owning app
+		if (node.type === 'alias') {
+			const target = resolveAlias(node);
+			if (target) handleOpen(target);
+			return;
+		}
 		const file = node as FSFile;
 		if (file.appId === 'textedit') {
 			os.openWindow(`textedit-${file.id}`);
 		} else if (file.appId === 'recorder') {
 			os.openWindow(`recorder-${file.id}`);
 		} else if (file.appId === 'stickies') {
-			os.openWindow(`sticky-${file.id}`);
+			os.launchApp('stickies', { action: 'new' });
+		} else if (file.appId === 'tvguide') {
+			os.openWindow('tv-guide');
+		} else if (file.appId === 'stats') {
+			os.openWindow('stats');
+		} else if (file.appId === 'error') {
+			os.openWindow('error');
+		} else if (file.appId === 'system-prefs') {
+			os.openSystemPreferences();
+		} else if (file.appId === 'about-terminal') {
+			os.openAbout(null);
 		} else {
 			os.openWindow(file.id);
 		}
@@ -82,7 +124,68 @@
 		currentFolderId = id;
 		selectedId = null;
 	}
+
+	let contextMenuNode = $state<FSNode | null>(null);
+	let contextMenuX = $state(0);
+	let contextMenuY = $state(0);
+	let contextMenuEl = $state<HTMLDivElement | null>(null);
+
+	function handleContextMenu(e: MouseEvent, node: FSNode) {
+		e.preventDefault();
+		contextMenuNode = node;
+		contextMenuX = e.clientX;
+		contextMenuY = e.clientY;
+		requestAnimationFrame(() => {
+			if (!contextMenuEl) return;
+			const rect = contextMenuEl.getBoundingClientRect();
+			if (rect.right > window.innerWidth) contextMenuX = e.clientX - rect.width;
+			if (rect.bottom > window.innerHeight) contextMenuY = e.clientY - rect.height;
+		});
+	}
+
+	function closeContextMenu() {
+		contextMenuNode = null;
+	}
+
+	function handleContextOpen() {
+		if (!contextMenuNode) return;
+		handleOpen(contextMenuNode);
+		closeContextMenu();
+	}
+
+	function handleContextMakeAlias() {
+		if (!contextMenuNode) return;
+		const name = contextMenuNode.name + ' alias';
+		try {
+			createAlias(currentFolderId, name, contextMenuNode.id);
+		} catch {
+			// alias already exists or other error
+		}
+		closeContextMenu();
+	}
+
+	const PROTECTED_IDS = new Set([ROOT_ID, SYSTEM_ID, APPS_ID, DESKTOP_ID, RECORDINGS_ID, TRASH_ID]);
+
+	function canTrash(node: FSNode): boolean {
+		return !PROTECTED_IDS.has(node.id);
+	}
+
+	function handleContextTrash() {
+		if (!contextMenuNode || !canTrash(contextMenuNode)) return;
+		trash(contextMenuNode.id);
+		closeContextMenu();
+	}
+
+	function handleContextDelete() {
+		if (!contextMenuNode) return;
+		deleteNode(contextMenuNode.id);
+		closeContextMenu();
+	}
+
+	const inTrash = $derived(currentFolderId === TRASH_ID);
 </script>
+
+<svelte:window onclick={closeContextMenu} />
 
 <div class="finder">
 	<div class="finder-path">
@@ -102,8 +205,9 @@
 				class:selected={selectedId === node.id}
 				onclick={() => handleSelect(node.id)}
 				ondblclick={() => handleOpen(node)}
+				oncontextmenu={(e) => handleContextMenu(e, node)}
 			>
-				<div class="finder-item-icon">
+				<div class="finder-item-icon" class:alias={node.type === 'alias'}>
 					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
 				</div>
 				<div class="finder-item-label">{node.name}</div>
@@ -117,6 +221,34 @@
 	<div class="finder-status">
 		{items.length} item{items.length !== 1 ? 's' : ''}
 	</div>
+
+	{#if contextMenuNode}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="context-menu"
+			bind:this={contextMenuEl}
+			style="left: {contextMenuX}px; top: {contextMenuY}px;"
+			onclick={(e) => e.stopPropagation()}
+		>
+			{#if inTrash}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="context-menu-item" onclick={handleContextDelete}>Delete Permanently</div>
+			{:else}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="context-menu-item" onclick={handleContextOpen}>Open</div>
+				{#if contextMenuNode.type === 'file'}
+					<div class="context-menu-sep"></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="context-menu-item" onclick={handleContextMakeAlias}>Make Alias</div>
+				{/if}
+				{#if canTrash(contextMenuNode)}
+					<div class="context-menu-sep"></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="context-menu-item" onclick={handleContextTrash}>Move to Trash</div>
+				{/if}
+			{/if}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -196,16 +328,22 @@
 	}
 
 	.finder-item-icon {
-		width: 42px;
-		height: 42px;
+		width: 52px;
+		height: 52px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		position: relative;
 	}
 
-	.finder-item-icon :global(.pixel-icon) {
-		width: 42px;
-		height: 42px;
+	.finder-item-icon.alias::after {
+		content: '\21A9';
+		position: absolute;
+		bottom: -2px;
+		left: -2px;
+		font-size: 14px;
+		color: var(--ink, #0a0a0a);
+		line-height: 1;
 	}
 
 	.finder-item-label {
@@ -235,5 +373,35 @@
 		color: var(--ink, #0a0a0a);
 		opacity: 0.7;
 		flex-shrink: 0;
+	}
+
+	.context-menu {
+		position: fixed;
+		background: var(--chrome-menubar-bg, var(--paper));
+		color: var(--chrome-menubar-fg, var(--ink));
+		border: 2px solid var(--chrome-window-border-color, var(--ink));
+		box-shadow: 3px 3px 0 var(--shadow);
+		min-width: 160px;
+		padding: 4px 0;
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
+		font-size: 14px;
+		z-index: 12000;
+	}
+
+	.context-menu-item {
+		padding: 4px 12px;
+		cursor: pointer;
+	}
+
+	.context-menu-item:hover {
+		background: var(--chrome-menubar-hover-bg, var(--ink));
+		color: var(--chrome-menubar-hover-fg, var(--paper));
+	}
+
+	.context-menu-sep {
+		height: 1px;
+		background: var(--chrome-menubar-fg, var(--ink));
+		margin: 4px 8px;
+		opacity: 0.2;
 	}
 </style>

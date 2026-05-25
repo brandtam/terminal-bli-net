@@ -3,12 +3,14 @@ import type { WindowState, TweaksState, Conversation } from './types';
 function isWindowState(v: unknown): v is WindowState {
 	if (typeof v !== 'object' || v === null) return false;
 	const o = v as Record<string, unknown>;
-	return typeof o.id === 'string'
-		&& typeof o.x === 'number'
-		&& typeof o.y === 'number'
-		&& typeof o.w === 'number'
-		&& typeof o.h === 'number'
-		&& typeof o.z === 'number';
+	return (
+		typeof o.id === 'string' &&
+		typeof o.x === 'number' &&
+		typeof o.y === 'number' &&
+		typeof o.w === 'number' &&
+		typeof o.h === 'number' &&
+		typeof o.z === 'number'
+	);
 }
 
 function isWindowStateArray(v: unknown): v is WindowState[] {
@@ -18,11 +20,13 @@ function isWindowStateArray(v: unknown): v is WindowState[] {
 function isTweaksState(v: unknown): v is TweaksState {
 	if (typeof v !== 'object' || v === null) return false;
 	const o = v as Record<string, unknown>;
-	return typeof o.wallpaper === 'string'
-		&& typeof o.accent === 'string'
-		&& typeof o.tvGridLoop === 'number'
-		&& typeof o.marqueeLoop === 'number'
-		&& typeof o.tvPauseOnHover === 'boolean';
+	return (
+		typeof o.wallpaper === 'string' &&
+		typeof o.accent === 'string' &&
+		typeof o.tvGridLoop === 'number' &&
+		typeof o.marqueeLoop === 'number' &&
+		typeof o.tvPauseOnHover === 'boolean'
+	);
 }
 
 const KEYS = {

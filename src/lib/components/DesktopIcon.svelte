@@ -4,12 +4,20 @@
 	let {
 		label,
 		disabled = false,
+		alias = false,
+		selected = false,
 		ondblclick,
+		onselect,
+		oncontextmenu,
 		children
 	}: {
 		label: string;
 		disabled?: boolean;
+		alias?: boolean;
+		selected?: boolean;
 		ondblclick: () => void;
+		onselect?: () => void;
+		oncontextmenu?: (e: MouseEvent) => void;
 		children: Snippet;
 	} = $props();
 </script>
@@ -18,8 +26,21 @@
 <div
 	class="desktop-icon"
 	class:disabled
-	ondblclick={ondblclick}
-	onclick={ondblclick}
+	class:alias
+	class:selected
+	onclick={(e) => {
+		e.stopPropagation();
+		onselect?.();
+	}}
+	{ondblclick}
+	oncontextmenu={(e) => {
+		if (oncontextmenu) {
+			e.preventDefault();
+			e.stopPropagation();
+			onselect?.();
+			oncontextmenu(e);
+		}
+	}}
 >
 	<div class="glyph">
 		{@render children()}
@@ -48,6 +69,17 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		position: relative;
+	}
+	.desktop-icon.alias .glyph::after {
+		content: '\21A9';
+		position: absolute;
+		bottom: -2px;
+		left: -2px;
+		font-size: 14px;
+		color: var(--paper);
+		text-shadow: 1px 1px 0 var(--ink);
+		line-height: 1;
 	}
 	.label {
 		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
@@ -58,10 +90,13 @@
 		background: transparent;
 		font-weight: 500;
 	}
-	.desktop-icon:hover .label,
-	.desktop-icon:focus .label {
+	.desktop-icon.selected .label {
 		background: var(--ink);
 		color: var(--paper);
 		text-shadow: none;
+	}
+	.desktop-icon.selected .glyph {
+		outline: 1px dotted var(--paper);
+		outline-offset: 2px;
 	}
 </style>

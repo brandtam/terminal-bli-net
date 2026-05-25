@@ -31,13 +31,25 @@
 		createFile,
 		writeFile,
 		deleteNode,
-		DOCS_ID
+		trash,
+		createAlias,
+		list,
+		resolveAlias,
+		onFsChange,
+		DOCS_ID,
+		DESKTOP_ID,
+		ROOT_ID,
+		SYSTEM_ID,
+		APPS_ID,
+		RECORDINGS_ID,
+		TRASH_ID
 	} from '$lib/os/filesystem';
-	import type { FSFile } from '$lib/os/filesystem';
+	import type { FSFile, FSNode } from '$lib/os/filesystem';
 	import StatsWindow from '$lib/apps/stats/StatsWindow.svelte';
 	import ErrorDialog from '$lib/apps/finder/ErrorDialog.svelte';
 	import TrashWindow from '$lib/apps/finder/TrashWindow.svelte';
 	import AboutAppWindow from '$lib/apps/finder/AboutAppWindow.svelte';
+	import AboutTerminal from '$lib/apps/finder/AboutTerminal.svelte';
 	import RecorderWindow from '$lib/apps/recorder/RecorderWindow.svelte';
 	import StickiesNote from '$lib/apps/stickies/StickiesNote.svelte';
 	import type { StickyNote } from '$lib/apps/stickies/StickiesNote.svelte';
@@ -143,8 +155,11 @@
 	let slotNow = $state(new Date());
 	let lastSlotIdx = $state(-1);
 	let isMobile = $state(false);
+	let selectedIconId = $state<string | null>(null);
 
 	let stickyNotes = $state<StickyNote[]>([]);
+	let desktopItems = $state<FSNode[]>([]);
+	let desktopFsRev = $state(0);
 
 	function stickyFromFile(f: FSFile): StickyNote {
 		try {
@@ -234,12 +249,122 @@
 		updateStickyNote({ ...note, color });
 	}
 
+	function openDesktopNode(node: FSNode) {
+		if (node.type === 'alias') {
+			const target = resolveAlias(node);
+			if (target) openDesktopNode(target);
+			return;
+		}
+		if (node.type === 'file') {
+			const file = node as FSFile;
+			if (file.appId === 'tvguide') openWindow('tv-guide');
+			else if (file.appId === 'stickies') createStickyNote();
+			else if (file.appId === 'recorder') openWindow('recorder');
+			else if (file.appId === 'stats') openWindow('stats');
+			else if (file.appId === 'error') openWindow('error');
+			else if (file.appId === 'system-prefs') os.openSystemPreferences();
+			else if (file.appId === 'about-terminal') os.openAbout(null);
+			else openWindow(file.id);
+		}
+	}
+
+	function desktopIconKind(node: FSNode): string {
+		if (node.type === 'alias') {
+			const target = resolveAlias(node);
+			if (target) return desktopIconKind(target);
+			return 'doc';
+		}
+		if (node.type === 'file') {
+			const file = node as FSFile;
+			if (file.appId === 'tvguide') return 'tvguide';
+			if (file.appId === 'stickies') return 'stickies';
+			if (file.appId === 'recorder') return 'tv';
+			if (file.appId === 'stats') return 'calc';
+			if (file.appId === 'error') return 'floppy';
+			if (file.appId === 'system-prefs') return 'hd';
+			if (file.appId === 'about-terminal') return 'doc';
+			return 'doc';
+		}
+		return 'doc';
+	}
+
+	let deskCtxNode = $state<FSNode | null>(null);
+	let deskCtxOpen_: (() => void) | null = $state(null);
+	let deskCtxCanAlias = $state(false);
+	let deskCtxCanTrash = $state(false);
+	let deskCtxX = $state(0);
+	let deskCtxY = $state(0);
+	let deskCtxEl = $state<HTMLDivElement | null>(null);
+
+	const PROTECTED_DESKTOP_IDS = new Set([
+		ROOT_ID,
+		SYSTEM_ID,
+		APPS_ID,
+		DESKTOP_ID,
+		RECORDINGS_ID,
+		TRASH_ID
+	]);
+
+	function showDesktopCtx(
+		e: MouseEvent,
+		opts: { open: () => void; node?: FSNode; canAlias?: boolean; canTrash?: boolean }
+	) {
+		deskCtxNode = opts.node ?? null;
+		deskCtxOpen_ = opts.open;
+		deskCtxCanAlias = opts.canAlias ?? false;
+		deskCtxCanTrash = opts.canTrash ?? false;
+		deskCtxX = e.clientX;
+		deskCtxY = e.clientY;
+		requestAnimationFrame(() => {
+			if (!deskCtxEl) return;
+			const rect = deskCtxEl.getBoundingClientRect();
+			if (rect.right > window.innerWidth) deskCtxX = e.clientX - rect.width;
+			if (rect.bottom > window.innerHeight) deskCtxY = e.clientY - rect.height;
+		});
+	}
+
+	function handleDesktopContextMenu(e: MouseEvent, node: FSNode) {
+		showDesktopCtx(e, {
+			open: () => openDesktopNode(node),
+			node,
+			canAlias: node.type === 'file',
+			canTrash: !PROTECTED_DESKTOP_IDS.has(node.id)
+		});
+	}
+
+	function closeDeskCtx() {
+		deskCtxNode = null;
+		deskCtxOpen_ = null;
+	}
+
+	function deskCtxOpen() {
+		deskCtxOpen_?.();
+		closeDeskCtx();
+	}
+
+	function deskCtxMakeAlias() {
+		if (!deskCtxNode) return;
+		try {
+			createAlias(DESKTOP_ID, deskCtxNode.name + ' alias', deskCtxNode.id);
+		} catch {
+			/* alias already exists */
+		}
+		closeDeskCtx();
+	}
+
+	function deskCtxTrash() {
+		if (!deskCtxNode) return;
+		trash(deskCtxNode.id);
+		closeDeskCtx();
+	}
+
 	onMount(() => {
 		tweaks = loadTweaks();
 		timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 		isMobile = window.innerWidth < 720;
 		seedFilesystem(); // seed filesystem default files
 		stickyNotes = loadStickyNotes();
+		desktopItems = list(DESKTOP_ID);
 
 		fetch('/api/data')
 			.then((res) => (res.ok ? res.json() : null))
@@ -257,7 +382,7 @@
 			windows = saved;
 			normalizeZOrder();
 		} else if (isFirstVisit()) {
-			openWindow('tv-guide');
+			openWindow('welcome');
 		}
 
 		const hash = window.location.hash.slice(1);
@@ -306,7 +431,7 @@
 				const appId = activeId ? windowAppId(activeId) : 'finder';
 				const app = APPS[appId];
 				if (app?.preferences) os.openPreferences(appId);
-				else os.openTweaks();
+				else os.openSystemPreferences();
 			}
 		};
 		window.addEventListener('keydown', handleKeydown);
@@ -335,6 +460,17 @@
 		const snapshot = windows;
 		const tid = setTimeout(() => saveWindows(snapshot), 300);
 		return () => clearTimeout(tid);
+	});
+
+	$effect(() =>
+		onFsChange(() => {
+			desktopFsRev++;
+		})
+	);
+
+	$effect(() => {
+		desktopFsRev;
+		if (mounted) desktopItems = list(DESKTOP_ID);
 	});
 
 	const KNOWN_WINDOW_IDS = new Set([
@@ -371,10 +507,10 @@
 		const defs: Record<string, { title: string; w: number; h: number }> = {
 			welcome: { title: 'Welcome.app', w: 460, h: 540 },
 			'tv-guide': { title: 'TV Guide.app', w: 660, h: 700 },
-			'terminal-prefs': { title: 'Terminal Preferences', w: 380, h: 360 },
+			'terminal-prefs': { title: 'System Preferences', w: 380, h: 360 },
 			'tvguide-prefs': { title: 'TV Guide Preferences', w: 360, h: 360 },
 			'chatrbot-prefs': { title: 'chatrbot Preferences', w: 360, h: 280 },
-			about: { title: 'About Terminal', w: 420, h: 480 },
+			about: { title: 'About This Terminal', w: 380, h: 380 },
 			'about-chatrbot': { title: 'About chatrbot', w: 420, h: 460 },
 			'about-tvguide': { title: 'About TV Guide', w: 420, h: 460 },
 			'about-textedit': { title: 'About TextEdit', w: 420, h: 380 },
@@ -382,7 +518,7 @@
 			'about-stickies': { title: 'About Stickies', w: 420, h: 380 },
 			stats: { title: 'Stats.app', w: 360, h: 360 },
 			error: { title: 'System Error', w: 420, h: 260 },
-			trash: { title: 'Trash — empty', w: 380, h: 320 },
+			trash: { title: 'Trash', w: 380, h: 320 },
 			recorder: { title: 'Camera.app', w: 360, h: 480 },
 			'about-recorder': { title: 'About Recorder', w: 420, h: 360 },
 			finder: { title: 'Terminal HD', w: 480, h: 420 }
@@ -592,7 +728,7 @@
 		closeWindow,
 		focusWindow,
 		openWindow,
-		openTweaks: () => openWindow('terminal-prefs'),
+		openSystemPreferences: () => openWindow('terminal-prefs'),
 		openPreferences: (appId) => {
 			const a = APPS[appId];
 			if (a?.preferences) openWindow(a.preferences);
@@ -706,12 +842,21 @@
 		<div class="mobile-footer">terminal.bli.net · one tab, one desktop</div>
 	</div>
 {:else}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="desktop"
 		data-wallpaper={tweaks.wallpaper.startsWith('sys7-') ? undefined : tweaks.wallpaper}
 		style={tweaks.wallpaper.startsWith('sys7-')
 			? `background: url(/themes/system7/wallpapers/${tweaks.wallpaper.replace('sys7-', '')}.png) repeat; image-rendering: pixelated;`
 			: ''}
+		onclick={() => {
+			selectedIconId = null;
+			closeDeskCtx();
+		}}
+		oncontextmenu={(e) => {
+			e.preventDefault();
+			closeDeskCtx();
+		}}
 	>
 		<MenuBar
 			app={activeApp}
@@ -726,36 +871,68 @@
 
 		{#if !isMobile || windows.length === 0}
 			<div class="desktop-icons left">
-				<DesktopIcon label="Terminal HD" ondblclick={() => openWindow('finder')}>
+				<DesktopIcon
+					label="Terminal HD"
+					selected={selectedIconId === 'hd'}
+					onselect={() => {
+						selectedIconId = 'hd';
+					}}
+					ondblclick={() => openWindow('finder')}
+					oncontextmenu={(e) => showDesktopCtx(e, { open: () => openWindow('finder') })}
+				>
 					<PixelIcon kind="hd" />
-				</DesktopIcon>
-				<DesktopIcon label="TV Guide.app" ondblclick={() => openWindow('tv-guide')}>
-					<PixelIcon kind="tvguide" />
-				</DesktopIcon>
-				<DesktopIcon label="README.txt" ondblclick={() => openTextEditFile('README.TXT')}>
-					<PixelIcon kind="doc" />
 				</DesktopIcon>
 			</div>
 
 			<div class="desktop-icons right">
-				<DesktopIcon label="Pricing.txt" ondblclick={() => openTextEditFile('Pricing.txt')}>
-					<PixelIcon kind="doc" accent />
-				</DesktopIcon>
-				<DesktopIcon label="Stickies" ondblclick={() => createStickyNote()}>
-					<PixelIcon kind="stickies" />
-				</DesktopIcon>
-				<DesktopIcon label="Camera.app" ondblclick={() => openWindow('recorder')}>
-					<PixelIcon kind="tv" />
-				</DesktopIcon>
-				<DesktopIcon label="Stats.app" ondblclick={() => openWindow('stats')}>
-					<PixelIcon kind="calc" />
-				</DesktopIcon>
-				<DesktopIcon label="DO_NOT_OPEN" ondblclick={() => openWindow('error')}>
-					<PixelIcon kind="floppy" />
-				</DesktopIcon>
-				<DesktopIcon label="Trash" ondblclick={() => openWindow('trash')}>
+				{#each desktopItems as node (node.id)}
+					<DesktopIcon
+						label={node.name}
+						alias={node.type === 'alias'}
+						selected={selectedIconId === node.id}
+						onselect={() => {
+							selectedIconId = node.id;
+						}}
+						ondblclick={() => openDesktopNode(node)}
+						oncontextmenu={(e) => handleDesktopContextMenu(e, node)}
+					>
+						<PixelIcon kind={desktopIconKind(node)} />
+					</DesktopIcon>
+				{/each}
+				<DesktopIcon
+					label="Trash"
+					selected={selectedIconId === 'trash'}
+					onselect={() => {
+						selectedIconId = 'trash';
+					}}
+					ondblclick={() => openWindow('trash')}
+					oncontextmenu={(e) => showDesktopCtx(e, { open: () => openWindow('trash') })}
+				>
 					<PixelIcon kind="trash" />
 				</DesktopIcon>
+			</div>
+		{/if}
+
+		{#if deskCtxOpen_}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="desktop-context-menu"
+				bind:this={deskCtxEl}
+				style="left: {deskCtxX}px; top: {deskCtxY}px;"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="desktop-context-item" onclick={deskCtxOpen}>Open</div>
+				{#if deskCtxCanAlias}
+					<div class="desktop-context-sep"></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="desktop-context-item" onclick={deskCtxMakeAlias}>Make Alias</div>
+				{/if}
+				{#if deskCtxCanTrash}
+					<div class="desktop-context-sep"></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="desktop-context-item" onclick={deskCtxTrash}>Move to Trash</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -770,6 +947,7 @@
 				height={w.h}
 				z={w.z}
 				active={activeId === w.id}
+				chromeless={w.id.startsWith('sticky-')}
 				onfocus={focusWindow}
 				onclose={closeWindow}
 				onmove={moveWindow}
@@ -816,8 +994,10 @@
 				{:else if w.id.startsWith('textedit-')}
 					{@const fileId = w.id.replace('textedit-', '')}
 					<TextEditWindow docId={fileId} />
-				{:else if w.id === 'about' || w.id.startsWith('about-')}
-					{@const aboutAppId = w.id === 'about' ? 'finder' : w.id.replace('about-', '')}
+				{:else if w.id === 'about'}
+					<AboutTerminal {os} />
+				{:else if w.id.startsWith('about-')}
+					{@const aboutAppId = w.id.replace('about-', '')}
 					{@const aboutApp = APPS[aboutAppId]}
 					{#if aboutApp?.about}
 						<AboutAppWindow about={aboutApp.about} />
@@ -827,7 +1007,7 @@
 				{:else if w.id === 'error'}
 					<ErrorDialog onclose={() => closeWindow('error')} />
 				{:else if w.id === 'trash'}
-					<TrashWindow />
+					<FinderWindow {os} folderId="trash" />
 				{:else if w.id === 'recorder'}
 					<RecorderWindow bind:recording={cameraRecording} />
 				{:else if w.id.startsWith('recorder-')}
@@ -1030,6 +1210,32 @@
 	}
 	.desktop-icons.right {
 		right: 16px;
+	}
+	.desktop-context-menu {
+		position: fixed;
+		background: var(--chrome-menubar-bg, var(--paper));
+		color: var(--chrome-menubar-fg, var(--ink));
+		border: 2px solid var(--chrome-window-border-color, var(--ink));
+		box-shadow: 3px 3px 0 var(--shadow);
+		min-width: 160px;
+		padding: 4px 0;
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
+		font-size: 14px;
+		z-index: 12000;
+	}
+	.desktop-context-item {
+		padding: 4px 12px;
+		cursor: pointer;
+	}
+	.desktop-context-item:hover {
+		background: var(--chrome-menubar-hover-bg, var(--ink));
+		color: var(--chrome-menubar-hover-fg, var(--paper));
+	}
+	.desktop-context-sep {
+		height: 1px;
+		background: var(--chrome-menubar-fg, var(--ink));
+		margin: 4px 8px;
+		opacity: 0.2;
 	}
 	.window-content {
 		padding: 14px;

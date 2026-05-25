@@ -1,4 +1,15 @@
-import { DOCS_ID, exists, createFile } from '$lib/os/filesystem';
+import {
+	DOCS_ID,
+	APPS_ID,
+	SYSTEM_ID,
+	DESKTOP_ID,
+	exists,
+	getNode,
+	createFile,
+	createFileWithId,
+	createAliasWithId,
+	ensureSystemFolders
+} from '$lib/os/filesystem';
 
 const README_CONTENT = `README.TXT — Terminal v1.0
 
@@ -60,10 +71,45 @@ Cancel any time. Pricing in fake dollars. Real dollars also fine.`;
  * Call once from Desktop's onMount.
  */
 export function seedFilesystem(): void {
+	ensureSystemFolders();
+
 	if (!exists(DOCS_ID, 'README.TXT')) {
 		createFile(DOCS_ID, 'README.TXT', 'textedit', README_CONTENT);
 	}
 	if (!exists(DOCS_ID, 'Pricing.txt')) {
 		createFile(DOCS_ID, 'Pricing.txt', 'textedit', PRICING_CONTENT);
+	}
+
+	const apps = [
+		{ id: 'app-tvguide', name: 'TV Guide.app', appId: 'tvguide' },
+		{ id: 'app-stickies', name: 'Stickies', appId: 'stickies' },
+		{ id: 'app-recorder', name: 'Camera.app', appId: 'recorder' },
+		{ id: 'app-stats', name: 'Stats.app', appId: 'stats' },
+		{ id: 'app-error', name: 'DO_NOT_OPEN', appId: 'error' }
+	];
+	for (const app of apps) {
+		if (!exists(APPS_ID, app.name)) {
+			createFileWithId(app.id, APPS_ID, app.name, app.appId, '');
+		}
+	}
+
+	if (!exists(SYSTEM_ID, 'System Preferences')) {
+		createFile(SYSTEM_ID, 'System Preferences', 'system-prefs', '');
+	}
+	if (!exists(SYSTEM_ID, 'About This Terminal')) {
+		createFile(SYSTEM_ID, 'About This Terminal', 'about-terminal', '');
+	}
+
+	const desktopAliases = [
+		{ id: 'desktop-tvguide', name: 'TV Guide.app', targetId: 'app-tvguide' },
+		{ id: 'desktop-stickies', name: 'Stickies', targetId: 'app-stickies' },
+		{ id: 'desktop-recorder', name: 'Camera.app', targetId: 'app-recorder' },
+		{ id: 'desktop-stats', name: 'Stats.app', targetId: 'app-stats' },
+		{ id: 'desktop-error', name: 'DO_NOT_OPEN', targetId: 'app-error' }
+	];
+	for (const da of desktopAliases) {
+		if (!exists(DESKTOP_ID, da.name) && getNode(da.targetId)) {
+			createAliasWithId(da.id, DESKTOP_ID, da.name, da.targetId);
+		}
 	}
 }
