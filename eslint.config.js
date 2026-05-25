@@ -41,7 +41,8 @@ export default [
 				CustomEvent: 'readonly',
 				ResizeObserver: 'readonly',
 				requestAnimationFrame: 'readonly',
-				KVNamespace: 'readonly'
+				KVNamespace: 'readonly',
+				__APP_VERSION__: 'readonly'
 			}
 		},
 		plugins: {
@@ -90,7 +91,8 @@ export default [
 				ResizeObserver: 'readonly',
 				requestAnimationFrame: 'readonly',
 				cancelAnimationFrame: 'readonly',
-				performance: 'readonly'
+				performance: 'readonly',
+				__APP_VERSION__: 'readonly'
 			}
 		},
 		rules: {
