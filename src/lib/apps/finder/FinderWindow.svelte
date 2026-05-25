@@ -1,6 +1,15 @@
 <script lang="ts">
 	import type { OsApi } from '$lib/os/os-api';
-	import { list, getNode, onFsChange, ROOT_ID, TRASH_ID, SYSTEM_ID, APPS_ID, RECORDINGS_ID } from '$lib/os/filesystem';
+	import {
+		list,
+		getNode,
+		onFsChange,
+		ROOT_ID,
+		TRASH_ID,
+		SYSTEM_ID,
+		APPS_ID,
+		RECORDINGS_ID
+	} from '$lib/os/filesystem';
 	import type { FSNode, FSFile } from '$lib/os/filesystem';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 
@@ -16,7 +25,11 @@
 	let selectedId = $state<string | null>(null);
 	let fsRev = $state(0);
 
-	$effect(() => onFsChange(() => { fsRev++; }));
+	$effect(() =>
+		onFsChange(() => {
+			fsRev++;
+		})
+	);
 
 	const items = $derived.by(() => {
 		fsRev;
@@ -40,10 +53,12 @@
 			if (node.id === RECORDINGS_ID) return 'floppy';
 			return 'folder';
 		}
-		// File
 		const file = node as FSFile;
-		if (file.appId === 'recorder') return 'floppy';
+		if (file.appId === 'recorder') return 'tv';
 		if (file.appId === 'stickies') return 'stickies';
+		if (file.appId === 'tvguide') return 'tvguide';
+		if (file.appId === 'stats') return 'calc';
+		if (file.appId === 'error') return 'floppy';
 		return 'doc';
 	}
 
@@ -65,14 +80,19 @@
 			selectedId = null;
 			return;
 		}
-		// File - open in owning app
 		const file = node as FSFile;
 		if (file.appId === 'textedit') {
 			os.openWindow(`textedit-${file.id}`);
 		} else if (file.appId === 'recorder') {
 			os.openWindow(`recorder-${file.id}`);
 		} else if (file.appId === 'stickies') {
-			os.openWindow(`sticky-${file.id}`);
+			os.launchApp('stickies', { action: 'new' });
+		} else if (file.appId === 'tvguide') {
+			os.openWindow('tv-guide');
+		} else if (file.appId === 'stats') {
+			os.openWindow('stats');
+		} else if (file.appId === 'error') {
+			os.openWindow('error');
 		} else {
 			os.openWindow(file.id);
 		}

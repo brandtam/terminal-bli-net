@@ -1,4 +1,4 @@
-import { DOCS_ID, exists, createFile } from '$lib/os/filesystem';
+import { DOCS_ID, APPS_ID, exists, createFile } from '$lib/os/filesystem';
 
 const README_CONTENT = `README.TXT — Terminal v1.0
 
@@ -65,5 +65,18 @@ export function seedFilesystem(): void {
 	}
 	if (!exists(DOCS_ID, 'Pricing.txt')) {
 		createFile(DOCS_ID, 'Pricing.txt', 'textedit', PRICING_CONTENT);
+	}
+
+	const apps = [
+		{ name: 'TV Guide.app', appId: 'tvguide' },
+		{ name: 'Stickies', appId: 'stickies' },
+		{ name: 'Camera.app', appId: 'recorder' },
+		{ name: 'Stats.app', appId: 'stats' },
+		{ name: 'DO_NOT_OPEN', appId: 'error' }
+	];
+	for (const app of apps) {
+		if (!exists(APPS_ID, app.name)) {
+			createFile(APPS_ID, app.name, app.appId, '');
+		}
 	}
 }
