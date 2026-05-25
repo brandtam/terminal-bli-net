@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { readFile, writeFile } from '$lib/os/filesystem';
 
 	interface Props {
@@ -11,10 +10,11 @@
 	let content = $state('');
 	let dirty = $state(false);
 
-	onMount(() => {
+	$effect(() => {
 		const file = readFile(docId);
 		if (file) {
 			content = file.data;
+			dirty = false;
 		}
 	});
 

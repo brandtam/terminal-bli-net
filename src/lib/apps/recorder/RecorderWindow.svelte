@@ -89,9 +89,13 @@
 					clipNumber++;
 					name = `Clip ${clipNumber} (${elapsed}s).webm`;
 				}
-				createFile(RECORDINGS_ID, name, 'recorder', dataUrl);
-				refreshRecordings();
-				playbackUrl = dataUrl;
+				try {
+					createFile(RECORDINGS_ID, name, 'recorder', dataUrl);
+					refreshRecordings();
+					playbackUrl = dataUrl;
+				} catch {
+					error = 'Storage full — delete old recordings to free space.';
+				}
 			};
 			reader.readAsDataURL(blob);
 		};

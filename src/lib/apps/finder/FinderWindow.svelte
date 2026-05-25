@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { OsApi } from '$lib/os/os-api';
-	import { list, getNode, ROOT_ID, TRASH_ID, SYSTEM_ID, APPS_ID, RECORDINGS_ID } from '$lib/os/filesystem';
+	import { list, getNode, onFsChange, ROOT_ID, TRASH_ID, SYSTEM_ID, APPS_ID, RECORDINGS_ID } from '$lib/os/filesystem';
 	import type { FSNode, FSFile } from '$lib/os/filesystem';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 
@@ -14,8 +14,14 @@
 
 	let currentFolderId = $state(initialFolderId);
 	let selectedId = $state<string | null>(null);
+	let fsRev = $state(0);
 
-	const items = $derived(list(currentFolderId));
+	$effect(() => onFsChange(() => { fsRev++; }));
+
+	const items = $derived.by(() => {
+		fsRev;
+		return list(currentFolderId);
+	});
 	const pathSegments = $derived.by(() => {
 		const segments: { id: string; name: string }[] = [];
 		let node = getNode(currentFolderId);

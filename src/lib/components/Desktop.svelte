@@ -180,7 +180,7 @@
 		const saved = loadWindows();
 		if (saved.length > 0) {
 			windows = saved;
-			zCounter = Math.max(zCounter, ...saved.map((w) => w.z));
+			normalizeZOrder();
 		} else if (isFirstVisit()) {
 			openWindow('tv-guide');
 		}
@@ -332,10 +332,17 @@
 		return defs[id] || { title: 'Unknown', w: 380, h: 320 };
 	}
 
+	function normalizeZOrder() {
+		const sorted = [...windows].sort((a, b) => a.z - b.z);
+		windows = sorted.map((w, i) => ({ ...w, z: i + 1 }));
+		zCounter = windows.length;
+	}
+
 	function focusWindow(id: string) {
 		activeId = id;
 		zCounter++;
 		windows = windows.map((w) => (w.id === id ? { ...w, z: zCounter } : w));
+		if (zCounter > 1000) normalizeZOrder();
 	}
 
 	function moveWindow(id: string, x: number, y: number) {
