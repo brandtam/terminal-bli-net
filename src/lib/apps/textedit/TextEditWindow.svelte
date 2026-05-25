@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getDoc, saveDoc } from './textedit-docs';
+	import { readFile, writeFile } from '$lib/os/filesystem';
 
 	interface Props {
 		docId: string;
@@ -12,9 +12,9 @@
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
 	onMount(() => {
-		const doc = getDoc(docId);
-		if (doc) {
-			content = doc.content;
+		const file = readFile(docId);
+		if (file) {
+			content = file.data;
 		}
 	});
 
@@ -22,9 +22,9 @@
 		content = (e.target as HTMLTextAreaElement).value;
 		if (timer) clearTimeout(timer);
 		timer = setTimeout(() => {
-			const doc = getDoc(docId);
-			if (doc) {
-				saveDoc({ ...doc, content, updatedAt: Date.now() });
+			const file = readFile(docId);
+			if (file) {
+				writeFile(docId, content);
 			}
 		}, 500);
 	}

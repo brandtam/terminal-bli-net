@@ -1,5 +1,5 @@
 import type { AppDef, OsApi, AppMenuSpec } from './os-api';
-import { createDoc, listDocs } from '$lib/apps/textedit/textedit-docs';
+import { createDoc, listDocs, findDocByName } from '$lib/apps/textedit/textedit-docs';
 
 export const APPS: Record<string, AppDef> = {
 	finder: {
@@ -44,7 +44,10 @@ export const APPS: Record<string, AppDef> = {
 				{ type: 'action', label: 'as List', disabled: true },
 				{ type: 'separator' },
 				{ type: 'action', label: 'Show Stats', action: () => os.openWindow('stats') },
-				{ type: 'action', label: 'Show Pricing', action: () => os.openWindow('pricing') },
+				{ type: 'action', label: 'Show Pricing', action: () => {
+					const f = findDocByName('Pricing.txt');
+					if (f) os.openWindow(`textedit-${f.id}`);
+				}},
 			]},
 			{ label: 'Special', items: [
 				{ type: 'action', label: 'Empty Trash', disabled: true },
@@ -54,7 +57,10 @@ export const APPS: Record<string, AppDef> = {
 			]},
 			{ label: 'Help', items: [
 				{ type: 'action', label: 'About Terminal', action: () => os.openAbout(null) },
-				{ type: 'action', label: 'README.txt', action: () => os.openWindow('readme') },
+				{ type: 'action', label: 'README.txt', action: () => {
+					const f = findDocByName('README.TXT');
+					if (f) os.openWindow(`textedit-${f.id}`);
+				}},
 			]},
 		],
 		statusExtra: () => null,
@@ -101,7 +107,10 @@ export const APPS: Record<string, AppDef> = {
 				{ type: 'action', label: 'Preferences…', shortcut: '⌘,', action: () => os.openPreferences('tvguide') },
 				{ type: 'separator' },
 				{ type: 'action', label: 'About TV Guide', action: () => os.openAbout('tvguide') },
-				{ type: 'action', label: 'How airing works', action: () => os.openWindow('readme') },
+				{ type: 'action', label: 'How airing works', action: () => {
+					const f = findDocByName('README.TXT');
+					if (f) os.openWindow(`textedit-${f.id}`);
+				}},
 			]},
 		],
 		statusExtra: (os) => {
@@ -286,8 +295,7 @@ export const APPS: Record<string, AppDef> = {
 					const buttons = docs.map((d) => ({
 						label: d.name,
 						action: () => {
-							const winId = (d.id === 'readme' || d.id === 'pricing') ? d.id : `textedit-${d.id}`;
-							os.openWindow(winId);
+							os.openWindow(`textedit-${d.id}`);
 						},
 					}));
 					os.alert({
