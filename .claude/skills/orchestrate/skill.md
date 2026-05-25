@@ -36,7 +36,7 @@ Every agent prompt must include this block (copy it verbatim into each prompt):
 After your code is written and checks pass, review your changes against the project's code review checklist. Read `.claude/skills/review-code/skill.md` for the full checklist. The key checks:
 
 1. **Architecture** — uses filesystem API (not raw localStorage) for file storage, window IDs registered, app registry entry if needed
-2. **Design system** — CSS uses token vars (--ink, --paper, --chrome-*), 2px borders, no rounded corners, correct font for context, Dropdown component instead of native select
+2. **Design system** — CSS uses theme vars (--ink, --paper, --chrome-*), 2px borders, no rounded corners, correct font for context, Dropdown component instead of native select
 3. **Code quality** — Svelte 5 runes, proper TypeScript types, tests for pure functions, no security issues
 
 Walk through each applicable item. If you find a violation, fix it before committing. If everything passes, commit. Do not commit code that fails review — iterate until clean.
