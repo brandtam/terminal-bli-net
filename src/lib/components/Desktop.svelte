@@ -147,6 +147,7 @@
 	let slotNow = $state(new Date());
 	let lastSlotIdx = $state(-1);
 	let isMobile = $state(false);
+	let selectedIconId = $state<string | null>(null);
 
 	let stickyNotes = $state<StickyNote[]>([]);
 	let aliases = $state<DesktopAlias[]>([]);
@@ -730,12 +731,16 @@
 		<div class="mobile-footer">terminal.bli.net · one tab, one desktop</div>
 	</div>
 {:else}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="desktop"
 		data-wallpaper={tweaks.wallpaper.startsWith('sys7-') ? undefined : tweaks.wallpaper}
 		style={tweaks.wallpaper.startsWith('sys7-')
 			? `background: url(/themes/system7/wallpapers/${tweaks.wallpaper.replace('sys7-', '')}.png) repeat; image-rendering: pixelated;`
 			: ''}
+		onclick={() => {
+			selectedIconId = null;
+		}}
 	>
 		<MenuBar
 			app={activeApp}
@@ -750,21 +755,51 @@
 
 		{#if !isMobile || windows.length === 0}
 			<div class="desktop-icons left">
-				<DesktopIcon label="Terminal HD" ondblclick={() => openWindow('finder')}>
+				<DesktopIcon
+					label="Terminal HD"
+					selected={selectedIconId === 'hd'}
+					onselect={() => {
+						selectedIconId = 'hd';
+					}}
+					ondblclick={() => openWindow('finder')}
+				>
 					<PixelIcon kind="hd" />
 				</DesktopIcon>
-				<DesktopIcon label="TV Guide.app" alias ondblclick={() => openWindow('tv-guide')}>
+				<DesktopIcon
+					label="TV Guide.app"
+					alias
+					selected={selectedIconId === 'alias-tvguide'}
+					onselect={() => {
+						selectedIconId = 'alias-tvguide';
+					}}
+					ondblclick={() => openWindow('tv-guide')}
+				>
 					<PixelIcon kind="tvguide" />
 				</DesktopIcon>
 			</div>
 
 			<div class="desktop-icons right">
 				{#each aliases as a (a.id)}
-					<DesktopIcon label={a.label} alias ondblclick={() => openAlias(a)}>
+					<DesktopIcon
+						label={a.label}
+						alias
+						selected={selectedIconId === a.id}
+						onselect={() => {
+							selectedIconId = a.id;
+						}}
+						ondblclick={() => openAlias(a)}
+					>
 						<PixelIcon kind={a.icon} />
 					</DesktopIcon>
 				{/each}
-				<DesktopIcon label="Trash" ondblclick={() => openWindow('trash')}>
+				<DesktopIcon
+					label="Trash"
+					selected={selectedIconId === 'trash'}
+					onselect={() => {
+						selectedIconId = 'trash';
+					}}
+					ondblclick={() => openWindow('trash')}
+				>
 					<PixelIcon kind="trash" />
 				</DesktopIcon>
 			</div>
