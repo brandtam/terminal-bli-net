@@ -7,6 +7,7 @@
 		createAlias,
 		resolveAlias,
 		trash,
+		deleteNode,
 		ROOT_ID,
 		TRASH_ID,
 		SYSTEM_ID,
@@ -167,6 +168,14 @@
 		trash(contextMenuNode.id);
 		closeContextMenu();
 	}
+
+	function handleContextDelete() {
+		if (!contextMenuNode) return;
+		deleteNode(contextMenuNode.id);
+		closeContextMenu();
+	}
+
+	const inTrash = $derived(currentFolderId === TRASH_ID);
 </script>
 
 <svelte:window onclick={closeContextMenu} />
@@ -216,17 +225,22 @@
 			style="left: {contextMenuX}px; top: {contextMenuY}px;"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="context-menu-item" onclick={handleContextOpen}>Open</div>
-			{#if contextMenuNode.type === 'file'}
-				<div class="context-menu-sep"></div>
+			{#if inTrash}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="context-menu-item" onclick={handleContextMakeAlias}>Make Alias</div>
-			{/if}
-			{#if canTrash(contextMenuNode)}
-				<div class="context-menu-sep"></div>
+				<div class="context-menu-item" onclick={handleContextDelete}>Delete Permanently</div>
+			{:else}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="context-menu-item" onclick={handleContextTrash}>Move to Trash</div>
+				<div class="context-menu-item" onclick={handleContextOpen}>Open</div>
+				{#if contextMenuNode.type === 'file'}
+					<div class="context-menu-sep"></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="context-menu-item" onclick={handleContextMakeAlias}>Make Alias</div>
+				{/if}
+				{#if canTrash(contextMenuNode)}
+					<div class="context-menu-sep"></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="context-menu-item" onclick={handleContextTrash}>Move to Trash</div>
+				{/if}
 			{/if}
 		</div>
 	{/if}
