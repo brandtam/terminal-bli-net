@@ -1,4 +1,3 @@
-import type { Component } from 'svelte';
 import type { WindowState, TweaksState } from '$lib/types';
 
 export interface AboutSection {
@@ -92,7 +91,7 @@ export interface OsApi {
 	now: Date;
 	timezone: string | undefined;
 	tweaks: TweaksState;
-	setTweak: (key: string, value: unknown) => void;
+	setTweak: (key: keyof TweaksState, value: TweaksState[keyof TweaksState]) => void;
 
 	guide: GuideApi;
 

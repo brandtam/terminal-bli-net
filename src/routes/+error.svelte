@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 </script>
 
 <div class="error-screen">
 	<div class="error-box">
 		<div class="error-icon">⚠</div>
 		<div class="error-content">
-			<h1>System Error {$page.status}</h1>
-			<p>{$page.error?.message ?? 'Something went wrong.'}</p>
+			<h1>System Error {page.status}</h1>
+			<p>{page.error?.message ?? 'Something went wrong.'}</p>
 			<a href="/" class="btn">← Back to desktop</a>
 		</div>
 	</div>

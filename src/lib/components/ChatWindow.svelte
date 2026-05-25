@@ -424,6 +424,10 @@
 		font-family: 'Press Start 2P', monospace;
 		font-size: 10px;
 	}
+	@keyframes blink {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0; }
+	}
 	.dot {
 		display: inline-block;
 		animation: blink 1s steps(2, end) infinite;
