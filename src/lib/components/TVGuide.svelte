@@ -36,7 +36,7 @@
 	const COLUMN_WIDTH_PX = 140;
 	const CHANNEL_COL_PX = 72;
 
-	let groupMap = $derived(new Map(groups.map(g => [g.slug, g])));
+	let groupMap = $derived(new Map(groups.map((g) => [g.slug, g])));
 
 	interface TimeSlot {
 		label: string;
@@ -70,7 +70,7 @@
 
 	function getEpisodeInfo(slot: ChannelSlot): { title: string; year: string } | null {
 		const show = groupMap.get(slot.showSlug);
-		const ep = show?.episodes?.find(e => e.season === slot.season && e.episode === slot.episode);
+		const ep = show?.episodes?.find((e) => e.season === slot.season && e.episode === slot.episode);
 		return ep ? { title: ep.title, year: ep.year } : null;
 	}
 
@@ -96,7 +96,11 @@
 		return slots;
 	}
 
-	function buildMergedCells(channel: Channel, slotOrder: TimeSlot[], currentSlotIdx: number): MergedCell[] {
+	function buildMergedCells(
+		channel: Channel,
+		slotOrder: TimeSlot[],
+		currentSlotIdx: number
+	): MergedCell[] {
 		const cells: MergedCell[] = [];
 		let i = 0;
 
@@ -129,7 +133,7 @@
 			}
 
 			// A cell is live if any of its slot indices equals the current slot
-			const isLive = slotOrder.slice(i, i + span).some(s => s.slotIndex === currentSlotIdx);
+			const isLive = slotOrder.slice(i, i + span).some((s) => s.slotIndex === currentSlotIdx);
 
 			cells.push({
 				startSlot: i,
@@ -175,9 +179,7 @@
 	let slots = $derived(buildTimeSlots(slotNow, timezone));
 	let currentSlotIdx = $derived(getSlotIndex(slotNow, timezone));
 
-	let sortedChannels = $derived(
-		[...channels].sort((a, b) => a.number - b.number)
-	);
+	let sortedChannels = $derived([...channels].sort((a, b) => a.number - b.number));
 
 	let schedule = $derived.by(() => {
 		return sortedChannels.map((channel) => ({
@@ -198,7 +200,9 @@
 				nowPlaying.push(`● CH${channel.number} ${showName.toUpperCase()}${epTitle}`);
 			}
 		}
-		return nowPlaying.join('   ✦   ') || '● ALL CHANNELS — check the schedule for upcoming broadcasts';
+		return (
+			nowPlaying.join('   ✦   ') || '● ALL CHANNELS — check the schedule for upcoming broadcasts'
+		);
 	});
 
 	$effect(() => {
@@ -227,8 +231,12 @@
 	});
 
 	const animState = { gridLoop: 0, paused: false };
-	$effect(() => { animState.gridLoop = gridLoop; });
-	$effect(() => { animState.paused = paused; });
+	$effect(() => {
+		animState.gridLoop = gridLoop;
+	});
+	$effect(() => {
+		animState.paused = paused;
+	});
 
 	onMount(() => {
 		let raf: number;
@@ -237,7 +245,10 @@
 
 		const animate = (t: number) => {
 			const el = scrollerEl;
-			if (!el) { raf = requestAnimationFrame(animate); return; }
+			if (!el) {
+				raf = requestAnimationFrame(animate);
+				return;
+			}
 
 			const dt = (t - last) / 1000;
 			last = t;
@@ -251,7 +262,10 @@
 				if (whole > 0) {
 					accum -= whole;
 					let target = el.scrollLeft + whole;
-					if (target >= max) { target = 0; accum = 0; }
+					if (target >= max) {
+						target = 0;
+						accum = 0;
+					}
 					el.scrollLeft = target;
 				}
 			}
@@ -359,11 +373,16 @@
 	<!-- Date Bar -->
 	<div class="tvg-datebar">
 		<span class="tvg-datebar-date">{formatGuideDate(now, timezone)}</span>
-		<button class="tvg-datebar-live" onclick={() => {
-			if (scrollerEl) scrollerEl.scrollLeft = 0;
-			paused = true;
-			setTimeout(() => { paused = false; }, 1000);
-		}}>
+		<button
+			class="tvg-datebar-live"
+			onclick={() => {
+				if (scrollerEl) scrollerEl.scrollLeft = 0;
+				paused = true;
+				setTimeout(() => {
+					paused = false;
+				}, 1000);
+			}}
+		>
 			{#if sortedChannels.some((ch) => getCurrentSlot(ch, slotNow, timezone) !== null)}
 				<span class="tvg-now-dot live">●</span>LIVE @ {formatLiveClock(now, timezone)}
 			{:else}
@@ -377,8 +396,16 @@
 	<div
 		class="tvg-scroller"
 		bind:this={scrollerEl}
-		onmouseenter={pauseOnHover ? () => { paused = true; } : undefined}
-		onmouseleave={pauseOnHover ? () => { paused = false; } : undefined}
+		onmouseenter={pauseOnHover
+			? () => {
+					paused = true;
+				}
+			: undefined}
+		onmouseleave={pauseOnHover
+			? () => {
+					paused = false;
+				}
+			: undefined}
 	>
 		<div
 			class="tvg-grid"
@@ -403,28 +430,42 @@
 			{#each schedule as { channel, cells }, chIdx}
 				{@const isAlt = chIdx % 2 === 1}
 				{@const currentShowSlug = getCurrentSlot(channel, slotNow, timezone)?.showSlug ?? null}
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
 				<div
 					class="tvg-cell tvg-ch-cell"
 					class:alt={isAlt}
 					class:current={currentShowSlug === activeChatGroupSlug && activeChatGroupSlug !== null}
 					style="grid-column: 1; grid-row: {chIdx + 2}; cursor: pointer;"
+					role="button"
+					tabindex="0"
 					onclick={() => selectFeaturedFromChannel(channel)}
+					onkeydown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							selectFeaturedFromChannel(channel);
+						}
+					}}
 				>
 					<div class="ch-num">{String(channel.number).padStart(2, '0')}</div>
 					<div class="ch-net">{channel.network}</div>
 					{#if currentShowSlug === activeChatGroupSlug && activeChatGroupSlug !== null}
 						<button
 							class="ch-open"
-							onclick={(e) => { e.stopPropagation(); if (activeChatGroupSlug) onFocusChat(activeChatGroupSlug); }}
-							title="Bring chat window to front"
-						>● open</button>
+							onclick={(e) => {
+								e.stopPropagation();
+								if (activeChatGroupSlug) onFocusChat(activeChatGroupSlug);
+							}}
+							title="Bring chat window to front">● open</button
+						>
 					{/if}
 				</div>
 
 				{#each cells as cell}
 					{@const showGroup = groupMap.get(cell.showSlug)}
-					{@const isFeatured = featured && featured.channelSlug === channel.slug && featured.showSlug === cell.showSlug && featured.title === cell.title}
+					{@const isFeatured =
+						featured &&
+						featured.channelSlug === channel.slug &&
+						featured.showSlug === cell.showSlug &&
+						featured.title === cell.title}
 					<div
 						class="tvg-cell tvg-ep-cell"
 						class:now={cell.isLive && cell.startSlot === 0}
@@ -433,15 +474,33 @@
 						class:featured={isFeatured}
 						class:alt={isAlt}
 						style="grid-column: {cell.startSlot + 2} / span {cell.span}; grid-row: {chIdx + 2};"
+						role="button"
+						tabindex="0"
+						aria-label="{groupMap.get(cell.showSlug)?.name ??
+							cell.showSlug} - {cell.title}{cell.isLive ? ' (live)' : ' (off air)'}"
 						onclick={() => selectFeaturedFromCell(channel, cell)}
 						ondblclick={() => handleCellDblClick(cell)}
-						title={cell.isLive ? `Click to preview · double-click to chat` : `Off air — click to preview`}
+						onkeydown={(e) => {
+							if (e.key === 'Enter') {
+								e.preventDefault();
+								if (cell.isLive) handleCellDblClick(cell);
+								else selectFeaturedFromCell(channel, cell);
+							} else if (e.key === ' ') {
+								e.preventDefault();
+								selectFeaturedFromCell(channel, cell);
+							}
+						}}
+						title={cell.isLive
+							? `Click to preview · double-click to chat`
+							: `Off air — click to preview`}
 					>
 						<div class="ep-show">
 							<span class="ep-show-name">{(showGroup?.name ?? cell.showSlug).toUpperCase()}</span>
 							{#if cell.span > 1}<span class="ep-runtime">{cell.span * 30}MIN</span>{/if}
 						</div>
-						<div class="ep-title">"{cell.title}" {#if cell.year}<span class="ep-year">({cell.year})</span>{/if}</div>
+						<div class="ep-title">
+							"{cell.title}" {#if cell.year}<span class="ep-year">({cell.year})</span>{/if}
+						</div>
 					</div>
 				{/each}
 			{/each}
@@ -502,7 +561,9 @@
 		color: var(--tvg-gold);
 		border-bottom: 1px solid var(--tvg-mid);
 	}
-	.tvg-preview-net { letter-spacing: 0.04em; }
+	.tvg-preview-net {
+		letter-spacing: 0.04em;
+	}
 	.tvg-preview-main {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
@@ -510,15 +571,23 @@
 		padding: 10px 12px 12px;
 		align-items: center;
 	}
-	.tvg-preview-text { min-width: 0; }
+	.tvg-preview-text {
+		min-width: 0;
+	}
 	.tvg-preview-titleline {
 		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 22px;
 		color: var(--tvg-text);
 		line-height: 1.15;
 	}
-	.tvg-preview-title { font-weight: 700; }
-	.tvg-preview-year { color: rgba(255, 255, 255, 0.55); font-size: 16px; margin-left: 4px; }
+	.tvg-preview-title {
+		font-weight: 700;
+	}
+	.tvg-preview-year {
+		color: rgba(255, 255, 255, 0.55);
+		font-size: 16px;
+		margin-left: 4px;
+	}
 	.tvg-preview-showname {
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
@@ -526,7 +595,9 @@
 		letter-spacing: 0.02em;
 		margin-top: 4px;
 	}
-	.tvg-preview-era { color: rgba(249, 189, 43, 0.6); }
+	.tvg-preview-era {
+		color: rgba(249, 189, 43, 0.6);
+	}
 	.tvg-preview-dialogue {
 		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 16px;
@@ -545,7 +616,11 @@
 		letter-spacing: 0.02em;
 		flex-shrink: 0;
 	}
-	.tvg-preview-line { font-style: italic; opacity: 0.95; min-width: 0; }
+	.tvg-preview-line {
+		font-style: italic;
+		opacity: 0.95;
+		min-width: 0;
+	}
 
 	/* ====== Date bar ====== */
 	.tvg-datebar {
@@ -572,14 +647,21 @@
 		cursor: pointer;
 		padding: 0;
 	}
-	.tvg-datebar-live:hover { color: var(--tvg-gold); }
+	.tvg-datebar-live:hover {
+		color: var(--tvg-gold);
+	}
 	.tvg-now-dot {
 		display: inline-block;
 		color: var(--tvg-accent);
 		animation: blink 1.4s steps(2, end) infinite;
 	}
-	.tvg-now-dot.live { color: var(--tvg-live); }
-	.tvg-paused { color: var(--tvg-paused); font-style: italic; }
+	.tvg-now-dot.live {
+		color: var(--tvg-live);
+	}
+	.tvg-paused {
+		color: var(--tvg-paused);
+		font-style: italic;
+	}
 
 	/* ====== Scrolling timeline grid ====== */
 	.tvg-scroller {
@@ -621,10 +703,20 @@
 		font-size: 11px;
 		color: var(--tvg-gold);
 	}
-	.tvg-ch-cell.alt { background: var(--tvg-alt-dark); }
-	.tvg-ch-cell.current { box-shadow: inset 3px 0 0 var(--tvg-live); }
-	.ch-num { font-size: 13px; color: var(--tvg-text); }
-	.ch-net { font-size: 8px; color: var(--tvg-live); }
+	.tvg-ch-cell.alt {
+		background: var(--tvg-alt-dark);
+	}
+	.tvg-ch-cell.current {
+		box-shadow: inset 3px 0 0 var(--tvg-live);
+	}
+	.ch-num {
+		font-size: 13px;
+		color: var(--tvg-text);
+	}
+	.ch-net {
+		font-size: 8px;
+		color: var(--tvg-live);
+	}
 	.ch-open {
 		margin-top: 2px;
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
@@ -670,7 +762,10 @@
 		background: var(--tvg-mid);
 		color: var(--tvg-text);
 	}
-	.tvg-day-mark { color: var(--tvg-live); font-size: 8px; }
+	.tvg-day-mark {
+		color: var(--tvg-live);
+		font-size: 8px;
+	}
 
 	/* Episode cells */
 	.tvg-ep-cell {
@@ -689,25 +784,52 @@
 		min-width: 0;
 		position: relative;
 	}
-	.tvg-ep-cell.alt { background: var(--tvg-alt); border-right-color: var(--tvg-alt-border); }
-	.tvg-ep-cell.off-air { opacity: 0.45; }
-	.tvg-ep-cell.off-air.alt { background: var(--tvg-alt-dim); }
+	.tvg-ep-cell.alt {
+		background: var(--tvg-alt);
+		border-right-color: var(--tvg-alt-border);
+	}
+	.tvg-ep-cell.off-air {
+		opacity: 0.45;
+	}
+	.tvg-ep-cell.off-air.alt {
+		background: var(--tvg-alt-dim);
+	}
 
-	.tvg-ep-cell:hover { background: var(--tvg-hover); opacity: 1; }
-	.tvg-ep-cell.alt:hover { background: var(--tvg-alt-border); }
-	.tvg-ep-cell:hover .ep-title { color: var(--tvg-live); }
+	.tvg-ep-cell:hover {
+		background: var(--tvg-hover);
+		opacity: 1;
+	}
+	.tvg-ep-cell.alt:hover {
+		background: var(--tvg-alt-border);
+	}
+	.tvg-ep-cell:hover .ep-title {
+		color: var(--tvg-live);
+	}
 
 	.tvg-ep-cell.now {
 		background: rgba(249, 189, 43, 0.18);
 		box-shadow: inset 0 0 0 2px var(--tvg-gold);
 	}
-	.tvg-ep-cell.now.alt { background: rgba(249, 189, 43, 0.30); }
-	.tvg-ep-cell.now .ep-title { color: var(--tvg-gold); font-weight: 700; }
+	.tvg-ep-cell.now.alt {
+		background: rgba(249, 189, 43, 0.3);
+	}
+	.tvg-ep-cell.now .ep-title {
+		color: var(--tvg-gold);
+		font-weight: 700;
+	}
 
 	.tvg-ep-cell.featured {
 		box-shadow: inset 0 0 0 3px var(--tvg-live);
 	}
-	.tvg-ep-cell.featured .ep-show-name { color: var(--tvg-live); }
+	.tvg-ep-cell.featured .ep-show-name {
+		color: var(--tvg-live);
+	}
+
+	.tvg-cell[role='button']:focus-visible {
+		outline: 2px solid var(--tvg-gold);
+		outline-offset: -2px;
+		z-index: 1;
+	}
 
 	.ep-show {
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
@@ -720,7 +842,9 @@
 		gap: 5px;
 		flex-wrap: wrap;
 	}
-	.ep-show-name { color: var(--tvg-gold); }
+	.ep-show-name {
+		color: var(--tvg-gold);
+	}
 	.ep-runtime {
 		font-size: 7px;
 		color: var(--tvg-live);
@@ -763,11 +887,21 @@
 	}
 
 	@keyframes blink {
-		0%, 49% { opacity: 1; }
-		50%, 100% { opacity: 0; }
+		0%,
+		49% {
+			opacity: 1;
+		}
+		50%,
+		100% {
+			opacity: 0;
+		}
 	}
 	@keyframes tvg-scroll {
-		from { transform: translateX(0); }
-		to { transform: translateX(-100%); }
+		from {
+			transform: translateX(0);
+		}
+		to {
+			transform: translateX(-100%);
+		}
 	}
 </style>

@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('desktop loads with menu bar', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('.menubar')).toBeVisible();
-	await expect(page.locator('.menubar')).toContainText('chatrbot.ai');
+	await expect(page.locator('.menubar')).toContainText('TV Guide');
 });
 
 test('TV Guide opens on first visit', async ({ page }) => {

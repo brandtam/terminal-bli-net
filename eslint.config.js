@@ -10,11 +10,9 @@ export default [
 	prettier,
 	...svelte.configs['flat/prettier'],
 	{
+		files: ['**/*.ts', '**/*.js'],
 		languageOptions: {
 			parser: tsParser,
-			parserOptions: {
-				extraFileExtensions: ['.svelte']
-			},
 			globals: {
 				console: 'readonly',
 				setTimeout: 'readonly',
@@ -54,13 +52,51 @@ export default [
 		}
 	},
 	{
-		ignores: [
-			'.svelte-kit/',
-			'build/',
-			'node_modules/',
-			'static/',
-			'bots/',
-			'scripts/'
-		]
+		files: ['**/*.svelte'],
+		languageOptions: {
+			parserOptions: {
+				parser: tsParser
+			},
+			globals: {
+				console: 'readonly',
+				setTimeout: 'readonly',
+				setInterval: 'readonly',
+				clearInterval: 'readonly',
+				clearTimeout: 'readonly',
+				fetch: 'readonly',
+				Response: 'readonly',
+				Request: 'readonly',
+				ReadableStream: 'readonly',
+				TextEncoder: 'readonly',
+				TextDecoder: 'readonly',
+				URL: 'readonly',
+				crypto: 'readonly',
+				Intl: 'readonly',
+				localStorage: 'readonly',
+				window: 'readonly',
+				document: 'readonly',
+				navigator: 'readonly',
+				HTMLElement: 'readonly',
+				HTMLDivElement: 'readonly',
+				HTMLInputElement: 'readonly',
+				Event: 'readonly',
+				KeyboardEvent: 'readonly',
+				MouseEvent: 'readonly',
+				PointerEvent: 'readonly',
+				EventSource: 'readonly',
+				CustomEvent: 'readonly',
+				ResizeObserver: 'readonly',
+				requestAnimationFrame: 'readonly',
+				cancelAnimationFrame: 'readonly',
+				performance: 'readonly'
+			}
+		},
+		rules: {
+			'no-unused-vars': 'off',
+			'svelte/valid-compile': 'warn'
+		}
+	},
+	{
+		ignores: ['.svelte-kit/', 'build/', 'node_modules/', 'static/', 'bots/', 'scripts/']
 	}
 ];
