@@ -180,7 +180,7 @@ describe('streamCompletion', () => {
 			const chunks = await collectChunks(stream);
 
 			expect(chunks).toHaveLength(1);
-			expect(chunks[0]).toEqual({ type: 'error', error: 'API rate limit' });
+			expect(chunks[0]).toEqual({ type: 'error', error: 'internal error' });
 		});
 
 		it('handles constructor errors', async () => {
@@ -200,7 +200,7 @@ describe('streamCompletion', () => {
 			const chunks = await collectChunks(stream);
 
 			expect(chunks).toHaveLength(1);
-			expect(chunks[0]).toEqual({ type: 'error', error: 'Invalid API key' });
+			expect(chunks[0]).toEqual({ type: 'error', error: 'internal error' });
 		});
 	});
 
@@ -292,7 +292,7 @@ describe('streamCompletion', () => {
 			const chunks = await collectChunks(stream);
 
 			expect(chunks).toHaveLength(1);
-			expect(chunks[0]).toEqual({ type: 'error', error: 'OpenAI API error' });
+			expect(chunks[0]).toEqual({ type: 'error', error: 'internal error' });
 		});
 	});
 

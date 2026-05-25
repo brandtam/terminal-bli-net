@@ -58,9 +58,10 @@ async function streamAnthropicCompletion(
 				});
 
 				stream.on('error', (error) => {
+					console.error('[llm] Anthropic stream error:', error);
 					controller.enqueue({
 						type: 'error',
-						error: error instanceof Error ? error.message : String(error)
+						error: 'internal error'
 					});
 					controller.close();
 				});
@@ -70,9 +71,10 @@ async function streamAnthropicCompletion(
 					controller.close();
 				});
 			} catch (err) {
+				console.error('[llm] Anthropic completion error:', err);
 				controller.enqueue({
 					type: 'error',
-					error: err instanceof Error ? err.message : String(err)
+					error: 'internal error'
 				});
 				controller.close();
 			}
@@ -124,9 +126,10 @@ async function streamOpenAICompletion(
 				controller.enqueue({ type: 'done', tokenCount: totalTokens });
 				controller.close();
 			} catch (err) {
+				console.error('[llm] OpenAI completion error:', err);
 				controller.enqueue({
 					type: 'error',
-					error: err instanceof Error ? err.message : String(err)
+					error: 'internal error'
 				});
 				controller.close();
 			}
