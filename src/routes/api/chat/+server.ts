@@ -122,7 +122,8 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 					}
 				}
 			} catch (e) {
-				const errData = `data: ${JSON.stringify({ type: 'error', error: String(e) })}\n\n`;
+				console.error('[chat SSE] stream error:', e);
+				const errData = `data: ${JSON.stringify({ type: 'error', error: 'internal error' })}\n\n`;
 				controller.enqueue(encoder.encode(errData));
 			} finally {
 				controller.close();
