@@ -3,17 +3,15 @@
 	"compatibility_date": "2024-12-30",
 	"compatibility_flags": ["nodejs_compat"],
 	"pages_build_output_dir": ".svelte-kit/cloudflare",
-
 	// For production: replace PLACEHOLDER_KV_ID with a real namespace ID from
 	// `wrangler kv namespace create KV`, or bind via the Pages dashboard.
 	// The placeholder works for local dev (miniflare creates an in-memory KV).
 	"kv_namespaces": [
 		{
 			"binding": "KV",
-			"id": "PLACEHOLDER_KV_ID"
+			"id": "f80e014c3a4f47d9895294d3aefdf516"
 		}
 	],
-
 	// ReminderAgent DO + send_email are a future feature.
 	// Cloudflare Pages (adapter-cloudflare) can't export DO classes from _worker.js,
 	// so these must be deployed as a separate Worker when ready.
@@ -26,13 +24,18 @@
 	// 	{ "tag": "v1", "new_sqlite_classes": ["ReminderAgent"] }
 	// ],
 	// "send_email": [{ "name": "SEND_EMAIL" }],
-
 	// Secrets (set via `wrangler secret put`):
 	// ANTHROPIC_API_KEY
 	// OPENAI_API_KEY (optional)
-
+	// PROVIDER: "claude" uses Anthropic (needs ANTHROPIC_API_KEY).
+	//           "openai" uses OpenAI (needs OPENAI_API_KEY).
+	//
+	// MODEL: optional, overrides the default model for the chosen provider.
+	//   Claude options:  claude-haiku-4-5-20251001 (default), claude-sonnet-4-6-20261001, claude-opus-4-7
+	//   OpenAI options:  gpt-4o-mini (default), gpt-4o, gpt-4.1-mini, gpt-4.1
 	"vars": {
-		"PROVIDER": "claude",
+		"PROVIDER": "openai",
+		"MODEL": "gpt-4o-mini",
 		"MONTHLY_SPEND_CAP": "50",
 		"RATE_LIMIT_PER_HOUR": "30",
 		"SESSION_MESSAGE_CAP": "50"

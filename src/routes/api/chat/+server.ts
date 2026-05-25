@@ -100,7 +100,7 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		messages,
 		provider,
 		apiKey,
-		options: { maxTokens: 300, temperature: 0.8 }
+		options: { maxTokens: 300, temperature: 0.8, model: env.MODEL || undefined }
 	});
 
 	await recordMessage(env.KV, ip, sessionId);
