@@ -31,11 +31,18 @@
 		createFile,
 		writeFile,
 		deleteNode,
+		trash,
+		createAlias,
 		list,
 		resolveAlias,
 		onFsChange,
 		DOCS_ID,
-		DESKTOP_ID
+		DESKTOP_ID,
+		ROOT_ID,
+		SYSTEM_ID,
+		APPS_ID,
+		RECORDINGS_ID,
+		TRASH_ID
 	} from '$lib/os/filesystem';
 	import type { FSFile, FSNode } from '$lib/os/filesystem';
 	import StatsWindow from '$lib/apps/stats/StatsWindow.svelte';
@@ -279,6 +286,76 @@
 			return 'doc';
 		}
 		return 'doc';
+	}
+
+	let deskCtxNode = $state<FSNode | null>(null);
+	let deskCtxOpen_: (() => void) | null = $state(null);
+	let deskCtxCanAlias = $state(false);
+	let deskCtxCanTrash = $state(false);
+	let deskCtxX = $state(0);
+	let deskCtxY = $state(0);
+	let deskCtxEl = $state<HTMLDivElement | null>(null);
+
+	const PROTECTED_DESKTOP_IDS = new Set([
+		ROOT_ID,
+		SYSTEM_ID,
+		APPS_ID,
+		DESKTOP_ID,
+		RECORDINGS_ID,
+		TRASH_ID
+	]);
+
+	function showDesktopCtx(
+		e: MouseEvent,
+		opts: { open: () => void; node?: FSNode; canAlias?: boolean; canTrash?: boolean }
+	) {
+		deskCtxNode = opts.node ?? null;
+		deskCtxOpen_ = opts.open;
+		deskCtxCanAlias = opts.canAlias ?? false;
+		deskCtxCanTrash = opts.canTrash ?? false;
+		deskCtxX = e.clientX;
+		deskCtxY = e.clientY;
+		requestAnimationFrame(() => {
+			if (!deskCtxEl) return;
+			const rect = deskCtxEl.getBoundingClientRect();
+			if (rect.right > window.innerWidth) deskCtxX = e.clientX - rect.width;
+			if (rect.bottom > window.innerHeight) deskCtxY = e.clientY - rect.height;
+		});
+	}
+
+	function handleDesktopContextMenu(e: MouseEvent, node: FSNode) {
+		showDesktopCtx(e, {
+			open: () => openDesktopNode(node),
+			node,
+			canAlias: node.type === 'file',
+			canTrash: !PROTECTED_DESKTOP_IDS.has(node.id)
+		});
+	}
+
+	function closeDeskCtx() {
+		deskCtxNode = null;
+		deskCtxOpen_ = null;
+	}
+
+	function deskCtxOpen() {
+		deskCtxOpen_?.();
+		closeDeskCtx();
+	}
+
+	function deskCtxMakeAlias() {
+		if (!deskCtxNode) return;
+		try {
+			createAlias(DESKTOP_ID, deskCtxNode.name + ' alias', deskCtxNode.id);
+		} catch {
+			/* alias already exists */
+		}
+		closeDeskCtx();
+	}
+
+	function deskCtxTrash() {
+		if (!deskCtxNode) return;
+		trash(deskCtxNode.id);
+		closeDeskCtx();
 	}
 
 	onMount(() => {
@@ -774,6 +851,11 @@
 			: ''}
 		onclick={() => {
 			selectedIconId = null;
+			closeDeskCtx();
+		}}
+		oncontextmenu={(e) => {
+			e.preventDefault();
+			closeDeskCtx();
 		}}
 	>
 		<MenuBar
@@ -796,19 +878,9 @@
 						selectedIconId = 'hd';
 					}}
 					ondblclick={() => openWindow('finder')}
+					oncontextmenu={(e) => showDesktopCtx(e, { open: () => openWindow('finder') })}
 				>
 					<PixelIcon kind="hd" />
-				</DesktopIcon>
-				<DesktopIcon
-					label="TV Guide.app"
-					alias
-					selected={selectedIconId === 'alias-tvguide'}
-					onselect={() => {
-						selectedIconId = 'alias-tvguide';
-					}}
-					ondblclick={() => openWindow('tv-guide')}
-				>
-					<PixelIcon kind="tvguide" />
 				</DesktopIcon>
 			</div>
 
@@ -822,6 +894,7 @@
 							selectedIconId = node.id;
 						}}
 						ondblclick={() => openDesktopNode(node)}
+						oncontextmenu={(e) => handleDesktopContextMenu(e, node)}
 					>
 						<PixelIcon kind={desktopIconKind(node)} />
 					</DesktopIcon>
@@ -833,9 +906,33 @@
 						selectedIconId = 'trash';
 					}}
 					ondblclick={() => openWindow('trash')}
+					oncontextmenu={(e) => showDesktopCtx(e, { open: () => openWindow('trash') })}
 				>
 					<PixelIcon kind="trash" />
 				</DesktopIcon>
+			</div>
+		{/if}
+
+		{#if deskCtxOpen_}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="desktop-context-menu"
+				bind:this={deskCtxEl}
+				style="left: {deskCtxX}px; top: {deskCtxY}px;"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="desktop-context-item" onclick={deskCtxOpen}>Open</div>
+				{#if deskCtxCanAlias}
+					<div class="desktop-context-sep"></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="desktop-context-item" onclick={deskCtxMakeAlias}>Make Alias</div>
+				{/if}
+				{#if deskCtxCanTrash}
+					<div class="desktop-context-sep"></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="desktop-context-item" onclick={deskCtxTrash}>Move to Trash</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -1113,6 +1210,32 @@
 	}
 	.desktop-icons.right {
 		right: 16px;
+	}
+	.desktop-context-menu {
+		position: fixed;
+		background: var(--chrome-menubar-bg, var(--paper));
+		color: var(--chrome-menubar-fg, var(--ink));
+		border: 2px solid var(--chrome-window-border-color, var(--ink));
+		box-shadow: 3px 3px 0 var(--shadow);
+		min-width: 160px;
+		padding: 4px 0;
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
+		font-size: 14px;
+		z-index: 12000;
+	}
+	.desktop-context-item {
+		padding: 4px 12px;
+		cursor: pointer;
+	}
+	.desktop-context-item:hover {
+		background: var(--chrome-menubar-hover-bg, var(--ink));
+		color: var(--chrome-menubar-hover-fg, var(--paper));
+	}
+	.desktop-context-sep {
+		height: 1px;
+		background: var(--chrome-menubar-fg, var(--ink));
+		margin: 4px 8px;
+		opacity: 0.2;
 	}
 	.window-content {
 		padding: 14px;

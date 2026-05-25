@@ -8,6 +8,7 @@
 		selected = false,
 		ondblclick,
 		onselect,
+		oncontextmenu,
 		children
 	}: {
 		label: string;
@@ -16,6 +17,7 @@
 		selected?: boolean;
 		ondblclick: () => void;
 		onselect?: () => void;
+		oncontextmenu?: (e: MouseEvent) => void;
 		children: Snippet;
 	} = $props();
 </script>
@@ -31,6 +33,14 @@
 		onselect?.();
 	}}
 	{ondblclick}
+	oncontextmenu={(e) => {
+		if (oncontextmenu) {
+			e.preventDefault();
+			e.stopPropagation();
+			onselect?.();
+			oncontextmenu(e);
+		}
+	}}
 >
 	<div class="glyph">
 		{@render children()}

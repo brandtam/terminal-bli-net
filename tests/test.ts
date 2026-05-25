@@ -145,3 +145,50 @@ test('right-click on folder shows Open only, no Make Alias', async ({ page }) =>
 	await expect(menu).toContainText('Open');
 	await expect(menu).not.toContainText('Make Alias');
 });
+
+test('Make Alias creates alias file in the same folder', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.dblclick('.desktop-icon:has-text("Terminal HD")');
+	await page.waitForTimeout(500);
+	await page.dblclick('.finder-item:has-text("Applications")');
+	await page.waitForTimeout(500);
+
+	// Count items before
+	const statusBefore = page.locator('.finder-status');
+	await expect(statusBefore).toContainText('5 items');
+
+	// Right-click Stats.app and Make Alias
+	await page.locator('.finder-item:has-text("Stats.app")').click({ button: 'right' });
+	await page.waitForTimeout(300);
+	await page.locator('.context-menu-item:has-text("Make Alias")').click();
+	await page.waitForTimeout(500);
+
+	// Alias should appear in the same folder with "alias" suffix
+	await expect(page.locator('.finder-item:has-text("Stats.app alias")')).toBeVisible();
+	await expect(statusBefore).toContainText('6 items');
+
+	// Alias should have the alias class on the icon
+	const aliasItem = page.locator('.finder-item:has-text("Stats.app alias")');
+	await expect(aliasItem.locator('.finder-item-icon.alias')).toBeVisible();
+});
+
+test('alias file opens the same app as the original', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.dblclick('.desktop-icon:has-text("Terminal HD")');
+	await page.waitForTimeout(500);
+	await page.dblclick('.finder-item:has-text("Applications")');
+	await page.waitForTimeout(500);
+
+	// Create alias of TV Guide
+	await page.locator('.finder-item:has-text("TV Guide.app")').click({ button: 'right' });
+	await page.waitForTimeout(300);
+	await page.locator('.context-menu-item:has-text("Make Alias")').click();
+	await page.waitForTimeout(500);
+
+	// Double-click the alias — should open the TV Guide window
+	await page.dblclick('.finder-item:has-text("TV Guide.app alias")');
+	await page.waitForTimeout(500);
+	await expect(page.locator('.window .title:has-text("TV Guide")')).toBeVisible();
+});

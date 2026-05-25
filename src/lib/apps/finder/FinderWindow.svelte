@@ -128,12 +128,19 @@
 	let contextMenuNode = $state<FSNode | null>(null);
 	let contextMenuX = $state(0);
 	let contextMenuY = $state(0);
+	let contextMenuEl = $state<HTMLDivElement | null>(null);
 
 	function handleContextMenu(e: MouseEvent, node: FSNode) {
 		e.preventDefault();
 		contextMenuNode = node;
 		contextMenuX = e.clientX;
 		contextMenuY = e.clientY;
+		requestAnimationFrame(() => {
+			if (!contextMenuEl) return;
+			const rect = contextMenuEl.getBoundingClientRect();
+			if (rect.right > window.innerWidth) contextMenuX = e.clientX - rect.width;
+			if (rect.bottom > window.innerHeight) contextMenuY = e.clientY - rect.height;
+		});
 	}
 
 	function closeContextMenu() {
@@ -200,12 +207,9 @@
 				ondblclick={() => handleOpen(node)}
 				oncontextmenu={(e) => handleContextMenu(e, node)}
 			>
-				<div class="finder-item-icon">
+				<div class="finder-item-icon" class:alias={node.type === 'alias'}>
 					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
 				</div>
-				{#if node.type === 'alias'}
-					<span class="alias-badge">&#x21A9;</span>
-				{/if}
 				<div class="finder-item-label">{node.name}</div>
 			</div>
 		{/each}
@@ -222,6 +226,7 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="context-menu"
+			bind:this={contextMenuEl}
 			style="left: {contextMenuX}px; top: {contextMenuY}px;"
 			onclick={(e) => e.stopPropagation()}
 		>
@@ -323,24 +328,22 @@
 	}
 
 	.finder-item-icon {
-		width: 42px;
-		height: 42px;
+		width: 52px;
+		height: 52px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		position: relative;
 	}
 
-	.finder-item-icon :global(.pixel-icon) {
-		width: 42px;
-		height: 42px;
-	}
-
-	.alias-badge {
-		font-size: 10px;
-		line-height: 1;
-		margin-top: -6px;
+	.finder-item-icon.alias::after {
+		content: '\21A9';
+		position: absolute;
+		bottom: -2px;
+		left: -2px;
+		font-size: 14px;
 		color: var(--ink, #0a0a0a);
-		opacity: 0.6;
+		line-height: 1;
 	}
 
 	.finder-item-label {
