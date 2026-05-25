@@ -59,6 +59,8 @@
 		if (file.appId === 'tvguide') return 'tvguide';
 		if (file.appId === 'stats') return 'calc';
 		if (file.appId === 'error') return 'floppy';
+		if (file.appId === 'system-prefs') return 'hd';
+		if (file.appId === 'about-terminal') return 'doc';
 		return 'doc';
 	}
 
@@ -93,6 +95,10 @@
 			os.openWindow('stats');
 		} else if (file.appId === 'error') {
 			os.openWindow('error');
+		} else if (file.appId === 'system-prefs') {
+			os.openSystemPreferences();
+		} else if (file.appId === 'about-terminal') {
+			os.openAbout(null);
 		} else {
 			os.openWindow(file.id);
 		}

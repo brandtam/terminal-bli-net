@@ -1,4 +1,4 @@
-import { DOCS_ID, APPS_ID, exists, createFile } from '$lib/os/filesystem';
+import { DOCS_ID, APPS_ID, SYSTEM_ID, exists, createFile } from '$lib/os/filesystem';
 
 const README_CONTENT = `README.TXT — Terminal v1.0
 
@@ -78,5 +78,12 @@ export function seedFilesystem(): void {
 		if (!exists(APPS_ID, app.name)) {
 			createFile(APPS_ID, app.name, app.appId, '');
 		}
+	}
+
+	if (!exists(SYSTEM_ID, 'System Preferences')) {
+		createFile(SYSTEM_ID, 'System Preferences', 'system-prefs', '');
+	}
+	if (!exists(SYSTEM_ID, 'About This Terminal')) {
+		createFile(SYSTEM_ID, 'About This Terminal', 'about-terminal', '');
 	}
 }
