@@ -50,7 +50,7 @@
 		justify-content: center;
 	}
 	.label {
-		font-family: 'Pixelify Sans', sans-serif;
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
 		font-size: 13px;
 		text-align: center;
 		line-height: 1.15;

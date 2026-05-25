@@ -119,7 +119,7 @@
 		flex-direction: column;
 		height: 100%;
 		background: var(--paper, #fff);
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 	}
 
 	.finder-path {
@@ -127,7 +127,7 @@
 		align-items: center;
 		gap: 2px;
 		padding: 6px 10px;
-		border-bottom: 1px solid var(--ink, #0a0a0a);
+		border-bottom: 2px solid var(--ink, #0a0a0a);
 		background: var(--paper-soft, #f5f0e8);
 		min-height: 28px;
 		flex-shrink: 0;
@@ -135,7 +135,7 @@
 	}
 
 	.path-crumb {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
 		background: none;
 		border: none;
@@ -174,7 +174,7 @@
 		gap: 4px;
 		padding: 6px 4px;
 		cursor: pointer;
-		border-radius: 2px;
+		border-radius: 0;
 	}
 
 	.finder-item:hover {
@@ -203,7 +203,7 @@
 	}
 
 	.finder-item-label {
-		font-family: 'Pixelify Sans', sans-serif;
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
 		font-size: 11px;
 		text-align: center;
 		line-height: 1.2;
@@ -223,8 +223,8 @@
 
 	.finder-status {
 		padding: 4px 10px;
-		border-top: 1px solid var(--ink, #0a0a0a);
-		font-family: 'VT323', monospace;
+		border-top: 2px solid var(--ink, #0a0a0a);
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 16px;
 		color: var(--ink, #0a0a0a);
 		opacity: 0.7;

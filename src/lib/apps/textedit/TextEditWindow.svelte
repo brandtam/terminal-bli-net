@@ -56,7 +56,7 @@
 
 <style>
 	.textedit-area {
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 18px;
 		background: var(--paper);
 		color: var(--ink);

@@ -234,7 +234,7 @@
 	}
 
 	.preview-area {
-		background: #000;
+		background: var(--brand-color-ink, #000);
 		border: 2px solid var(--ink);
 		box-shadow: 2px 2px 0 var(--shadow);
 		aspect-ratio: 4 / 3;
