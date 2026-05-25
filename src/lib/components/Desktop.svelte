@@ -37,6 +37,18 @@
 	import FinderWindow from '$lib/apps/finder/FinderWindow.svelte';
 	import { seedFilesystem } from '$lib/os/filesystem-seed';
 
+	const SYS7_PATTERNS = [
+		'128', '129', '130', '131', '132', '133', '134', '136', '137', '139',
+		'141', '142', '144', '145', '146', '147', '148', '149', '150', '151',
+		'547', '870', '987', '1111', '1969', '1970', '1971', '1972', '1973',
+		'1974', '1975', '1976', '1977', '1978', '2767', '3727', '4193', '6006',
+		'6741', '7041', '7321', '7344', '7527', '8388', '8448', '9695', '10042',
+		'11703', '12484', '12593', '12821', '13096', '13665', '16825', '16974',
+		'17803', '18078', '19688', '20318', '20446', '21225', '22348', '23295',
+		'24517', '24642', '24817', '28851', '28920', '29907', '30711', '30930',
+		'31689', '32307', '32623'
+	];
+
 	let groups = $state<GroupMeta[]>([]);
 	let bots = $state<Bot[]>([]);
 	let channels = $state<Channel[]>([]);
@@ -464,7 +476,13 @@
 	<div class="mobile-footer">terminal.bli.net · built in a garage</div>
 </div>
 {:else}
-<div class="desktop" data-wallpaper={tweaks.wallpaper}>
+<div
+	class="desktop"
+	data-wallpaper={tweaks.wallpaper.startsWith('sys7-') ? undefined : tweaks.wallpaper}
+	style={tweaks.wallpaper.startsWith('sys7-')
+		? `background: url(/themes/system7/wallpapers/${tweaks.wallpaper.replace('sys7-', '')}.png) repeat; image-rendering: pixelated;`
+		: ''}
+>
 	<MenuBar
 		app={activeApp}
 		{os}
@@ -564,6 +582,7 @@
 					<h3 class="prefs-heading">TERMINAL PREFERENCES</h3>
 					<div class="pref-row">
 						<div class="pref-label">WALLPAPER</div>
+						<div class="pref-sublabel">Classic</div>
 						<div style="display: flex; gap: 6px; flex-wrap: wrap;">
 							{#each [
 								{ value: 'teal', label: 'Teal', color: '#5e8585' },
@@ -579,6 +598,17 @@
 									<span class="btn-chip" style:background={opt.color}></span>
 									{opt.label}
 								</button>
+							{/each}
+						</div>
+						<div class="pref-sublabel" style="margin-top: 10px;">System 7 Patterns</div>
+						<div class="pattern-grid">
+							{#each SYS7_PATTERNS as pat}
+								<button
+									class="pattern-thumb {tweaks.wallpaper === `sys7-${pat}` ? 'selected' : ''}"
+									style="background-image: url(/themes/system7/wallpapers/{pat}.png);"
+									onclick={() => setTweak('wallpaper', `sys7-${pat}`)}
+									title="Pattern {pat}"
+								></button>
 							{/each}
 						</div>
 						<div class="pref-hint">desktop pattern — survives reload</div>
@@ -877,6 +907,35 @@
 		opacity: 0.6;
 		font-size: 14px;
 		margin-top: 4px;
+	}
+	.pref-sublabel {
+		font-family: 'VT323', monospace;
+		font-size: 15px;
+		opacity: 0.7;
+		margin-bottom: 4px;
+	}
+	.pattern-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		max-height: 200px;
+		overflow-y: auto;
+		margin-top: 6px;
+	}
+	.pattern-thumb {
+		width: 36px;
+		height: 36px;
+		border: 2px solid var(--ink);
+		cursor: pointer;
+		background-size: 64px 64px;
+		image-rendering: pixelated;
+	}
+	.pattern-thumb:hover {
+		box-shadow: 0 0 0 2px var(--accent);
+	}
+	.pattern-thumb.selected {
+		box-shadow: 0 0 0 2px var(--accent);
+		border-color: var(--accent);
 	}
 
 	/* System alert */
