@@ -29,7 +29,7 @@ function hexToBuf(hex: string): ArrayBuffer {
 /**
  * Produce an HMAC-signed unsubscribe address.
  *
- * Format: `unsub+<hex-signature>--<email>@chatrbot.ai`
+ * Format: `unsub+<hex-signature>--<email>@bli.net`
  *
  * The signature covers the subscriber email so that only a valid signature
  * can trigger an unsubscribe (prevents spoofed unsubscribe requests).
@@ -42,7 +42,7 @@ export async function signUnsubscribeAddress(
 	const enc = new TextEncoder();
 	const sig = await crypto.subtle.sign('HMAC', key, enc.encode(email));
 	const hex = bufToHex(sig);
-	return `unsub+${hex}${SEPARATOR}${email}@chatrbot.ai`;
+	return `unsub+${hex}${SEPARATOR}${email}@bli.net`;
 }
 
 /**
