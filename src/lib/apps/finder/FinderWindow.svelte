@@ -37,6 +37,7 @@
 		// File
 		const file = node as FSFile;
 		if (file.appId === 'recorder') return 'floppy';
+		if (file.appId === 'stickies') return 'stickies';
 		return 'doc';
 	}
 
@@ -64,6 +65,8 @@
 			os.openWindow(`textedit-${file.id}`);
 		} else if (file.appId === 'recorder') {
 			os.openWindow(`recorder-${file.id}`);
+		} else if (file.appId === 'stickies') {
+			os.openWindow(`sticky-${file.id}`);
 		} else {
 			os.openWindow(file.id);
 		}

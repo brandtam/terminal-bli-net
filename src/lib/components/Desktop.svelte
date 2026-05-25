@@ -13,8 +13,7 @@
 		loadTimezone,
 		saveTimezone,
 		isFirstVisit,
-		appRead,
-		appWrite
+		appRead
 	} from '$lib/persistence';
 	import Window from './Window.svelte';
 	import MenuBar from './MenuBar.svelte';
@@ -70,59 +69,102 @@
 	let lastSlotIdx = $state(-1);
 	let isMobile = $state(false);
 
-	const DEFAULT_NOTES: StickyNote[] = [
-		{
-			id: 'default-1',
+	let stickyNotes = $state<StickyNote[]>([]);
+
+	function stickyFromFile(f: FSFile): StickyNote {
+		try {
+			const parsed = JSON.parse(f.data) as { title?: string; body?: string; color?: string };
+			return {
+				id: f.id,
+				title: parsed.title ?? '',
+				body: parsed.body ?? '',
+				color: parsed.color ?? '#f9bd2b'
+			};
+		} catch {
+			return { id: f.id, title: '', body: '', color: '#f9bd2b' };
+		}
+	}
+
+	function loadStickyNotes(): StickyNote[] {
+		const files = findByApp('stickies');
+		if (files.length > 0) return files.map(stickyFromFile);
+
+		// Migrate from legacy appRead persistence if present
+		const legacy = appRead<StickyNote[] | null>('stickies', 'notes', null);
+		if (legacy && legacy.length > 0) {
+			const migrated: StickyNote[] = [];
+			for (const note of legacy) {
+				const name = note.title || 'Untitled Note';
+				const data = JSON.stringify({ title: note.title, body: note.body, color: note.color });
+				try {
+					const file = createFile(DOCS_ID, name, 'stickies', data);
+					migrated.push({ ...note, id: file.id });
+				} catch {
+					// duplicate name -- append a suffix
+					const file = createFile(DOCS_ID, `${name} (${note.id.slice(-4)})`, 'stickies', data);
+					migrated.push({ ...note, id: file.id });
+				}
+			}
+			return migrated;
+		}
+
+		// Seed a default note for first-time users
+		const defaultData = JSON.stringify({
 			title: 'v1 launch — todo',
 			body: '☑ ship Seinfeld\n☑ ship The Office\n☒ get sued\n☐ teach Kramer to type\n☐ figure out Joey/Phoebe\n☐ "try Succession?"',
 			color: '#f9bd2b'
-		}
-	];
-
-	let stickyNotes = $state<StickyNote[]>([]);
-
-	function loadStickyNotes(): StickyNote[] {
-		return appRead<StickyNote[]>('stickies', 'notes', DEFAULT_NOTES);
+		});
+		const file = createFile(DOCS_ID, 'v1 launch — todo', 'stickies', defaultData);
+		return [stickyFromFile(file)];
 	}
 
-	function saveStickyNotes() {
-		appWrite('stickies', 'notes', stickyNotes);
+	function refreshStickyNotes() {
+		stickyNotes = findByApp('stickies').map(stickyFromFile);
 	}
 
 	function createStickyNote() {
-		const note: StickyNote = {
-			id: `sticky-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-			title: '',
-			body: '',
-			color: '#f9bd2b'
-		};
-		stickyNotes = [...stickyNotes, note];
-		saveStickyNotes();
-		openWindow(`sticky-${note.id}`);
+		let name = 'Untitled Note';
+		let suffix = 1;
+		const existing = findByApp('stickies');
+		const names = new Set(existing.map(f => f.name));
+		while (names.has(name)) {
+			suffix++;
+			name = `Untitled Note ${suffix}`;
+		}
+		const data = JSON.stringify({ title: '', body: '', color: '#f9bd2b' });
+		const file = createFile(DOCS_ID, name, 'stickies', data);
+		refreshStickyNotes();
+		openWindow(`sticky-${file.id}`);
 	}
 
 	function deleteStickyNote(id: string) {
-		stickyNotes = stickyNotes.filter(n => n.id !== id);
-		saveStickyNotes();
+		deleteNode(id);
+		refreshStickyNotes();
 		closeWindow(`sticky-${id}`);
 	}
 
 	function updateStickyNote(updated: StickyNote) {
-		stickyNotes = stickyNotes.map(n => n.id === updated.id ? updated : n);
-		saveStickyNotes();
+		const data = JSON.stringify({ title: updated.title, body: updated.body, color: updated.color });
+		try {
+			writeFile(updated.id, data);
+		} catch {
+			// file may have been deleted
+		}
+		refreshStickyNotes();
 	}
 
 	function colorStickyNote(noteId: string, color: string) {
-		stickyNotes = stickyNotes.map(n => n.id === noteId ? { ...n, color } : n);
-		saveStickyNotes();
+		const note = stickyNotes.find(n => n.id === noteId);
+		if (!note) return;
+		updateStickyNote({ ...note, color });
 	}
 
 	onMount(() => {
 		tweaks = loadTweaks();
 		timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 		isMobile = window.innerWidth < 720;
-		stickyNotes = loadStickyNotes();
 		seedFilesystem(); // seed filesystem default files
+		stickyNotes = loadStickyNotes();
 
 		fetch('/api/data')
 			.then((res) => (res.ok ? res.json() : null))
