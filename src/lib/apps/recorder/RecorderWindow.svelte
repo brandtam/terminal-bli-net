@@ -1,14 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { appRead, appWrite } from '$lib/persistence';
-
-	interface Recording {
-		id: string;
-		name: string;
-		dataUrl: string;
-		createdAt: number;
-		duration: number;
-	}
+	import { createFile, deleteNode, findByApp, exists, RECORDINGS_ID, type FSFile } from '$lib/os/filesystem';
 
 	let {
 		recording = $bindable(false)
@@ -23,7 +15,7 @@
 	let recorder = $state<MediaRecorder | null>(null);
 	let isRecording = $state(false);
 	let elapsed = $state(0);
-	let recordings = $state<Recording[]>(appRead<Recording[]>('recorder', 'recordings', []));
+	let recordings = $state<FSFile[]>(findByApp('recorder', RECORDINGS_ID));
 	let playbackUrl = $state<string | null>(null);
 	let error = $state<string | null>(null);
 	let videoEl: HTMLVideoElement | undefined = $state(undefined);
@@ -33,8 +25,8 @@
 
 	$effect(() => { recording = isRecording; });
 
-	function persist() {
-		appWrite('recorder', 'recordings', recordings);
+	function refreshRecordings() {
+		recordings = findByApp('recorder', RECORDINGS_ID);
 	}
 
 	function formatTime(s: number): string {
@@ -91,22 +83,14 @@
 			const reader = new FileReader();
 			reader.onload = () => {
 				const dataUrl = reader.result as string;
-				// Check approximate size — localStorage ~5MB total
-				const existingSize = JSON.stringify(recordings).length;
-				if (existingSize + dataUrl.length > 4 * 1024 * 1024) {
-					error = 'Storage is nearly full. Delete old recordings first.';
-					playbackUrl = URL.createObjectURL(blob);
-					return;
+				let clipNumber = recordings.length + 1;
+				let name = `Clip ${clipNumber} (${elapsed}s).webm`;
+				while (exists(RECORDINGS_ID, name)) {
+					clipNumber++;
+					name = `Clip ${clipNumber} (${elapsed}s).webm`;
 				}
-				const rec: Recording = {
-					id: crypto.randomUUID(),
-					name: `Clip ${recordings.length + 1}`,
-					dataUrl,
-					createdAt: Date.now(),
-					duration: elapsed
-				};
-				recordings = [...recordings, rec];
-				persist();
+				createFile(RECORDINGS_ID, name, 'recorder', dataUrl);
+				refreshRecordings();
 				playbackUrl = dataUrl;
 			};
 			reader.readAsDataURL(blob);
@@ -136,16 +120,16 @@
 		}
 	}
 
-	function deleteRecording(id: string) {
-		recordings = recordings.filter((r) => r.id !== id);
-		persist();
-		if (playbackUrl && recordings.every((r) => r.dataUrl !== playbackUrl)) {
+	function removeRecording(id: string) {
+		deleteNode(id);
+		refreshRecordings();
+		if (playbackUrl && recordings.every((r) => r.data !== playbackUrl)) {
 			playbackUrl = null;
 		}
 	}
 
-	function playRecording(rec: Recording) {
-		playbackUrl = rec.dataUrl;
+	function playRecording(rec: FSFile) {
+		playbackUrl = rec.data;
 	}
 
 	function cleanup() {
@@ -221,8 +205,8 @@
 					<button class="rec-item-play" onclick={() => playRecording(rec)}>
 						{rec.name}
 					</button>
-					<span class="rec-item-meta">{rec.duration}s · {new Date(rec.createdAt).toLocaleTimeString()}</span>
-					<button class="rec-item-del" onclick={() => deleteRecording(rec.id)}>✕</button>
+					<span class="rec-item-meta">{new Date(rec.createdAt).toLocaleTimeString()}</span>
+					<button class="rec-item-del" onclick={() => removeRecording(rec.id)}>✕</button>
 				</div>
 			{/each}
 		</div>
