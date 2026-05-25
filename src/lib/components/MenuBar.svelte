@@ -403,6 +403,8 @@
 		border: 2px solid var(--chrome-window-border-color, var(--ink));
 		box-shadow: 4px 4px 0 var(--shadow);
 		min-width: 240px;
+		max-height: 360px;
+		overflow-y: auto;
 		z-index: 11000;
 		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
 	}
