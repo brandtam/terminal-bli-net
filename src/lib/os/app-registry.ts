@@ -531,7 +531,12 @@ export const APPS: Record<string, AppDef> = {
 			{
 				label: 'Help',
 				items: [
-					{ type: 'action', label: 'Preferences…', shortcut: '⌘,', action: () => os.openTweaks() },
+					{
+						type: 'action',
+						label: 'Preferences…',
+						shortcut: '⌘,',
+						action: () => os.openSystemPreferences()
+					},
 					{ type: 'action', label: 'About TextEdit', action: () => os.openAbout('textedit') }
 				]
 			}
