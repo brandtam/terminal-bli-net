@@ -257,7 +257,9 @@
 
 	$effect(() => {
 		if (!mounted) return;
-		saveWindows(windows);
+		const snapshot = windows;
+		const tid = setTimeout(() => saveWindows(snapshot), 300);
+		return () => clearTimeout(tid);
 	});
 
 	const KNOWN_WINDOW_IDS = new Set([
@@ -837,10 +839,10 @@
 				<div class="window-body" style="padding: 18px; display: flex; gap: 14px;">
 					<div class="bomb">⚠</div>
 					<div style="flex: 1; min-width: 0;">
-						<div style="font-family: 'Press Start 2P', monospace; font-size: 11px; margin-bottom: 10px; line-height: 1.4;">
+						<div style="font-family: var(--brand-font-display, 'Press Start 2P', monospace); font-size: 11px; margin-bottom: 10px; line-height: 1.4;">
 							{alertSpec.title}
 						</div>
-						<div style="font-family: 'VT323', monospace; font-size: 17px; margin-bottom: 14px; line-height: 1.3;">
+						<div style="font-family: var(--brand-font-body, 'VT323', monospace); font-size: 17px; margin-bottom: 14px; line-height: 1.3;">
 							{alertSpec.body}
 						</div>
 						<div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -906,7 +908,7 @@
 		overflow: hidden;
 		cursor: default;
 		user-select: none;
-		font-family: 'Pixelify Sans', 'VT323', monospace;
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
 	}
 	.desktop[data-wallpaper='teal'] {
 		background-color: #008080;
@@ -983,18 +985,18 @@
 	}
 	.window-content {
 		padding: 14px;
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 18px;
 		line-height: 1.35;
 	}
 
 	/* Preferences windows */
 	.prefs-content {
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 18px;
 	}
 	.prefs-heading {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 11px;
 		margin: 0 0 14px;
 		font-weight: normal;
@@ -1005,7 +1007,7 @@
 		padding-bottom: 12px;
 	}
 	.pref-label {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
 		margin-bottom: 6px;
 	}
@@ -1015,7 +1017,7 @@
 		margin-top: 4px;
 	}
 	.pref-sublabel {
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 15px;
 		opacity: 0.7;
 		margin-bottom: 4px;
@@ -1066,7 +1068,7 @@
 		align-items: center;
 		justify-content: center;
 		height: 100%;
-		background: #000;
+		background: var(--brand-color-ink, #000);
 	}
 	.recording-video {
 		width: 100%;
