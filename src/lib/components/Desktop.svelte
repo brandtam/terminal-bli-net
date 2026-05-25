@@ -42,6 +42,9 @@
 	import StickiesNote from '$lib/apps/stickies/StickiesNote.svelte';
 	import type { StickyNote } from '$lib/apps/stickies/StickiesNote.svelte';
 	import FinderWindow from '$lib/apps/finder/FinderWindow.svelte';
+	import TerminalPrefs from './TerminalPrefs.svelte';
+	import TVGuidePrefs from './TVGuidePrefs.svelte';
+	import ChatrbotPrefs from './ChatrbotPrefs.svelte';
 	import { seedFilesystem } from '$lib/os/filesystem-seed';
 
 	const SYS7_PATTERNS = [
@@ -805,113 +808,11 @@
 						/>
 					{/if}
 				{:else if w.id === 'terminal-prefs'}
-					<div class="window-content prefs-content">
-						<h3 class="prefs-heading">TERMINAL PREFERENCES</h3>
-						<div class="pref-row">
-							<div class="pref-label">WALLPAPER</div>
-							<div class="pref-sublabel">Classic</div>
-							<div style="display: flex; gap: 6px; flex-wrap: wrap;">
-								{#each [{ value: 'teal', label: 'Teal', color: '#5e8585' }, { value: 'speckle', label: 'Speckle', color: '#c8bda6' }, { value: 'yellow', label: 'Yellow', color: '#f9bd2b' }, { value: 'pink', label: 'Pink', color: '#ee63b3' }, { value: 'navy', label: 'Navy', color: '#16243a' }] as opt}
-									<button
-										class="btn btn-with-chip {tweaks.wallpaper === opt.value ? 'selected' : ''}"
-										onclick={() => setTweak('wallpaper', opt.value)}
-									>
-										<span class="btn-chip" style:background={opt.color}></span>
-										{opt.label}
-									</button>
-								{/each}
-							</div>
-							<div class="pref-sublabel" style="margin-top: 10px;">System 7 Patterns</div>
-							<div class="pattern-grid">
-								{#each SYS7_PATTERNS as pat}
-									<button
-										class="pattern-thumb {tweaks.wallpaper === `sys7-${pat}` ? 'selected' : ''}"
-										style="background-image: url(/themes/system7/wallpapers/{pat}.png);"
-										onclick={() => setTweak('wallpaper', `sys7-${pat}`)}
-										title="Pattern {pat}"
-									></button>
-								{/each}
-							</div>
-							<div class="pref-hint">desktop pattern — survives reload</div>
-						</div>
-						<div class="pref-row">
-							<div class="pref-label">ACCENT</div>
-							<div style="display: flex; gap: 6px;">
-								{#each ['#f54e00', '#2b6cb0', '#a6f000', '#ff79c6', '#0a0a0a'] as c}
-									<button
-										class="btn btn-swatch {tweaks.accent === c ? 'selected' : ''}"
-										style:background={c}
-										onclick={() => setTweak('accent', c)}
-										title={c}
-									></button>
-								{/each}
-							</div>
-							<div class="pref-hint">primary call-to-action color across the OS</div>
-						</div>
-						<p class="muted" style="margin-top: 14px; font-size: 15px;">
-							App-specific settings live in each app's Help → Preferences menu.
-						</p>
-					</div>
+					<TerminalPrefs {tweaks} {SYS7_PATTERNS} onSetTweak={setTweak} />
 				{:else if w.id === 'tvguide-prefs'}
-					<div class="window-content prefs-content">
-						<h3 class="prefs-heading">TV GUIDE PREFERENCES</h3>
-						<div class="pref-row">
-							<div class="pref-label">GRID LOOP</div>
-							<input
-								type="range"
-								min={30}
-								max={400}
-								step={5}
-								value={tweaks.tvGridLoop}
-								oninput={(e) =>
-									setTweak('tvGridLoop', parseInt((e.target as HTMLInputElement).value, 10))}
-								style="width: 100%;"
-							/>
-							<div class="pref-hint">
-								{tweaks.tvGridLoop}s · how long for the timeline to scroll a full 24 hours
-							</div>
-						</div>
-						<div class="pref-row">
-							<div class="pref-label">MARQUEE LOOP</div>
-							<input
-								type="range"
-								min={10}
-								max={120}
-								step={2}
-								value={tweaks.marqueeLoop}
-								oninput={(e) =>
-									setTweak('marqueeLoop', parseInt((e.target as HTMLInputElement).value, 10))}
-								style="width: 100%;"
-							/>
-							<div class="pref-hint">{tweaks.marqueeLoop}s · bottom chyron drift speed</div>
-						</div>
-						<div class="pref-row">
-							<div class="pref-label">PAUSE ON HOVER</div>
-							<label style="display: flex; gap: 8px; align-items: center; cursor: pointer;">
-								<input
-									type="checkbox"
-									checked={tweaks.tvPauseOnHover}
-									onchange={(e) =>
-										setTweak('tvPauseOnHover', (e.target as HTMLInputElement).checked)}
-								/>
-								<span>{tweaks.tvPauseOnHover ? 'on' : 'off'}</span>
-							</label>
-							<div class="pref-hint">freeze the auto-scroll when your mouse is over the grid</div>
-						</div>
-						<p class="muted" style="margin-top: 16px; font-size: 15px;">
-							Wallpaper, accent color, and other OS-wide settings live in the <span class="kbd"
-								>●</span
-							> menu → Tweaks…
-						</p>
-					</div>
+					<TVGuidePrefs {tweaks} onSetTweak={setTweak} />
 				{:else if w.id === 'chatrbot-prefs'}
-					<div class="window-content prefs-content">
-						<h3 class="prefs-heading">CHATRBOT PREFERENCES</h3>
-						<p style="opacity: 0.7;">No preferences yet — the chat just chats.</p>
-						<p class="muted" style="margin-top: 12px; font-size: 15px;">
-							Coming later: typing speed, sound effects, default opener.
-						</p>
-					</div>
+					<ChatrbotPrefs />
 				{:else if w.id.startsWith('textedit-')}
 					{@const fileId = w.id.replace('textedit-', '')}
 					<TextEditWindow docId={fileId} />
@@ -1135,62 +1036,6 @@
 		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 18px;
 		line-height: 1.35;
-	}
-
-	/* Preferences windows */
-	.prefs-content {
-		font-family: var(--brand-font-body, 'VT323', monospace);
-		font-size: 18px;
-	}
-	.prefs-heading {
-		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
-		font-size: 11px;
-		margin: 0 0 14px;
-		font-weight: normal;
-	}
-	.pref-row {
-		margin-bottom: 14px;
-		border-bottom: 1px solid var(--paper-soft);
-		padding-bottom: 12px;
-	}
-	.pref-label {
-		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
-		font-size: 9px;
-		margin-bottom: 6px;
-	}
-	.pref-hint {
-		opacity: 0.6;
-		font-size: 14px;
-		margin-top: 4px;
-	}
-	.pref-sublabel {
-		font-family: var(--brand-font-body, 'VT323', monospace);
-		font-size: 15px;
-		opacity: 0.7;
-		margin-bottom: 4px;
-	}
-	.pattern-grid {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
-		max-height: 200px;
-		overflow-y: auto;
-		margin-top: 6px;
-	}
-	.pattern-thumb {
-		width: 36px;
-		height: 36px;
-		border: 2px solid var(--ink);
-		cursor: pointer;
-		background-size: 64px 64px;
-		image-rendering: pixelated;
-	}
-	.pattern-thumb:hover {
-		box-shadow: 0 0 0 2px var(--accent);
-	}
-	.pattern-thumb.selected {
-		box-shadow: 0 0 0 2px var(--accent);
-		border-color: var(--accent);
 	}
 
 	/* System alert */
