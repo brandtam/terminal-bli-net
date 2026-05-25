@@ -3,22 +3,145 @@ import { expect, test } from '@playwright/test';
 test('desktop loads with menu bar', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('.menubar')).toBeVisible();
-	await expect(page.locator('.menubar')).toContainText('TV Guide');
+	await expect(page.locator('.menubar')).toContainText('Finder');
 });
 
-test('TV Guide opens on first visit', async ({ page }) => {
+test('first visit opens Welcome, not TV Guide', async ({ page }) => {
 	await page.goto('/');
-	await page.waitForTimeout(1000);
-	const tvGuide = page.locator('.tv-guide');
-	if (await tvGuide.isVisible()) {
-		await expect(tvGuide).toContainText('TV GUIDE');
-	}
+	await page.waitForTimeout(1500);
+	await expect(page.locator('.window .title:has-text("Welcome")')).toBeVisible();
 });
 
-test('desktop icons render for shows', async ({ page }) => {
+test('desktop icons render with alias badges', async ({ page }) => {
 	await page.goto('/');
 	await page.waitForTimeout(1000);
 	const icons = page.locator('.desktop-icon');
 	const count = await icons.count();
 	expect(count).toBeGreaterThan(0);
+
+	const aliasIcons = page.locator('.desktop-icon.alias');
+	const aliasCount = await aliasIcons.count();
+	expect(aliasCount).toBeGreaterThanOrEqual(5);
+
+	const terminalHD = page.locator('.desktop-icon:has-text("Terminal HD")');
+	await expect(terminalHD).not.toHaveClass(/alias/);
+
+	const trash = page.locator('.desktop-icon:has-text("Trash")');
+	await expect(trash).not.toHaveClass(/alias/);
+});
+
+test('no README.txt or Pricing.txt on desktop', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await expect(page.locator('.desktop-icon:has-text("README")')).not.toBeVisible();
+	await expect(page.locator('.desktop-icon:has-text("Pricing")')).not.toBeVisible();
+});
+
+test('system menu shows System Preferences, not Tweaks', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.click('.apple.menu-item');
+	await page.waitForTimeout(300);
+	const dropdown = page.locator('.dropdown');
+	await expect(dropdown).toBeVisible();
+	await expect(dropdown).toContainText('System Preferences');
+	await expect(dropdown).not.toContainText('Tweaks');
+});
+
+test('About This Terminal shows version', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.click('.apple.menu-item');
+	await page.waitForTimeout(300);
+	await page.click('.dropdown-item:has-text("About Terminal")');
+	await page.waitForTimeout(500);
+	const aboutWindow = page.locator('.about-terminal');
+	await expect(aboutWindow).toBeVisible();
+	await expect(aboutWindow).toContainText('Terminal');
+	await expect(aboutWindow).toContainText('v1.0.0');
+});
+
+test('TV Guide grid has no reduced opacity on off-air shows', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.dblclick('.desktop-icon:has-text("TV Guide")');
+	await page.waitForTimeout(1500);
+	const cells = page.locator('.tvg-ep-cell');
+	const count = await cells.count();
+	if (count > 0) {
+		for (let i = 0; i < Math.min(count, 5); i++) {
+			const opacity = await cells.nth(i).evaluate((el) => window.getComputedStyle(el).opacity);
+			expect(opacity).toBe('1');
+		}
+	}
+});
+
+test('Stickies render without title bar (chromeless)', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.dblclick('.desktop-icon:has-text("Stickies")');
+	await page.waitForTimeout(500);
+	const stickyWindows = page.locator('.window.chromeless');
+	const count = await stickyWindows.count();
+	expect(count).toBeGreaterThan(0);
+	const first = stickyWindows.first();
+	await expect(first).toBeVisible();
+	await expect(first.locator('.window-titlebar')).not.toBeVisible();
+	await expect(first.locator('.sticky-close')).toBeVisible();
+});
+
+test('Applications folder contains seeded apps', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.dblclick('.desktop-icon:has-text("Terminal HD")');
+	await page.waitForTimeout(500);
+	await page.dblclick('.finder-item:has-text("Applications")');
+	await page.waitForTimeout(500);
+	await expect(page.locator('.finder-item:has-text("TV Guide")')).toBeVisible();
+	await expect(page.locator('.finder-item:has-text("Stickies")')).toBeVisible();
+	await expect(page.locator('.finder-item:has-text("Camera")')).toBeVisible();
+	await expect(page.locator('.finder-item:has-text("Stats")')).toBeVisible();
+	await expect(page.locator('.finder-status')).toContainText('5 items');
+});
+
+test('System folder contains System Preferences and About', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.dblclick('.desktop-icon:has-text("Terminal HD")');
+	await page.waitForTimeout(500);
+	await page.dblclick('.finder-item:has-text("System")');
+	await page.waitForTimeout(500);
+	await expect(page.locator('.finder-item:has-text("System Preferences")')).toBeVisible();
+	await expect(page.locator('.finder-item:has-text("About This Terminal")')).toBeVisible();
+	await expect(page.locator('.finder-status')).toContainText('2 items');
+});
+
+test('right-click shows context menu with Make Alias for files', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.dblclick('.desktop-icon:has-text("Terminal HD")');
+	await page.waitForTimeout(500);
+	await page.dblclick('.finder-item:has-text("Applications")');
+	await page.waitForTimeout(500);
+
+	await page.locator('.finder-item:has-text("Stats")').click({ button: 'right' });
+	await page.waitForTimeout(300);
+	const menu = page.locator('.context-menu');
+	await expect(menu).toBeVisible();
+	await expect(menu).toContainText('Open');
+	await expect(menu).toContainText('Make Alias');
+});
+
+test('right-click on folder shows Open only, no Make Alias', async ({ page }) => {
+	await page.goto('/');
+	await page.waitForTimeout(1000);
+	await page.dblclick('.desktop-icon:has-text("Terminal HD")');
+	await page.waitForTimeout(500);
+
+	await page.locator('.finder-item:has-text("System")').click({ button: 'right' });
+	await page.waitForTimeout(300);
+	const menu = page.locator('.context-menu');
+	await expect(menu).toBeVisible();
+	await expect(menu).toContainText('Open');
+	await expect(menu).not.toContainText('Make Alias');
 });

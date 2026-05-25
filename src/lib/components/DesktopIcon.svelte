@@ -5,19 +5,33 @@
 		label,
 		disabled = false,
 		alias = false,
+		selected = false,
 		ondblclick,
+		onselect,
 		children
 	}: {
 		label: string;
 		disabled?: boolean;
 		alias?: boolean;
+		selected?: boolean;
 		ondblclick: () => void;
+		onselect?: () => void;
 		children: Snippet;
 	} = $props();
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="desktop-icon" class:disabled class:alias {ondblclick} onclick={ondblclick}>
+<div
+	class="desktop-icon"
+	class:disabled
+	class:alias
+	class:selected
+	onclick={(e) => {
+		e.stopPropagation();
+		onselect?.();
+	}}
+	{ondblclick}
+>
 	<div class="glyph">
 		{@render children()}
 	</div>
@@ -66,10 +80,13 @@
 		background: transparent;
 		font-weight: 500;
 	}
-	.desktop-icon:hover .label,
-	.desktop-icon:focus .label {
+	.desktop-icon.selected .label {
 		background: var(--ink);
 		color: var(--paper);
 		text-shadow: none;
+	}
+	.desktop-icon.selected .glyph {
+		outline: 1px dotted var(--paper);
+		outline-offset: 2px;
 	}
 </style>
