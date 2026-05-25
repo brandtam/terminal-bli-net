@@ -319,12 +319,12 @@
 		{@const feat = featured}
 		{@const featuredGroup = groupMap.get(feat.showSlug)}
 		{@const featuredBots = featuredGroup ? getGroupBots(featuredGroup) : []}
-		{@const liveNow = isShowOnAir(feat.showSlug, channels, slotNow, timezone)}
+		{@const showOnAir = isShowOnAir(feat.showSlug, channels, slotNow, timezone)}
 		<div class="tvg-preview">
 			<div class="tvg-preview-bar">
 				<span class="tvg-preview-net">{feat.net} · CHANNEL {feat.ch}</span>
 				<span class="tvg-preview-time">
-					{#if liveNow}ON NOW{:else}UPCOMING{/if}
+					{#if feat.isLive}ON NOW{:else}UPCOMING{/if}
 				</span>
 			</div>
 			<div class="tvg-preview-main">
@@ -342,14 +342,14 @@
 						<span class="tvg-preview-line">"{featuredBots[0]?.greeting ?? '...'}"</span>
 					</div>
 				</div>
-				{#if liveNow && featuredGroup}
+				{#if showOnAir && featuredGroup}
 					<button
-						class="tvg-preview-cta"
+						class="btn primary"
 						onclick={() => {
 							if (featuredGroup) onOpenChat(featuredGroup);
 						}}
 					>
-						▸ START<br/>CHAT
+						▸ CHAT
 					</button>
 				{/if}
 			</div>
@@ -359,14 +359,18 @@
 	<!-- Date Bar -->
 	<div class="tvg-datebar">
 		<span class="tvg-datebar-date">{formatGuideDate(now, timezone)}</span>
-		<span class="tvg-datebar-live">
+		<button class="tvg-datebar-live" onclick={() => {
+			if (scrollerEl) scrollerEl.scrollLeft = 0;
+			paused = true;
+			setTimeout(() => { paused = false; }, 1000);
+		}}>
 			{#if sortedChannels.some((ch) => getCurrentSlot(ch, slotNow, timezone) !== null)}
 				<span class="tvg-now-dot live">●</span>LIVE @ {formatLiveClock(now, timezone)}
 			{:else}
 				<span class="tvg-now-dot">●</span>OFF AIR · {formatLiveClock(now, timezone)}
 			{/if}
 			{#if paused}<span class="tvg-paused"> · ⏸ paused</span>{/if}
-		</span>
+		</button>
 	</div>
 
 	<!-- Scrolling Timeline Grid -->
@@ -436,7 +440,6 @@
 						<div class="ep-show">
 							<span class="ep-show-name">{(showGroup?.name ?? cell.showSlug).toUpperCase()}</span>
 							{#if cell.span > 1}<span class="ep-runtime">{cell.span * 30}MIN</span>{/if}
-							{#if !cell.isLive}<span class="ep-off">OFF AIR</span>{/if}
 						</div>
 						<div class="ep-title">"{cell.title}" {#if cell.year}<span class="ep-year">({cell.year})</span>{/if}</div>
 					</div>
@@ -543,28 +546,6 @@
 		flex-shrink: 0;
 	}
 	.tvg-preview-line { font-style: italic; opacity: 0.95; min-width: 0; }
-	.tvg-preview-cta {
-		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
-		font-size: 10px;
-		background: var(--tvg-accent);
-		color: var(--tvg-text);
-		border: 2px solid var(--tvg-text);
-		padding: 12px 14px;
-		cursor: pointer;
-		letter-spacing: 0.05em;
-		line-height: 1.4;
-		white-space: nowrap;
-		text-align: center;
-		align-self: stretch;
-	}
-	.tvg-preview-cta:hover { background: var(--tvg-text); color: var(--tvg-accent); }
-	.tvg-preview-cta:active { transform: translate(1px, 1px); }
-	.tvg-preview-cta.off {
-		background: var(--tvg-dark);
-		border-color: var(--tvg-gold);
-		color: var(--tvg-gold);
-	}
-	.tvg-preview-cta.off:hover { background: var(--tvg-gold); color: var(--tvg-dark); }
 
 	/* ====== Date bar ====== */
 	.tvg-datebar {
@@ -580,7 +561,18 @@
 		border-bottom: 1px solid var(--tvg-mid);
 		flex-shrink: 0;
 	}
-	.tvg-datebar-live { color: var(--tvg-text); display: flex; align-items: center; gap: 6px; }
+	.tvg-datebar-live {
+		color: var(--tvg-text);
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		background: none;
+		border: none;
+		font: inherit;
+		cursor: pointer;
+		padding: 0;
+	}
+	.tvg-datebar-live:hover { color: var(--tvg-gold); }
 	.tvg-now-dot {
 		display: inline-block;
 		color: var(--tvg-accent);
@@ -736,13 +728,6 @@
 		border: 1px solid var(--tvg-live);
 		padding: 1px 3px;
 		letter-spacing: 0.02em;
-	}
-	.ep-off {
-		font-size: 7px;
-		color: var(--tvg-off);
-		border: 1px solid var(--tvg-off-border);
-		padding: 1px 3px;
-		letter-spacing: 0.04em;
 	}
 	.ep-title {
 		font-family: var(--brand-font-body, 'VT323', monospace);
