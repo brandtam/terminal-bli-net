@@ -56,6 +56,7 @@
 
 	const osMenuItems: AppMenuItem[] = [
 		{ type: 'action', label: 'About Terminal', action: (os) => os.openAbout(null) },
+		{ type: 'action', label: 'Welcome', action: (os) => os.openWindow('welcome') },
 		{ type: 'separator' },
 		{ type: 'action', label: 'Tweaks…', shortcut: '⌘,', action: (os) => os.openTweaks() },
 		{ type: 'separator' },
