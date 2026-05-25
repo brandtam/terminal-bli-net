@@ -8,7 +8,18 @@ const config = {
 		adapter: adapter({
 			routes: {
 				include: ['/*'],
-				exclude: ['<all>']
+				exclude: [
+					'<build>',
+					'<prerendered>',
+					'/bots/*',
+					'/themes/*',
+					'/favicon.*',
+					'/*.png',
+					'/*.ico',
+					'/*.xml',
+					'/*.svg',
+					'/site.webmanifest'
+				]
 			}
 		})
 	}
