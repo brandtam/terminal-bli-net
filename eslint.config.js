@@ -80,6 +80,7 @@ export default [
 				HTMLElement: 'readonly',
 				HTMLDivElement: 'readonly',
 				HTMLInputElement: 'readonly',
+				HTMLTextAreaElement: 'readonly',
 				Event: 'readonly',
 				KeyboardEvent: 'readonly',
 				MouseEvent: 'readonly',

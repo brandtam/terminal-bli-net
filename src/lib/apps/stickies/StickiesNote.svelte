@@ -6,18 +6,18 @@
 		color: string;
 	}
 
-	const COLORS: { label: string; bg: string; header: string }[] = [
-		{ label: 'Yellow', bg: '#f9bd2b', header: '#d4a020' },
-		{ label: 'Pink', bg: '#ee63b3', header: '#c44e94' },
-		{ label: 'Green', bg: '#a6f000', header: '#7cb800' },
-		{ label: 'Blue', bg: '#6bb5ff', header: '#4a8fd6' },
-		{ label: 'Orange', bg: '#f54e00', header: '#c43e00' },
+	const COLORS: { label: string; bg: string }[] = [
+		{ label: 'Yellow', bg: '#f9bd2b' },
+		{ label: 'Pink', bg: '#ee63b3' },
+		{ label: 'Green', bg: '#a6f000' },
+		{ label: 'Blue', bg: '#6bb5ff' },
+		{ label: 'Orange', bg: '#f54e00' }
 	];
 
 	let {
 		note,
 		ondelete,
-		onupdate,
+		onupdate
 	}: {
 		note: StickyNote;
 		ondelete: (id: string) => void;
@@ -29,7 +29,7 @@
 	let dirty = $state(false);
 
 	function getColorDef(hex: string) {
-		return COLORS.find(c => c.bg === hex) || COLORS[0];
+		return COLORS.find((c) => c.bg === hex) || COLORS[0];
 	}
 
 	function flushSave() {
@@ -58,11 +58,6 @@
 		dirty = true;
 	}
 
-	function handleTitleInput(e: Event) {
-		titleText = (e.target as HTMLInputElement).value;
-		dirty = true;
-	}
-
 	$effect(() => {
 		bodyText = note.body;
 		titleText = note.title;
@@ -71,21 +66,11 @@
 	const colorDef = $derived(getColorDef(note.color));
 </script>
 
-<div class="sticky-note" style:--note-bg={colorDef.bg} style:--note-header={colorDef.header}>
-	<div class="sticky-header">
-		<input
-			class="sticky-title"
-			value={titleText}
-			oninput={handleTitleInput}
-			placeholder="untitled"
-		/>
-		<button class="sticky-close" onclick={() => ondelete(note.id)} title="Delete note">×</button>
+<div class="sticky-note" style:--note-bg={colorDef.bg}>
+	<div class="sticky-drag-strip">
+		<button class="sticky-close" onclick={() => ondelete(note.id)} title="Delete note"></button>
 	</div>
-	<textarea
-		class="sticky-body"
-		value={bodyText}
-		oninput={handleBodyInput}
-		placeholder="type here…"
+	<textarea class="sticky-body" value={bodyText} oninput={handleBodyInput} placeholder="type here…"
 	></textarea>
 </div>
 
@@ -97,45 +82,25 @@
 		background: var(--note-bg);
 		font-family: var(--brand-font-body, 'VT323', monospace);
 	}
-	.sticky-header {
+	.sticky-drag-strip {
 		display: flex;
 		align-items: center;
-		background: var(--note-header);
-		padding: 4px 6px;
-		gap: 4px;
-		min-height: 24px;
-	}
-	.sticky-title {
-		flex: 1;
-		background: none;
-		border: none;
-		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
-		font-size: 9px;
-		color: var(--ink);
-		outline: none;
-		padding: 2px 0;
-		min-width: 0;
-	}
-	.sticky-title::placeholder {
-		color: rgba(0, 0, 0, 0.4);
+		background: var(--note-bg);
+		height: 12px;
+		min-height: 12px;
+		padding: 0 2px;
 	}
 	.sticky-close {
 		appearance: none;
-		border: 1px solid rgba(0, 0, 0, 0.3);
-		background: rgba(255, 255, 255, 0.25);
-		width: 16px;
-		height: 16px;
-		font-size: 14px;
-		line-height: 1;
+		border: 1px solid rgba(0, 0, 0, 0.4);
+		background: none;
+		width: 12px;
+		height: 12px;
 		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		padding: 0;
-		color: var(--ink);
 	}
 	.sticky-close:hover {
-		background: rgba(255, 255, 255, 0.5);
+		background: rgba(0, 0, 0, 0.12);
 	}
 	.sticky-body {
 		flex: 1;
@@ -145,7 +110,7 @@
 		font-size: 17px;
 		line-height: 1.35;
 		color: var(--ink);
-		padding: 8px 10px;
+		padding: 2px 10px 8px;
 		resize: none;
 		outline: none;
 		width: 100%;
