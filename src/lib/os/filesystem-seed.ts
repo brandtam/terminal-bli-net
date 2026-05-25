@@ -4,9 +4,11 @@ import {
 	SYSTEM_ID,
 	DESKTOP_ID,
 	exists,
+	getNode,
 	createFile,
 	createFileWithId,
-	createAliasWithId
+	createAliasWithId,
+	ensureSystemFolders
 } from '$lib/os/filesystem';
 
 const README_CONTENT = `README.TXT — Terminal v1.0
@@ -69,6 +71,8 @@ Cancel any time. Pricing in fake dollars. Real dollars also fine.`;
  * Call once from Desktop's onMount.
  */
 export function seedFilesystem(): void {
+	ensureSystemFolders();
+
 	if (!exists(DOCS_ID, 'README.TXT')) {
 		createFile(DOCS_ID, 'README.TXT', 'textedit', README_CONTENT);
 	}
@@ -104,7 +108,7 @@ export function seedFilesystem(): void {
 		{ id: 'desktop-error', name: 'DO_NOT_OPEN', targetId: 'app-error' }
 	];
 	for (const da of desktopAliases) {
-		if (!exists(DESKTOP_ID, da.name)) {
+		if (!exists(DESKTOP_ID, da.name) && getNode(da.targetId)) {
 			createAliasWithId(da.id, DESKTOP_ID, da.name, da.targetId);
 		}
 	}

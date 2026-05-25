@@ -108,6 +108,28 @@ function save(store: Record<string, FSNode>): void {
 	for (const fn of _changeListeners) fn();
 }
 
+export function ensureSystemFolders(): void {
+	const store = load();
+	const now = Date.now();
+	const required: [string, string, string | null][] = [
+		[ROOT_ID, 'Terminal HD', null],
+		[SYSTEM_ID, 'System', ROOT_ID],
+		[APPS_ID, 'Applications', ROOT_ID],
+		[DOCS_ID, 'Documents', ROOT_ID],
+		[RECORDINGS_ID, 'Recordings', ROOT_ID],
+		[TRASH_ID, 'Trash', ROOT_ID],
+		[DESKTOP_ID, 'Desktop', ROOT_ID]
+	];
+	let changed = false;
+	for (const [id, name, parentId] of required) {
+		if (!store[id]) {
+			store[id] = { id, name, type: 'folder' as const, parentId, createdAt: now, updatedAt: now };
+			changed = true;
+		}
+	}
+	if (changed) save(store);
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
