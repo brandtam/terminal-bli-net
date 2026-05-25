@@ -441,7 +441,7 @@
 			'about-stickies': { title: 'About Stickies', w: 420, h: 380 },
 			stats: { title: 'Stats.app', w: 360, h: 360 },
 			error: { title: 'System Error', w: 420, h: 260 },
-			trash: { title: 'Trash — empty', w: 380, h: 320 },
+			trash: { title: 'Trash', w: 380, h: 320 },
 			recorder: { title: 'Camera.app', w: 360, h: 480 },
 			'about-recorder': { title: 'About Recorder', w: 420, h: 360 },
 			finder: { title: 'Terminal HD', w: 480, h: 420 }
@@ -910,7 +910,7 @@
 				{:else if w.id === 'error'}
 					<ErrorDialog onclose={() => closeWindow('error')} />
 				{:else if w.id === 'trash'}
-					<TrashWindow />
+					<FinderWindow {os} folderId="trash" />
 				{:else if w.id === 'recorder'}
 					<RecorderWindow bind:recording={cameraRecording} />
 				{:else if w.id.startsWith('recorder-')}
