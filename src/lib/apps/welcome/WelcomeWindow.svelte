@@ -5,18 +5,18 @@
 <div class="welcome">
 	<h1>terminal<span class="accent">.bli.net</span><span class="blink-cursor"></span></h1>
 	<div class="lede">
-		<b>Previously on screens…</b><br/>
+		<b>Previously on screens…</b><br />
 		A retro desktop you visit in a browser. Drag windows. Open apps. Tweak things until they feel right.
 	</div>
 	<p class="tagline">
 		Terminal is a tiny operating system that runs in a tab. It's what the inside of a computer
-		looked like before screens got slick. Floppy icons, striped title bars, chunky borders,
-		a clock you can change.
+		looked like before screens got slick. Floppy icons, striped title bars, chunky borders, a clock
+		you can change.
 	</p>
 	<p class="tagline">
-		Open <b>TV Guide.app</b> to see what's broadcasting. Open <b>README.txt</b> for the manual.
-		Drag the windows around. Resize them. Stack them. Lose one behind another and find it again
-		in the dock. The desktop is yours.
+		Open <b>TV Guide.app</b> to see what's broadcasting. Open <b>README.txt</b> for the manual. Drag the
+		windows around. Resize them. Stack them. Lose one behind another and find it again in the dock. The
+		desktop is yours.
 	</p>
 	<div class="btn-row">
 		<button class="btn primary" onclick={() => onopen('tv-guide')}>OPEN TV GUIDE</button>
@@ -26,16 +26,17 @@
 		<div class="logo-marquee-track">
 			<span>&#9733; TERMINAL — terminal.bli.net</span>
 			<span>&#9733; NO COOKIES, NO TRACKING, NO ANALYTICS</span>
-			<span>&#9733; BUILT IN A GARAGE</span>
+			<span>&#9733; ONE TAB, ONE DESKTOP</span>
 			<span>&#9733; ONE PERSON'S PROJECT, NOT A PLATFORM</span>
 			<span>&#9733; TERMINAL — terminal.bli.net</span>
 			<span>&#9733; NO COOKIES, NO TRACKING, NO ANALYTICS</span>
-			<span>&#9733; BUILT IN A GARAGE</span>
+			<span>&#9733; ONE TAB, ONE DESKTOP</span>
 			<span>&#9733; ONE PERSON'S PROJECT, NOT A PLATFORM</span>
 		</div>
 	</div>
 	<p class="muted" style="margin:0;">
-		&uarr; open windows by double-clicking the icons, dragging stuff around, or pretending it's 1994.
+		&uarr; open windows by double-clicking the icons, dragging stuff around, or pretending it's
+		1994.
 	</p>
 </div>
 
@@ -54,7 +55,9 @@
 		letter-spacing: -1px;
 		font-weight: normal;
 	}
-	.accent { color: var(--accent); }
+	.accent {
+		color: var(--accent);
+	}
 	.blink-cursor {
 		display: inline-block;
 		width: 14px;
