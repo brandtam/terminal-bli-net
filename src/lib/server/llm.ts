@@ -2,8 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import type { ChatMessage, TextChunk } from '$lib/types';
 
-const CLAUDE_DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
-const OPENAI_DEFAULT_MODEL = 'gpt-4o-mini';
+const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
+const OPENAI_FALLBACK_MODEL = 'gpt-4o-mini';
 
 interface StreamCompletionParams {
 	systemPrompt: string;
@@ -21,7 +21,7 @@ async function streamAnthropicCompletion(
 	params: StreamCompletionParams
 ): Promise<ReadableStream<TextChunk>> {
 	const { systemPrompt, messages, options, apiKey } = params;
-	const model = options?.model ?? CLAUDE_DEFAULT_MODEL;
+	const model = options?.model ?? CLAUDE_FALLBACK_MODEL;
 	const maxTokens = options?.maxTokens ?? 1024;
 	const temperature = options?.temperature ?? 1.0;
 
@@ -86,7 +86,7 @@ async function streamOpenAICompletion(
 	params: StreamCompletionParams
 ): Promise<ReadableStream<TextChunk>> {
 	const { systemPrompt, messages, options, apiKey } = params;
-	const model = options?.model ?? OPENAI_DEFAULT_MODEL;
+	const model = options?.model ?? OPENAI_FALLBACK_MODEL;
 	const maxTokens = options?.maxTokens ?? 1024;
 	const temperature = options?.temperature ?? 1.0;
 
