@@ -9,6 +9,7 @@ declare global {
 				MONTHLY_SPEND_CAP: string;
 				RATE_LIMIT_PER_HOUR: string;
 				SESSION_MESSAGE_CAP: string;
+				MODEL?: string;
 			};
 		}
 	}
