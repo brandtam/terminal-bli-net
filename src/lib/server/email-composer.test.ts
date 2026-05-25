@@ -19,7 +19,7 @@ const DEFAULT_PARAMS: ComposeReminderParams = {
 	characterPrompt:
 		'greeting": "Well, hello there. Pull up a martini, soldier." voice: sardonic',
 	recipientEmail: 'fan@example.com',
-	signedReplyAddr: 'unsub+abc123--fan@example.com@chatrbot.ai',
+	signedReplyAddr: 'unsub+abc123--fan@example.com@bli.net',
 	nextAirTime: '7:00 PM EST'
 };
 
@@ -61,7 +61,7 @@ describe('composeReminder', () => {
 	it('sets List-Unsubscribe header with mailto format', () => {
 		const { headers } = composeReminder(DEFAULT_PARAMS);
 		expect(headers['List-Unsubscribe']).toBe(
-			'<mailto:unsub+abc123--fan@example.com@chatrbot.ai>'
+			'<mailto:unsub+abc123--fan@example.com@bli.net>'
 		);
 	});
 
@@ -87,7 +87,7 @@ describe('signUnsubscribeAddress / verifyUnsubscribeAddress', () => {
 
 	it('signed address has the expected format', async () => {
 		const signed = await signUnsubscribeAddress('a@b.com', TEST_SECRET);
-		expect(signed).toMatch(/^unsub\+[0-9a-f]+--a@b\.com@chatrbot\.ai$/);
+		expect(signed).toMatch(/^unsub\+[0-9a-f]+--a@b\.com@bli\.net$/);
 	});
 
 	it('rejects when the signature is tampered with', async () => {
@@ -110,13 +110,13 @@ describe('signUnsubscribeAddress / verifyUnsubscribeAddress', () => {
 	});
 
 	it('rejects when the address has no unsub+ prefix', async () => {
-		const result = await verifyUnsubscribeAddress('bad+stuff@chatrbot.ai', TEST_SECRET);
+		const result = await verifyUnsubscribeAddress('bad+stuff@bli.net', TEST_SECRET);
 		expect(result.valid).toBe(false);
 		expect(result.email).toBe('');
 	});
 
 	it('rejects when the address has no separator', async () => {
-		const result = await verifyUnsubscribeAddress('unsub+noseparator@chatrbot.ai', TEST_SECRET);
+		const result = await verifyUnsubscribeAddress('unsub+noseparator@bli.net', TEST_SECRET);
 		expect(result.valid).toBe(false);
 		expect(result.email).toBe('');
 	});

@@ -111,7 +111,7 @@ export class ReminderAgent extends Agent<Env> {
 				// TODO: Replace with real send once Email Routing is configured
 				try {
 					await this.env.SEND_EMAIL.send({
-						from: `${bot.name} <reminders@chatrbot.ai>`,
+						from: `${bot.name} <reminders@bli.net>`,
 						to: sub.email,
 						subject,
 						text: body,
