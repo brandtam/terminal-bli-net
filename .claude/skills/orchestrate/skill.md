@@ -21,10 +21,26 @@ Each agent gets a **self-contained prompt** that includes:
 - Exact file paths and current state of files being modified
 - Types, interfaces, and function signatures they'll need
 - What to import and from where
-- How to verify their work (`npm run check`, `npx vitest run`, etc.)
+- The review-then-commit workflow (see below)
 - Commit rules: concise message, no Co-Authored-By or trailer lines, stay on current branch
 
 **Good prompt = good results.** A vague prompt produces vague work. Include line numbers, current code snippets, and the specific changes needed. If you'd need to read a file to do the work yourself, read it before writing the prompt.
+
+### Agent review-then-commit workflow
+
+Every agent prompt must include this block (copy it verbatim into each prompt):
+
+```
+## Before committing
+
+After your code is written and checks pass, review your changes against the project's code review checklist. Read `.claude/skills/review-code/skill.md` for the full checklist. The key checks:
+
+1. **Architecture** — uses filesystem API (not raw localStorage) for file storage, window IDs registered, app registry entry if needed
+2. **Design system** — CSS uses token vars (--ink, --paper, --chrome-*), 2px borders, no rounded corners, correct font for context, Dropdown component instead of native select
+3. **Code quality** — Svelte 5 runes, proper TypeScript types, tests for pure functions, no security issues
+
+Walk through each applicable item. If you find a violation, fix it before committing. If everything passes, commit. Do not commit code that fails review — iterate until clean.
+```
 
 ### Parallel vs sequential
 
@@ -37,8 +53,9 @@ Each agent gets a **self-contained prompt** that includes:
 1. Run `npm run check` — must be 0 errors
 2. Run tests if relevant — `npx vitest run`
 3. Spot-check the changes (grep for key patterns, read critical sections)
-4. If something is broken, fix it yourself (small fixes) or send the agent a follow-up message
-5. Report one sentence to the user: what was done, what's next
+4. If something looks off, launch a quick review agent in the background against `.claude/skills/review-code/skill.md` — or check the critical items yourself
+5. If something is broken, fix it yourself (small fixes) or send the agent a follow-up message
+6. Report one sentence to the user: what was done, what's next
 
 ### When to fix things yourself
 
