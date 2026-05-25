@@ -9,7 +9,7 @@
 	let { docId }: Props = $props();
 
 	let content = $state('');
-	let timer: ReturnType<typeof setTimeout> | null = null;
+	let dirty = $state(false);
 
 	onMount(() => {
 		const file = readFile(docId);
@@ -18,15 +18,32 @@
 		}
 	});
 
+	function flushSave() {
+		const file = readFile(docId);
+		if (file) {
+			writeFile(docId, content);
+		}
+		dirty = false;
+	}
+
+	$effect(() => {
+		if (!dirty) return;
+		const _capture = content;
+		const tid = setTimeout(() => flushSave(), 500);
+		return () => {
+			clearTimeout(tid);
+		};
+	});
+
+	$effect(() => {
+		return () => {
+			if (dirty) flushSave();
+		};
+	});
+
 	function handleInput(e: Event) {
 		content = (e.target as HTMLTextAreaElement).value;
-		if (timer) clearTimeout(timer);
-		timer = setTimeout(() => {
-			const file = readFile(docId);
-			if (file) {
-				writeFile(docId, content);
-			}
-		}, 500);
+		dirty = true;
 	}
 </script>
 
