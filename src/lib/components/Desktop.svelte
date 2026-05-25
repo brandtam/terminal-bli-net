@@ -26,7 +26,8 @@
 	import WelcomeWindow from '$lib/apps/welcome/WelcomeWindow.svelte';
 	import TextEditWindow from '$lib/apps/textedit/TextEditWindow.svelte';
 	import { findDocByName } from '$lib/apps/textedit/textedit-docs';
-	import { readFile } from '$lib/os/filesystem';
+	import { readFile, findByApp, createFile, writeFile, deleteNode, DOCS_ID } from '$lib/os/filesystem';
+	import type { FSFile } from '$lib/os/filesystem';
 	import StatsWindow from '$lib/apps/stats/StatsWindow.svelte';
 	import ErrorDialog from '$lib/apps/finder/ErrorDialog.svelte';
 	import TrashWindow from '$lib/apps/finder/TrashWindow.svelte';
@@ -65,6 +66,8 @@
 	});
 	let timezone = $state<string | undefined>(undefined);
 	let now = $state(new Date());
+	let slotNow = $state(new Date());
+	let lastSlotIdx = $state(-1);
 	let isMobile = $state(false);
 
 	const DEFAULT_NOTES: StickyNote[] = [
@@ -145,8 +148,18 @@
 			openWindow(hash);
 		}
 
+		// Seed slotNow before the interval starts
+		const initialNow = new Date();
+		lastSlotIdx = getSlotIndex(initialNow, timezone);
+		slotNow = initialNow;
+
 		const tick = setInterval(() => {
 			now = new Date();
+			const idx = getSlotIndex(now, timezone);
+			if (idx !== lastSlotIdx) {
+				lastSlotIdx = idx;
+				slotNow = now;
+			}
 		}, 1000);
 
 		const handleResize = () => {
@@ -213,7 +226,7 @@
 	]);
 
 	function isKnownWindowId(id: string): boolean {
-		return KNOWN_WINDOW_IDS.has(id) || id.startsWith('chat-') || id.startsWith('sticky-') || id.startsWith('textedit-');
+		return KNOWN_WINDOW_IDS.has(id) || id.startsWith('chat-') || id.startsWith('sticky-') || id.startsWith('textedit-') || id.startsWith('recorder-');
 	}
 
 	function getWindowDef(id: string): { title: string; w: number; h: number } {
@@ -263,6 +276,15 @@
 				h: 220
 			};
 		}
+		if (id.startsWith('recorder-')) {
+			const fileId = id.replace('recorder-', '');
+			const file = readFile(fileId);
+			return {
+				title: file?.name || 'Recording',
+				w: 360,
+				h: 340
+			};
+		}
 		return defs[id] || { title: 'Unknown', w: 380, h: 320 };
 	}
 
@@ -285,7 +307,18 @@
 		if (activeId === id) activeId = null;
 	}
 
+	/** Dock alias map: symbolic Dock IDs that route to real windows */
+	const DOCK_ALIASES: Record<string, () => void> = {
+		chat: () => openWindow('tv-guide'),
+		pricing: () => openTextEditFile('Pricing.txt'),
+		readme: () => openTextEditFile('README.TXT')
+	};
+
 	function openWindow(id: string) {
+		// Route symbolic Dock IDs to real windows
+		const alias = DOCK_ALIASES[id];
+		if (alias) { alias(); return; }
+
 		if (isMobile) {
 			windows = windows.filter((w) => w.id !== id);
 		}
@@ -342,9 +375,10 @@
 	let cameraRecording = $state(false);
 
 	const activeChatGroupSlug = $derived.by(() => {
-		const chatWindow = windows.find((w) => w.id.startsWith('chat-'));
-		if (!chatWindow) return null;
-		return chatWindow.id.replace('chat-', '');
+		if (!activeId?.startsWith('chat-')) return null;
+		const botId = activeId.replace('chat-', '');
+		const bot = bots.find((b) => b.id === botId);
+		return bot?.group ?? null;
 	});
 
 	function setTimezone(tz: string) {
@@ -554,6 +588,7 @@
 					{channels}
 					{timezone}
 					{now}
+					{slotNow}
 					{activeChatGroupSlug}
 					gridLoop={tweaks.tvGridLoop}
 					marqueeLoop={tweaks.marqueeLoop}
@@ -695,6 +730,19 @@
 				<TrashWindow />
 			{:else if w.id === 'recorder'}
 				<RecorderWindow bind:recording={cameraRecording} />
+			{:else if w.id.startsWith('recorder-')}
+				{@const recFileId = w.id.replace('recorder-', '')}
+				{@const recFile = readFile(recFileId)}
+				{#if recFile?.data}
+					<div class="recording-playback">
+						<!-- svelte-ignore a11y_media_has_caption -->
+						<video src={recFile.data} controls autoplay class="recording-video"></video>
+					</div>
+				{:else}
+					<div class="window-content">
+						<p>Recording not found.</p>
+					</div>
+				{/if}
 			{:else if w.id.startsWith('sticky-')}
 				{@const noteId = w.id.replace('sticky-', '')}
 				{@const note = stickyNotes.find((n) => n.id === noteId)}
@@ -952,6 +1000,20 @@
 		position: relative !important;
 		width: 420px;
 		max-width: calc(100vw - 40px);
+	}
+
+	/* Recording playback */
+	.recording-playback {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
+		background: #000;
+	}
+	.recording-video {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
 	}
 
 	@media (max-width: 767px) {
