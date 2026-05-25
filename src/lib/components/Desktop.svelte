@@ -38,6 +38,7 @@
 	import ErrorDialog from '$lib/apps/finder/ErrorDialog.svelte';
 	import TrashWindow from '$lib/apps/finder/TrashWindow.svelte';
 	import AboutAppWindow from '$lib/apps/finder/AboutAppWindow.svelte';
+	import AboutTerminal from '$lib/apps/finder/AboutTerminal.svelte';
 	import RecorderWindow from '$lib/apps/recorder/RecorderWindow.svelte';
 	import StickiesNote from '$lib/apps/stickies/StickiesNote.svelte';
 	import type { StickyNote } from '$lib/apps/stickies/StickiesNote.svelte';
@@ -374,7 +375,7 @@
 			'terminal-prefs': { title: 'System Preferences', w: 380, h: 360 },
 			'tvguide-prefs': { title: 'TV Guide Preferences', w: 360, h: 360 },
 			'chatrbot-prefs': { title: 'chatrbot Preferences', w: 360, h: 280 },
-			about: { title: 'About Terminal', w: 420, h: 480 },
+			about: { title: 'About This Terminal', w: 380, h: 380 },
 			'about-chatrbot': { title: 'About chatrbot', w: 420, h: 460 },
 			'about-tvguide': { title: 'About TV Guide', w: 420, h: 460 },
 			'about-textedit': { title: 'About TextEdit', w: 420, h: 380 },
@@ -811,8 +812,10 @@
 				{:else if w.id.startsWith('textedit-')}
 					{@const fileId = w.id.replace('textedit-', '')}
 					<TextEditWindow docId={fileId} />
-				{:else if w.id === 'about' || w.id.startsWith('about-')}
-					{@const aboutAppId = w.id === 'about' ? 'finder' : w.id.replace('about-', '')}
+				{:else if w.id === 'about'}
+					<AboutTerminal {os} />
+				{:else if w.id.startsWith('about-')}
+					{@const aboutAppId = w.id.replace('about-', '')}
 					{@const aboutApp = APPS[aboutAppId]}
 					{#if aboutApp?.about}
 						<AboutAppWindow about={aboutApp.about} />
