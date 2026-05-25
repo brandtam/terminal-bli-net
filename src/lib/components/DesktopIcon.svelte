@@ -4,23 +4,20 @@
 	let {
 		label,
 		disabled = false,
+		alias = false,
 		ondblclick,
 		children
 	}: {
 		label: string;
 		disabled?: boolean;
+		alias?: boolean;
 		ondblclick: () => void;
 		children: Snippet;
 	} = $props();
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-	class="desktop-icon"
-	class:disabled
-	ondblclick={ondblclick}
-	onclick={ondblclick}
->
+<div class="desktop-icon" class:disabled class:alias {ondblclick} onclick={ondblclick}>
 	<div class="glyph">
 		{@render children()}
 	</div>
@@ -48,6 +45,17 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		position: relative;
+	}
+	.desktop-icon.alias .glyph::after {
+		content: '\21A9';
+		position: absolute;
+		bottom: -2px;
+		left: -2px;
+		font-size: 14px;
+		color: var(--paper);
+		text-shadow: 1px 1px 0 var(--ink);
+		line-height: 1;
 	}
 	.label {
 		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
