@@ -15,10 +15,12 @@
 
 	let {
 		folderId: initialFolderId = ROOT_ID,
-		os
+		os,
+		onmakealias
 	}: {
 		folderId?: string;
 		os: OsApi;
+		onmakealias?: (name: string, appId: string, icon: string) => void;
 	} = $props();
 
 	let currentFolderId = $state(initialFolderId);
@@ -108,7 +110,37 @@
 		currentFolderId = id;
 		selectedId = null;
 	}
+
+	let contextMenuNode = $state<FSNode | null>(null);
+	let contextMenuX = $state(0);
+	let contextMenuY = $state(0);
+
+	function handleContextMenu(e: MouseEvent, node: FSNode) {
+		e.preventDefault();
+		contextMenuNode = node;
+		contextMenuX = e.clientX;
+		contextMenuY = e.clientY;
+	}
+
+	function closeContextMenu() {
+		contextMenuNode = null;
+	}
+
+	function handleContextOpen() {
+		if (!contextMenuNode) return;
+		handleOpen(contextMenuNode);
+		closeContextMenu();
+	}
+
+	function handleContextMakeAlias() {
+		if (!contextMenuNode || contextMenuNode.type !== 'file') return;
+		const file = contextMenuNode as FSFile;
+		onmakealias?.(file.name, file.appId, iconKind(contextMenuNode));
+		closeContextMenu();
+	}
 </script>
+
+<svelte:window onclick={closeContextMenu} />
 
 <div class="finder">
 	<div class="finder-path">
@@ -128,6 +160,7 @@
 				class:selected={selectedId === node.id}
 				onclick={() => handleSelect(node.id)}
 				ondblclick={() => handleOpen(node)}
+				oncontextmenu={(e) => handleContextMenu(e, node)}
 			>
 				<div class="finder-item-icon">
 					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
@@ -143,6 +176,23 @@
 	<div class="finder-status">
 		{items.length} item{items.length !== 1 ? 's' : ''}
 	</div>
+
+	{#if contextMenuNode}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="context-menu"
+			style="left: {contextMenuX}px; top: {contextMenuY}px;"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="context-menu-item" onclick={handleContextOpen}>Open</div>
+			{#if contextMenuNode.type === 'file'}
+				<div class="context-menu-sep"></div>
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="context-menu-item" onclick={handleContextMakeAlias}>Make Alias</div>
+			{/if}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -261,5 +311,35 @@
 		color: var(--ink, #0a0a0a);
 		opacity: 0.7;
 		flex-shrink: 0;
+	}
+
+	.context-menu {
+		position: fixed;
+		background: var(--chrome-menubar-bg, var(--paper));
+		color: var(--chrome-menubar-fg, var(--ink));
+		border: 2px solid var(--chrome-window-border-color, var(--ink));
+		box-shadow: 3px 3px 0 var(--shadow);
+		min-width: 160px;
+		padding: 4px 0;
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
+		font-size: 14px;
+		z-index: 12000;
+	}
+
+	.context-menu-item {
+		padding: 4px 12px;
+		cursor: pointer;
+	}
+
+	.context-menu-item:hover {
+		background: var(--chrome-menubar-hover-bg, var(--ink));
+		color: var(--chrome-menubar-hover-fg, var(--paper));
+	}
+
+	.context-menu-sep {
+		height: 1px;
+		background: var(--chrome-menubar-fg, var(--ink));
+		margin: 4px 8px;
+		opacity: 0.2;
 	}
 </style>
