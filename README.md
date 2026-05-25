@@ -1,61 +1,22 @@
-# ChatrBot.ai
+# Terminal
 
-A basic chatbot that can be used to answer questions in different moods for fun.
+A retro desktop you visit in a browser. It looks like what the inside of a computer looked like before screens got slick — striped title bars, chunky icons, draggable windows.
 
-## What it does
+Open TV Guide to see what's on. Channels run shows on a schedule like mid-80s cable. If a show is airing, you can chat with the characters — they know what episode they're in.
 
-In practice, the chatbot can be used to answer questions in different moods. The idea is to show that the responses can be different depending on the mood of the chatbot.
+Built with SvelteKit, deployed on Cloudflare Pages, powered by Claude.
 
----
-
-## Install the project
-
-- Clone the project onto your local machine
-
-```bash
-git clone https://github.com/brandtam/sk-chatr-bot.git
-```
-
-- Install the packages with your favorite package manager (pnpm)
+## Setup
 
 ```bash
 pnpm install
-```
-
-## Setup the OpenAI API
-
-- Create an account on [OpenAI](https://platform.openai.com/)
-- Create an API key
-- Create a `.env` file in the root of the project
-- Add your API key to the `.env` file as follows:
-
-```bash
-OPENAI_KEY=your_api_key_that_you_copied_from_openai
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-- Start the server locally
-
-```bash
+cp .env.example .env  # add your ANTHROPIC_API_KEY
 pnpm dev
 ```
 
-## Building
+## Deploy
 
-To create a production version of your app:
-
-```bash
-pnpm run build
-```
-
-## Deploying to Production
-
-Since this specific app uses Vercel Edge Functions you will need to deploy to [Vercel](https://www.vercel.com).
-
-- Copy the OpenAi API key to the projects environment variables on Vercel.
+Deployed to Cloudflare Pages. Secrets (`ANTHROPIC_API_KEY`, optionally `OPENAI_API_KEY`) are set via the Pages dashboard or `wrangler secret put`.
 
 ## License
 
