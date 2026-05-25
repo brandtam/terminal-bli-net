@@ -26,27 +26,41 @@
 
 	let bodyText = $state('');
 	let titleText = $state('');
-	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let dirty = $state(false);
 
 	function getColorDef(hex: string) {
 		return COLORS.find(c => c.bg === hex) || COLORS[0];
 	}
 
-	function save() {
-		if (debounceTimer) clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => {
-			onupdate({ ...note, title: titleText, body: bodyText });
-		}, 300);
+	function flushSave() {
+		onupdate({ ...note, title: titleText, body: bodyText });
+		dirty = false;
 	}
+
+	$effect(() => {
+		if (!dirty) return;
+		const _t = titleText;
+		const _b = bodyText;
+		const tid = setTimeout(() => flushSave(), 300);
+		return () => {
+			clearTimeout(tid);
+		};
+	});
+
+	$effect(() => {
+		return () => {
+			if (dirty) flushSave();
+		};
+	});
 
 	function handleBodyInput(e: Event) {
 		bodyText = (e.target as HTMLTextAreaElement).value;
-		save();
+		dirty = true;
 	}
 
 	function handleTitleInput(e: Event) {
 		titleText = (e.target as HTMLInputElement).value;
-		save();
+		dirty = true;
 	}
 
 	$effect(() => {
@@ -81,7 +95,7 @@
 		flex-direction: column;
 		height: 100%;
 		background: var(--note-bg);
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 	}
 	.sticky-header {
 		display: flex;
@@ -95,9 +109,9 @@
 		flex: 1;
 		background: none;
 		border: none;
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 9px;
-		color: #0a0a0a;
+		color: var(--ink);
 		outline: none;
 		padding: 2px 0;
 		min-width: 0;
@@ -118,7 +132,7 @@
 		align-items: center;
 		justify-content: center;
 		padding: 0;
-		color: #0a0a0a;
+		color: var(--ink);
 	}
 	.sticky-close:hover {
 		background: rgba(255, 255, 255, 0.5);
@@ -127,10 +141,10 @@
 		flex: 1;
 		background: none;
 		border: none;
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 17px;
 		line-height: 1.35;
-		color: #0a0a0a;
+		color: var(--ink);
 		padding: 8px 10px;
 		resize: none;
 		outline: none;
