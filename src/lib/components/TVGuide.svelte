@@ -15,8 +15,7 @@
 		marqueeLoop = 100,
 		pauseOnHover = false,
 		onOpenChat,
-		onFocusChat,
-		onSubscribe
+		onFocusChat
 	}: {
 		groups: GroupMeta[];
 		bots: Bot[];
@@ -30,7 +29,6 @@
 		pauseOnHover?: boolean;
 		onOpenChat: (group: GroupMeta) => void;
 		onFocusChat: (groupSlug: string) => void;
-		onSubscribe: (group: GroupMeta) => void;
 	} = $props();
 
 	const SLOT_MINUTES = 30;
@@ -350,13 +348,6 @@
 						}}
 					>
 						▸ START<br/>CHAT
-					</button>
-				{:else}
-					<button
-						class="tvg-preview-cta off"
-						onclick={() => { if (featuredGroup) onSubscribe(featuredGroup); }}
-					>
-						NOTIFY<br/>ME
 					</button>
 				{/if}
 			</div>

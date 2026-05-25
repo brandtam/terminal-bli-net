@@ -405,9 +405,7 @@
 		openWindow(windowId);
 	}
 
-	function handleSubscribe(_group: GroupMeta) {
-		// TODO: open email opt-in
-	}
+
 
 	function openTextEditFile(name: string) {
 		const file = findDocByName(name);
@@ -432,8 +430,8 @@
 	function showAlert(spec: AlertSpec) { alertSpec = { ...spec, id: Math.random() }; }
 	function dismissAlert() { alertSpec = null; }
 
-	function setTweak(key: string, value: unknown) {
-		tweaks = { ...tweaks, [key]: value } as TweaksState;
+	function setTweak(key: keyof TweaksState, value: TweaksState[keyof TweaksState]) {
+		tweaks = { ...tweaks, [key]: value };
 		saveTweaks(tweaks);
 	}
 
@@ -656,7 +654,6 @@
 					pauseOnHover={tweaks.tvPauseOnHover}
 					onOpenChat={openChat}
 					onFocusChat={focusChat}
-					onSubscribe={handleSubscribe}
 				/>
 			{:else if w.id.startsWith('chat-')}
 				{@const showSlug = w.id.replace('chat-', '')}
