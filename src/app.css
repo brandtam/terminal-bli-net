@@ -5,7 +5,7 @@
 	--bg: var(--brand-color-teal);
 	--ink: var(--brand-color-ink);
 	--paper: var(--brand-color-paper);
-	--paper-soft: #e9e8df;
+	--paper-soft: var(--brand-color-paper-soft);
 	--accent: var(--brand-color-orange);
 	--accent-2: var(--brand-color-yellow);
 	--shadow: rgba(0, 0, 0, 0.35);
