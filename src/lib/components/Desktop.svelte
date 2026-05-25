@@ -219,7 +219,7 @@
 			stats: { title: 'Stats.app', w: 360, h: 360 },
 			error: { title: 'System Error', w: 420, h: 260 },
 			trash: { title: 'Trash — empty', w: 380, h: 320 },
-			recorder: { title: 'Recorder.app', w: 360, h: 480 },
+			recorder: { title: 'Camera.app', w: 360, h: 480 },
 			'about-recorder': { title: 'About Recorder', w: 420, h: 360 }
 		};
 		if (id.startsWith('chat-')) {
@@ -320,9 +320,7 @@
 		// TODO: open email opt-in
 	}
 
-	function handleRecClick() {
-		openWindow('recorder');
-	}
+	let cameraRecording = $state(false);
 
 	const activeChatGroupSlug = $derived.by(() => {
 		const chatWindow = windows.find((w) => w.id.startsWith('chat-'));
@@ -461,7 +459,7 @@
 		app={activeApp}
 		{os}
 		openWindows={windows.length}
-		onRecClick={handleRecClick}
+		isRecording={cameraRecording}
 		contextInfo={chatContextInfo}
 		{now}
 		{timezone}
@@ -487,6 +485,9 @@
 			</DesktopIcon>
 			<DesktopIcon label="Stickies" ondblclick={() => createStickyNote()}>
 				<PixelIcon kind="stickies" />
+			</DesktopIcon>
+			<DesktopIcon label="Camera.app" ondblclick={() => openWindow('recorder')}>
+				<PixelIcon kind="tv" />
 			</DesktopIcon>
 			<DesktopIcon label="Stats.app" ondblclick={() => openWindow('stats')}>
 				<PixelIcon kind="calc" />
@@ -653,7 +654,7 @@
 			{:else if w.id === 'trash'}
 				<TrashWindow />
 			{:else if w.id === 'recorder'}
-				<RecorderWindow />
+				<RecorderWindow bind:recording={cameraRecording} />
 			{:else if w.id.startsWith('sticky-')}
 				{@const noteId = w.id.replace('sticky-', '')}
 				{@const note = stickyNotes.find((n) => n.id === noteId)}

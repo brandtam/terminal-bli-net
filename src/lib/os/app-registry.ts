@@ -231,17 +231,17 @@ export const APPS: Record<string, AppDef> = {
 
 	recorder: {
 		id: 'recorder',
-		name: 'Recorder',
-		filename: 'Recorder.app',
+		name: 'Camera',
+		filename: 'Camera.app',
 		about: {
-			title: 'Recorder',
+			title: 'Camera',
 			version: 'v1.0',
 			tagline: 'record short clips from your webcam',
 			glyph: 'REC',
 			glyphBg: 'var(--accent)',
 			glyphFg: 'var(--paper)',
 			sections: [
-				{ h: 'WHAT IT IS', body: 'A camcorder in your menu bar. Click REC, look at the camera, record up to 10 seconds. Clips are saved locally in your browser.' },
+				{ h: 'WHAT IT IS', body: 'A camcorder on your desktop. Open Camera, look at the lens, record up to 10 seconds. Clips are saved locally in your browser.' },
 				{ h: 'LIMITS', body: 'Max 10 seconds per clip. Max 5 clips stored. Everything lives in localStorage so keep it short.' },
 			],
 		},
@@ -252,7 +252,7 @@ export const APPS: Record<string, AppDef> = {
 				{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() },
 			]},
 			{ label: 'Help', items: [
-				{ type: 'action', label: 'About Recorder', action: () => os.openAbout('recorder') },
+				{ type: 'action', label: 'About Camera', action: () => os.openAbout('recorder') },
 			]},
 		],
 		statusExtra: () => null,
