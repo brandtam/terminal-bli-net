@@ -13,8 +13,11 @@
 		loadTimezone,
 		saveTimezone,
 		isFirstVisit,
-		appRead
+		appRead,
+		loadAliases,
+		saveAliases
 	} from '$lib/persistence';
+	import type { DesktopAlias } from '$lib/persistence';
 	import Window from './Window.svelte';
 	import MenuBar from './MenuBar.svelte';
 	import DesktopIcon from './DesktopIcon.svelte';
@@ -146,6 +149,7 @@
 	let isMobile = $state(false);
 
 	let stickyNotes = $state<StickyNote[]>([]);
+	let aliases = $state<DesktopAlias[]>([]);
 
 	function stickyFromFile(f: FSFile): StickyNote {
 		try {
@@ -235,12 +239,31 @@
 		updateStickyNote({ ...note, color });
 	}
 
+	function createAlias(name: string, appId: string, icon: string) {
+		if (aliases.some((a) => a.appId === appId)) return;
+		const id = `alias-${appId}-${Date.now()}`;
+		aliases = [...aliases, { id, label: name, appId, icon }];
+		saveAliases(aliases);
+	}
+
+	function openAlias(alias: DesktopAlias) {
+		if (alias.appId === 'tvguide') openWindow('tv-guide');
+		else if (alias.appId === 'stickies') createStickyNote();
+		else if (alias.appId === 'recorder') openWindow('recorder');
+		else if (alias.appId === 'stats') openWindow('stats');
+		else if (alias.appId === 'error') openWindow('error');
+		else if (alias.appId === 'system-prefs') os.openSystemPreferences();
+		else if (alias.appId === 'about-terminal') os.openAbout(null);
+		else openWindow(alias.appId);
+	}
+
 	onMount(() => {
 		tweaks = loadTweaks();
 		timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 		isMobile = window.innerWidth < 720;
 		seedFilesystem(); // seed filesystem default files
 		stickyNotes = loadStickyNotes();
+		aliases = loadAliases();
 
 		fetch('/api/data')
 			.then((res) => (res.ok ? res.json() : null))
@@ -736,18 +759,11 @@
 			</div>
 
 			<div class="desktop-icons right">
-				<DesktopIcon label="Stickies" alias ondblclick={() => createStickyNote()}>
-					<PixelIcon kind="stickies" />
-				</DesktopIcon>
-				<DesktopIcon label="Camera.app" alias ondblclick={() => openWindow('recorder')}>
-					<PixelIcon kind="tv" />
-				</DesktopIcon>
-				<DesktopIcon label="Stats.app" alias ondblclick={() => openWindow('stats')}>
-					<PixelIcon kind="calc" />
-				</DesktopIcon>
-				<DesktopIcon label="DO_NOT_OPEN" alias ondblclick={() => openWindow('error')}>
-					<PixelIcon kind="floppy" />
-				</DesktopIcon>
+				{#each aliases as a (a.id)}
+					<DesktopIcon label={a.label} alias ondblclick={() => openAlias(a)}>
+						<PixelIcon kind={a.icon} />
+					</DesktopIcon>
+				{/each}
 				<DesktopIcon label="Trash" ondblclick={() => openWindow('trash')}>
 					<PixelIcon kind="trash" />
 				</DesktopIcon>
@@ -848,7 +864,7 @@
 						<StickiesNote {note} ondelete={deleteStickyNote} onupdate={updateStickyNote} />
 					{/if}
 				{:else if w.id === 'finder'}
-					<FinderWindow {os} />
+					<FinderWindow {os} onmakealias={createAlias} />
 				{:else}
 					<div class="window-content">
 						<p>Coming soon...</p>
