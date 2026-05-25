@@ -1,25 +1,54 @@
-<script>
-  import { page } from '$app/stores';
-
+<script lang="ts">
+	import { page } from '$app/state';
 </script>
 
+<div class="error-screen">
+	<div class="error-box">
+		<div class="error-icon">⚠</div>
+		<div class="error-content">
+			<h1>System Error {page.status}</h1>
+			<p>{page.error?.message ?? 'Something went wrong.'}</p>
+			<a href="/" class="btn">← Back to desktop</a>
+		</div>
+	</div>
+</div>
 
-<!--
-  This example requires updating your template:
-
-  ```
-  <html class="h-full">
-  <body class="h-full">
-  ```
--->
-<main class="relative isolate min-h-full">
-  <img src="https://images.unsplash.com/photo-1545972154-9bb223aac798?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=3050&q=80&exp=8&con=-15&sat=-75" alt="" class="absolute inset-0 -z-10 h-full w-full object-cover object-top">
-  <div class="mx-auto max-w-7xl px-6 py-32 text-center sm:py-40 lg:px-8">
-    <p class="text-base text-white">{$page.status}</p>
-    <h1 class="mt-4 text-3xl  text-white sm:text-5xl">Page {$page.error?.message}</h1>
-    <p class="mt-4 text-base text-white/70 sm:mt-6">Sorry, we couldn’t find the page you’re looking for.</p>
-    <div class="mt-10 flex justify-center">
-      <a href="/" class="text-sm  text-white"><span aria-hidden="true">&larr;</span> Back to home</a>
-    </div>
-  </div>
-</main>
+<style>
+	.error-screen {
+		height: 100vh;
+		display: grid;
+		place-items: center;
+		background: var(--bg);
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
+	}
+	.error-box {
+		background: var(--paper);
+		border: 2px solid var(--ink);
+		box-shadow: 4px 4px 0 var(--shadow);
+		padding: 24px;
+		display: flex;
+		gap: 16px;
+		max-width: 420px;
+	}
+	.error-icon {
+		width: 44px;
+		height: 44px;
+		background: var(--ink);
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		color: var(--paper);
+		font-size: 28px;
+		flex-shrink: 0;
+	}
+	h1 {
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
+		font-size: 11px;
+		margin: 0 0 8px;
+	}
+	p {
+		font-family: var(--brand-font-body, 'VT323', monospace);
+		font-size: 18px;
+		margin: 0 0 16px;
+	}
+</style>
