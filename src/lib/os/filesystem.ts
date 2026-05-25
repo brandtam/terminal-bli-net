@@ -56,17 +56,17 @@ function seed(): Record<string, FSNode> {
 let _cache: Record<string, FSNode> | null = null;
 
 function load(): Record<string, FSNode> {
-	if (_cache) return _cache;
+	if (_cache) return { ..._cache };
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) { _cache = seed(); return _cache; }
+		if (!raw) { _cache = seed(); return { ..._cache }; }
 		const parsed = JSON.parse(raw) as Record<string, FSNode>;
-		if (!parsed[ROOT_ID]) { _cache = seed(); return _cache; }
+		if (!parsed[ROOT_ID]) { _cache = seed(); return { ..._cache }; }
 		_cache = parsed;
-		return _cache;
+		return { ..._cache };
 	} catch {
 		_cache = seed();
-		return _cache;
+		return { ..._cache };
 	}
 }
 

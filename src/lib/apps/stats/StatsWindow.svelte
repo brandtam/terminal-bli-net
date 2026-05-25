@@ -16,6 +16,6 @@
 <style>
 	.stats { padding: 14px; font-family: var(--brand-font-display, 'Press Start 2P', monospace); font-size: 10px; line-height: 1.5; display: grid; gap: 8px; }
 	.row { display: flex; justify-content: space-between; border-bottom: 1px dotted var(--ink); padding-bottom: 6px; align-items: baseline; }
-	.n { font-size: 22px; }
+	.n { font-family: var(--brand-font-body, 'VT323', monospace); font-size: 22px; }
 	.footnote { font-family: var(--brand-font-body, 'VT323', monospace); font-size: 16px; margin-top: 4px; opacity: 0.8; }
 </style>

@@ -19,7 +19,7 @@
 		display: grid;
 		place-items: center;
 		background: var(--bg);
-		font-family: 'Pixelify Sans', sans-serif;
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
 	}
 	.error-box {
 		background: var(--paper);
@@ -42,12 +42,12 @@
 		flex-shrink: 0;
 	}
 	h1 {
-		font-family: 'Press Start 2P', monospace;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 11px;
 		margin: 0 0 8px;
 	}
 	p {
-		font-family: 'VT323', monospace;
+		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 18px;
 		margin: 0 0 16px;
 	}
