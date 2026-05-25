@@ -360,7 +360,6 @@
 						class="tvg-cell tvg-ep-cell"
 						class:now={cell.isLive && cell.startSlot === 0}
 						class:live={cell.isLive}
-						class:off-air={!cell.isLive}
 						class:featured={isFeatured}
 						class:alt={isAlt}
 						style="grid-column: {cell.startSlot + 2} / span {cell.span}; grid-row: {chIdx + 2};"
@@ -418,7 +417,6 @@
 		--tvg-alt: #6b0000;
 		--tvg-alt-dark: #2a0000;
 		--tvg-alt-border: #aa2929;
-		--tvg-alt-dim: #3a0000;
 		--tvg-hover: #2929cc;
 		--tvg-off: #888;
 		--tvg-off-border: #555;
@@ -678,16 +676,8 @@
 		background: var(--tvg-alt);
 		border-right-color: var(--tvg-alt-border);
 	}
-	.tvg-ep-cell.off-air {
-		opacity: 0.45;
-	}
-	.tvg-ep-cell.off-air.alt {
-		background: var(--tvg-alt-dim);
-	}
-
 	.tvg-ep-cell:hover {
 		background: var(--tvg-hover);
-		opacity: 1;
 	}
 	.tvg-ep-cell.alt:hover {
 		background: var(--tvg-alt-border);
