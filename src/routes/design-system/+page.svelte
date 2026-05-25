@@ -12,13 +12,13 @@
 	];
 
 	const colors = [
-		{ name: '--ink', token: 'var(--ink)', desc: 'Primary foreground' },
-		{ name: '--paper', token: 'var(--paper)', desc: 'Primary background' },
-		{ name: '--paper-soft', token: 'var(--paper-soft)', desc: 'Soft background' },
-		{ name: '--accent', token: 'var(--accent)', desc: 'Orange accent' },
-		{ name: '--accent-2', token: 'var(--accent-2)', desc: 'Yellow accent' },
-		{ name: '--bg', token: 'var(--bg)', desc: 'Desktop teal' },
-		{ name: '--shadow', token: 'var(--shadow)', desc: 'Shadow color' }
+		{ name: '--ink', cssVar: 'var(--ink)', desc: 'Primary foreground' },
+		{ name: '--paper', cssVar: 'var(--paper)', desc: 'Primary background' },
+		{ name: '--paper-soft', cssVar: 'var(--paper-soft)', desc: 'Soft background' },
+		{ name: '--accent', cssVar: 'var(--accent)', desc: 'Orange accent' },
+		{ name: '--accent-2', cssVar: 'var(--accent-2)', desc: 'Yellow accent' },
+		{ name: '--bg', cssVar: 'var(--bg)', desc: 'Desktop teal' },
+		{ name: '--shadow', cssVar: 'var(--shadow)', desc: 'Shadow color' }
 	];
 
 	const iconKinds = ['hd', 'folder', 'tv', 'doc', 'trash', 'calc', 'floppy', 'guide'];
@@ -40,7 +40,7 @@
 		<div class="swatch-grid">
 			{#each colors as c}
 				<div class="swatch-card">
-					<div class="swatch-block" style="background: {c.token};"></div>
+					<div class="swatch-block" style="background: {c.cssVar};"></div>
 					<code class="swatch-name">{c.name}</code>
 					<span class="swatch-desc">{c.desc}</span>
 				</div>

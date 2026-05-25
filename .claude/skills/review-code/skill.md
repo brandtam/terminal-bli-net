@@ -39,9 +39,9 @@ This review covers three layers: **architecture**, **design system**, and **code
 
 ## 2. Design system
 
-### Tokens — always use CSS custom properties, never hardcode values
+### Themes — always use CSS custom properties, never hardcode values
 - [ ] Colors use `var(--ink)`, `var(--paper)`, `var(--accent)`, `var(--accent-2)`, `var(--paper-soft)`, `var(--bg)`, `var(--shadow)` — not hex literals for structural colors
-- [ ] Chrome elements use `var(--chrome-*)` tokens: `--chrome-menubar-bg`, `--chrome-menubar-fg`, `--chrome-menubar-hover-bg`, `--chrome-menubar-hover-fg`, `--chrome-window-border-color`, `--chrome-window-bg`, `--chrome-titlebar-bg`
+- [ ] Chrome elements use `var(--chrome-*)` theme variables: `--chrome-menubar-bg`, `--chrome-menubar-fg`, `--chrome-menubar-hover-bg`, `--chrome-menubar-hover-fg`, `--chrome-window-border-color`, `--chrome-window-bg`, `--chrome-titlebar-bg`
 - [ ] Fonts use `var(--brand-font-ui)`, `var(--brand-font-display)`, `var(--brand-font-body)` with fallbacks — or the direct font names with correct usage:
   - `'Press Start 2P'` — labels, headings, UI chrome (small sizes: 8-11px)
   - `'VT323'` — body text, chat, descriptions (larger sizes: 16-22px)
