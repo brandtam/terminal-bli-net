@@ -40,7 +40,8 @@ export default [
 				EventSource: 'readonly',
 				CustomEvent: 'readonly',
 				ResizeObserver: 'readonly',
-				requestAnimationFrame: 'readonly'
+				requestAnimationFrame: 'readonly',
+				KVNamespace: 'readonly'
 			}
 		},
 		plugins: {
