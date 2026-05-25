@@ -31,7 +31,7 @@
 <div class="ds-page" data-os-theme="system7">
 	<header class="ds-header">
 		<h1>Design System</h1>
-		<p>Living style guide for Terminal — the retro TV chat experience.</p>
+		<p>Living style guide for Terminal — previously on screens...</p>
 	</header>
 
 	<!-- Color Palette -->
