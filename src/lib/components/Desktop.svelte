@@ -491,6 +491,25 @@
 		return undefined;
 	});
 
+	/** Map real window IDs back to symbolic Dock item IDs for active indicators */
+	const dockOpenIds = $derived.by(() => {
+		const ids = windows.map((w) => w.id);
+		if (windows.some((w) => w.id.startsWith('chat-'))) ids.push('chat');
+		if (windows.some((w) => {
+			if (!w.id.startsWith('textedit-')) return false;
+			const fileId = w.id.replace('textedit-', '');
+			const file = readFile(fileId);
+			return file?.name === 'Pricing.txt';
+		})) ids.push('pricing');
+		if (windows.some((w) => {
+			if (!w.id.startsWith('textedit-')) return false;
+			const fileId = w.id.replace('textedit-', '');
+			const file = readFile(fileId);
+			return file?.name === 'README.TXT';
+		})) ids.push('readme');
+		return ids;
+	});
+
 	function focusChat(groupSlug: string) {
 		const chatWindow = windows.find((w) => w.id === `chat-${groupSlug}`);
 		if (chatWindow) {
@@ -763,7 +782,7 @@
 		</Window>
 	{/each}
 
-	<Dock onopen={openWindow} openIds={windows.map((w) => w.id)} />
+	<Dock onopen={openWindow} openIds={dockOpenIds} />
 
 	{#if alertSpec}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
