@@ -4,10 +4,13 @@
 		list,
 		getNode,
 		onFsChange,
+		createAlias,
+		resolveAlias,
 		ROOT_ID,
 		TRASH_ID,
 		SYSTEM_ID,
 		APPS_ID,
+		DESKTOP_ID,
 		RECORDINGS_ID
 	} from '$lib/os/filesystem';
 	import type { FSNode, FSFile } from '$lib/os/filesystem';
@@ -15,12 +18,10 @@
 
 	let {
 		folderId: initialFolderId = ROOT_ID,
-		os,
-		onmakealias
+		os
 	}: {
 		folderId?: string;
 		os: OsApi;
-		onmakealias?: (name: string, appId: string, icon: string) => void;
 	} = $props();
 
 	let currentFolderId = $state(initialFolderId);
@@ -48,10 +49,16 @@
 	});
 
 	function iconKind(node: FSNode): string {
+		if (node.type === 'alias') {
+			const target = resolveAlias(node);
+			if (target) return iconKind(target);
+			return 'doc';
+		}
 		if (node.type === 'folder') {
 			if (node.id === TRASH_ID) return 'trash';
 			if (node.id === SYSTEM_ID) return 'hd';
 			if (node.id === APPS_ID) return 'folder';
+			if (node.id === DESKTOP_ID) return 'folder';
 			if (node.id === RECORDINGS_ID) return 'floppy';
 			return 'folder';
 		}
@@ -82,6 +89,11 @@
 		if (node.type === 'folder') {
 			currentFolderId = node.id;
 			selectedId = null;
+			return;
+		}
+		if (node.type === 'alias') {
+			const target = resolveAlias(node);
+			if (target) handleOpen(target);
 			return;
 		}
 		const file = node as FSFile;
@@ -133,9 +145,13 @@
 	}
 
 	function handleContextMakeAlias() {
-		if (!contextMenuNode || contextMenuNode.type !== 'file') return;
-		const file = contextMenuNode as FSFile;
-		onmakealias?.(file.name, file.appId, iconKind(contextMenuNode));
+		if (!contextMenuNode) return;
+		const name = contextMenuNode.name + ' alias';
+		try {
+			createAlias(currentFolderId, name, contextMenuNode.id);
+		} catch {
+			// alias already exists or other error
+		}
 		closeContextMenu();
 	}
 </script>
@@ -165,6 +181,9 @@
 				<div class="finder-item-icon">
 					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
 				</div>
+				{#if node.type === 'alias'}
+					<span class="alias-badge">&#x21A9;</span>
+				{/if}
 				<div class="finder-item-label">{node.name}</div>
 			</div>
 		{/each}
@@ -186,7 +205,7 @@
 		>
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="context-menu-item" onclick={handleContextOpen}>Open</div>
-			{#if contextMenuNode.type === 'file'}
+			{#if contextMenuNode.type === 'file' || contextMenuNode.type === 'alias'}
 				<div class="context-menu-sep"></div>
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div class="context-menu-item" onclick={handleContextMakeAlias}>Make Alias</div>
@@ -282,6 +301,14 @@
 	.finder-item-icon :global(.pixel-icon) {
 		width: 42px;
 		height: 42px;
+	}
+
+	.alias-badge {
+		font-size: 10px;
+		line-height: 1;
+		margin-top: -6px;
+		color: var(--ink, #0a0a0a);
+		opacity: 0.6;
 	}
 
 	.finder-item-label {
