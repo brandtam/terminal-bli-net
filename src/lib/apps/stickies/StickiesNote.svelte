@@ -67,7 +67,7 @@
 </script>
 
 <div class="sticky-note" style:--note-bg={colorDef.bg}>
-	<div class="sticky-drag-strip">
+	<div class="sticky-drag-strip" data-drag-handle>
 		<button class="sticky-close" onclick={() => ondelete(note.id)} title="Delete note"></button>
 	</div>
 	<textarea class="sticky-body" value={bodyText} oninput={handleBodyInput} placeholder="type here…"
