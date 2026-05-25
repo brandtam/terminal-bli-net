@@ -10,6 +10,12 @@
 		duration: number;
 	}
 
+	let {
+		recording = $bindable(false)
+	}: {
+		recording?: boolean;
+	} = $props();
+
 	const MAX_DURATION = 10;
 	const MAX_RECORDINGS = 5;
 
@@ -24,6 +30,8 @@
 	let playbackEl: HTMLVideoElement | undefined = $state(undefined);
 	let chunks: Blob[] = [];
 	let timerInterval: ReturnType<typeof setInterval> | null = null;
+
+	$effect(() => { recording = isRecording; });
 
 	function persist() {
 		appWrite('recorder', 'recordings', recordings);
