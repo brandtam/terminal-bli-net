@@ -9,6 +9,7 @@
 		channels,
 		timezone,
 		now,
+		slotNow,
 		activeChatGroupSlug = null,
 		gridLoop = 400,
 		marqueeLoop = 100,
@@ -22,6 +23,7 @@
 		channels: Channel[];
 		timezone?: string;
 		now: Date;
+		slotNow: Date;
 		activeChatGroupSlug?: string | null;
 		gridLoop?: number;
 		marqueeLoop?: number;
@@ -170,8 +172,8 @@
 	let paused = $state(false);
 	let featured = $state<FeaturedShow | null>(null);
 
-	let slots = $derived(buildTimeSlots(now, timezone));
-	let currentSlotIdx = $derived(getSlotIndex(now, timezone));
+	let slots = $derived(buildTimeSlots(slotNow, timezone));
+	let currentSlotIdx = $derived(getSlotIndex(slotNow, timezone));
 
 	let sortedChannels = $derived(
 		[...channels].sort((a, b) => a.number - b.number)
@@ -187,7 +189,7 @@
 	let marqueeText = $derived.by(() => {
 		const nowPlaying: string[] = [];
 		for (const channel of sortedChannels) {
-			const slot = getCurrentSlot(channel, now, timezone);
+			const slot = getCurrentSlot(channel, slotNow, timezone);
 			if (slot) {
 				const show = groups.find(g => g.slug === slot.showSlug);
 				const epInfo = getEpisodeInfo(slot);
@@ -261,7 +263,7 @@
 	});
 
 	function selectFeaturedFromChannel(channel: Channel) {
-		const slot = getCurrentSlot(channel, now, timezone);
+		const slot = getCurrentSlot(channel, slotNow, timezone);
 		if (slot) {
 			const epInfo = getEpisodeInfo(slot);
 			featured = {
@@ -304,7 +306,7 @@
 	}
 
 	function handleCellDblClick(cell: MergedCell) {
-		if (!isShowOnAir(cell.showSlug, channels, now, timezone)) return;
+		if (!isShowOnAir(cell.showSlug, channels, slotNow, timezone)) return;
 		const group = groups.find(g => g.slug === cell.showSlug);
 		if (!group) return;
 		onOpenChat(group);
@@ -317,7 +319,7 @@
 		{@const feat = featured}
 		{@const featuredGroup = groups.find((g) => g.slug === feat.showSlug)}
 		{@const featuredBots = featuredGroup ? getGroupBots(featuredGroup) : []}
-		{@const liveNow = isShowOnAir(feat.showSlug, channels, now, timezone)}
+		{@const liveNow = isShowOnAir(feat.showSlug, channels, slotNow, timezone)}
 		<div class="tvg-preview">
 			<div class="tvg-preview-bar">
 				<span class="tvg-preview-net">{feat.net} · CHANNEL {feat.ch}</span>
@@ -365,7 +367,7 @@
 	<div class="tvg-datebar">
 		<span class="tvg-datebar-date">{formatGuideDate(now, timezone)}</span>
 		<span class="tvg-datebar-live">
-			{#if sortedChannels.some((ch) => getCurrentSlot(ch, now, timezone) !== null)}
+			{#if sortedChannels.some((ch) => getCurrentSlot(ch, slotNow, timezone) !== null)}
 				<span class="tvg-now-dot live">●</span>LIVE @ {formatLiveClock(now, timezone)}
 			{:else}
 				<span class="tvg-now-dot">●</span>OFF AIR · {formatLiveClock(now, timezone)}
@@ -403,7 +405,7 @@
 			<!-- Channel rows -->
 			{#each schedule as { channel, cells }, chIdx}
 				{@const isAlt = chIdx % 2 === 1}
-				{@const currentShowSlug = getCurrentSlot(channel, now, timezone)?.showSlug ?? null}
+				{@const currentShowSlug = getCurrentSlot(channel, slotNow, timezone)?.showSlug ?? null}
 				<!-- svelte-ignore a11y_click_events_have_key_events -->
 				<div
 					class="tvg-cell tvg-ch-cell"
