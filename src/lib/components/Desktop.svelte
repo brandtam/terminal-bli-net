@@ -729,28 +729,22 @@
 				<DesktopIcon label="Terminal HD" ondblclick={() => openWindow('finder')}>
 					<PixelIcon kind="hd" />
 				</DesktopIcon>
-				<DesktopIcon label="TV Guide.app" ondblclick={() => openWindow('tv-guide')}>
+				<DesktopIcon label="TV Guide.app" alias ondblclick={() => openWindow('tv-guide')}>
 					<PixelIcon kind="tvguide" />
-				</DesktopIcon>
-				<DesktopIcon label="README.txt" ondblclick={() => openTextEditFile('README.TXT')}>
-					<PixelIcon kind="doc" />
 				</DesktopIcon>
 			</div>
 
 			<div class="desktop-icons right">
-				<DesktopIcon label="Pricing.txt" ondblclick={() => openTextEditFile('Pricing.txt')}>
-					<PixelIcon kind="doc" accent />
-				</DesktopIcon>
-				<DesktopIcon label="Stickies" ondblclick={() => createStickyNote()}>
+				<DesktopIcon label="Stickies" alias ondblclick={() => createStickyNote()}>
 					<PixelIcon kind="stickies" />
 				</DesktopIcon>
-				<DesktopIcon label="Camera.app" ondblclick={() => openWindow('recorder')}>
+				<DesktopIcon label="Camera.app" alias ondblclick={() => openWindow('recorder')}>
 					<PixelIcon kind="tv" />
 				</DesktopIcon>
-				<DesktopIcon label="Stats.app" ondblclick={() => openWindow('stats')}>
+				<DesktopIcon label="Stats.app" alias ondblclick={() => openWindow('stats')}>
 					<PixelIcon kind="calc" />
 				</DesktopIcon>
-				<DesktopIcon label="DO_NOT_OPEN" ondblclick={() => openWindow('error')}>
+				<DesktopIcon label="DO_NOT_OPEN" alias ondblclick={() => openWindow('error')}>
 					<PixelIcon kind="floppy" />
 				</DesktopIcon>
 				<DesktopIcon label="Trash" ondblclick={() => openWindow('trash')}>
@@ -770,6 +764,7 @@
 				height={w.h}
 				z={w.z}
 				active={activeId === w.id}
+				chromeless={w.id.startsWith('sticky-')}
 				onfocus={focusWindow}
 				onclose={closeWindow}
 				onmove={moveWindow}
