@@ -257,7 +257,7 @@
 			windows = saved;
 			normalizeZOrder();
 		} else if (isFirstVisit()) {
-			openWindow('tv-guide');
+			openWindow('welcome');
 		}
 
 		const hash = window.location.hash.slice(1);
