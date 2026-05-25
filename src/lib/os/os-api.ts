@@ -120,8 +120,7 @@ export const WINDOW_APP_MAP: Record<string, string> = {
 	finder: 'finder',
 	'tv-guide': 'tvguide',
 	'tvguide-prefs': 'tvguide',
-	pricing: 'textedit',
-	readme: 'textedit',
+	'chatrbot-prefs': 'chatrbot',
 	stats: 'stats',
 	about: 'finder',
 	'about-chatrbot': 'chatrbot',
@@ -139,5 +138,6 @@ export function windowAppId(windowId: string): string {
 	if (windowId.startsWith('chat-')) return 'chatrbot';
 	if (windowId.startsWith('sticky-')) return 'stickies';
 	if (windowId.startsWith('textedit-')) return 'textedit';
+	if (windowId.startsWith('recorder-')) return 'recorder';
 	return WINDOW_APP_MAP[windowId] || 'finder';
 }
