@@ -17,6 +17,7 @@
 	} from '$lib/os/filesystem';
 	import type { FSNode, FSFile } from '$lib/os/filesystem';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
+	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 
 	let {
 		folderId = ROOT_ID,
@@ -68,13 +69,7 @@
 			return 'folder';
 		}
 		const file = node as FSFile;
-		if (file.appId === 'recorder') return 'tv';
-		if (file.appId === 'stickies') return 'stickies';
-		if (file.appId === 'tvguide') return 'tvguide';
-		if (file.appId === 'stats') return 'calc';
-		if (file.appId === 'error') return 'floppy';
-		if (file.appId === 'system-prefs') return 'hd';
-		if (file.appId === 'about-terminal') return 'doc';
+		if (file.appId) return getAppIconKind(file.appId);
 		return 'doc';
 	}
 
@@ -102,25 +97,39 @@
 			return;
 		}
 		const file = node as FSFile;
-		if (file.appId === 'textedit') {
-			os.openWindow(`textedit-${file.id}`);
-		} else if (file.appId === 'recorder') {
-			os.openWindow(`recorder-${file.id}`);
-		} else if (file.appId === 'stickies') {
-			os.launchApp('stickies', { action: 'new' });
-		} else if (file.appId === 'tvguide') {
-			os.openWindow('tv-guide');
-		} else if (file.appId === 'stats') {
-			os.openWindow('stats');
-		} else if (file.appId === 'error') {
-			os.openWindow('error');
-		} else if (file.appId === 'system-prefs') {
-			os.openSystemPreferences();
-		} else if (file.appId === 'about-terminal') {
-			os.openAbout(null);
-		} else {
+		const appId = file.appId;
+		if (!appId) {
 			os.openWindow(file.id);
+			return;
 		}
+		// Files that open by their file ID (documents)
+		if (appId === 'textedit') {
+			os.openWindow(`textedit-${file.id}`);
+			return;
+		}
+		if (appId === 'recorder') {
+			os.openWindow(`recorder-${file.id}`);
+			return;
+		}
+		if (appId === 'stickies') {
+			os.launchApp('stickies', { action: 'new' });
+			return;
+		}
+		if (appId === 'system-prefs') {
+			os.openSystemPreferences();
+			return;
+		}
+		if (appId === 'about-terminal') {
+			os.openAbout(null);
+			return;
+		}
+		// Generic: look up window ID from AppLibrary
+		const windowId = getAppWindowId(appId);
+		if (windowId) {
+			os.openWindow(windowId);
+			return;
+		}
+		os.openWindow(file.id);
 	}
 
 	function navigateTo(id: string) {

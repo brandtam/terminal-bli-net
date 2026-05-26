@@ -58,6 +58,7 @@
 	import TVGuidePrefs from './TVGuidePrefs.svelte';
 	import ChatrbotPrefs from './ChatrbotPrefs.svelte';
 	import { seedFilesystem } from '$lib/os/filesystem-seed';
+	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 
 	const SYS7_PATTERNS = [
 		'128',
@@ -257,14 +258,32 @@
 		}
 		if (node.type === 'file') {
 			const file = node as FSFile;
-			if (file.appId === 'tvguide') openWindow('tv-guide');
-			else if (file.appId === 'stickies') createStickyNote();
-			else if (file.appId === 'recorder') openWindow('recorder');
-			else if (file.appId === 'stats') openWindow('stats');
-			else if (file.appId === 'error') openWindow('error');
-			else if (file.appId === 'system-prefs') os.openSystemPreferences();
-			else if (file.appId === 'about-terminal') os.openAbout(null);
-			else openWindow(file.id);
+			const appId = file.appId;
+			if (!appId) {
+				openWindow(file.id);
+				return;
+			}
+			// Special apps need their own handling
+			if (appId === 'stickies') {
+				createStickyNote();
+				return;
+			}
+			if (appId === 'system-prefs') {
+				os.openSystemPreferences();
+				return;
+			}
+			if (appId === 'about-terminal') {
+				os.openAbout(null);
+				return;
+			}
+			// Generic: look up the window ID
+			const windowId = getAppWindowId(appId);
+			if (windowId) {
+				openWindow(windowId);
+				return;
+			}
+			// Fallback for files opened by their app (textedit docs, recordings)
+			openWindow(file.id);
 		}
 	}
 
@@ -276,13 +295,7 @@
 		}
 		if (node.type === 'file') {
 			const file = node as FSFile;
-			if (file.appId === 'tvguide') return 'tvguide';
-			if (file.appId === 'stickies') return 'stickies';
-			if (file.appId === 'recorder') return 'tv';
-			if (file.appId === 'stats') return 'calc';
-			if (file.appId === 'error') return 'floppy';
-			if (file.appId === 'system-prefs') return 'hd';
-			if (file.appId === 'about-terminal') return 'doc';
+			if (file.appId) return getAppIconKind(file.appId);
 			return 'doc';
 		}
 		return 'doc';

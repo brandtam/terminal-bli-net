@@ -149,3 +149,9 @@ export function windowAppId(windowId: string): string {
 	if (windowId.startsWith('recorder-')) return 'recorder';
 	return WINDOW_APP_MAP[windowId] || 'finder';
 }
+
+export {
+	getAppWindowId,
+	getAppIconKind,
+	isSpecialLaunchApp
+} from '$lib/terminalos/apps/app-install';
