@@ -9,7 +9,8 @@ import {
 	saveTweaks,
 	loadTimezone,
 	saveTimezone,
-	isFirstVisit
+	isFirstVisit,
+	clearAllPreferences
 } from '$lib/persistence';
 import { getAppWindowId } from '$lib/terminalos/apps/app-install';
 import type { TerminalFS } from '$lib/terminalos';
@@ -560,6 +561,7 @@ export class OsApiClass implements OsApi {
 					primary: true,
 					action: () => {
 						this.fs.reinstallOS().then(() => {
+							clearAllPreferences();
 							window.location.reload();
 						});
 					}
