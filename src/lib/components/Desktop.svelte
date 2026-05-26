@@ -842,16 +842,23 @@
 		<div class="mobile-footer">terminal.bli.net · one tab, one desktop</div>
 	</div>
 {:else}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="desktop"
 		data-wallpaper={tweaks.wallpaper.startsWith('sys7-') ? undefined : tweaks.wallpaper}
 		style={tweaks.wallpaper.startsWith('sys7-')
 			? `background: url(/themes/system7/wallpapers/${tweaks.wallpaper.replace('sys7-', '')}.png) repeat; image-rendering: pixelated;`
 			: ''}
+		role="toolbar"
+		tabindex="-1"
 		onclick={() => {
 			selectedIconId = null;
 			closeDeskCtx();
+		}}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') {
+				selectedIconId = null;
+				closeDeskCtx();
+			}
 		}}
 		oncontextmenu={(e) => {
 			e.preventDefault();
@@ -914,24 +921,27 @@
 		{/if}
 
 		{#if deskCtxOpen_}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="desktop-context-menu"
+				role="menu"
+				tabindex="-1"
 				bind:this={deskCtxEl}
 				style="left: {deskCtxX}px; top: {deskCtxY}px;"
 				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => {
+					if (e.key === 'Escape') {
+						closeDeskCtx();
+					}
+				}}
 			>
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="desktop-context-item" onclick={deskCtxOpen}>Open</div>
+				<button class="desktop-context-item" onclick={deskCtxOpen}>Open</button>
 				{#if deskCtxCanAlias}
 					<div class="desktop-context-sep"></div>
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="desktop-context-item" onclick={deskCtxMakeAlias}>Make Alias</div>
+					<button class="desktop-context-item" onclick={deskCtxMakeAlias}>Make Alias</button>
 				{/if}
 				{#if deskCtxCanTrash}
 					<div class="desktop-context-sep"></div>
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="desktop-context-item" onclick={deskCtxTrash}>Move to Trash</div>
+					<button class="desktop-context-item" onclick={deskCtxTrash}>Move to Trash</button>
 				{/if}
 			</div>
 		{/if}
@@ -1015,8 +1025,9 @@
 					{@const recFile = readFile(recFileId)}
 					{#if recFile?.data}
 						<div class="recording-playback">
-							<!-- svelte-ignore a11y_media_has_caption -->
-							<video src={recFile.data} controls autoplay class="recording-video"></video>
+							<video src={recFile.data} controls autoplay class="recording-video">
+								<track kind="captions" />
+							</video>
 						</div>
 					{:else}
 						<div class="window-content">
@@ -1042,10 +1053,18 @@
 		<Dock onopen={openWindow} openIds={dockOpenIds} />
 
 		{#if alertSpec}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="system-alert-backdrop" onclick={(e) => e.stopPropagation()}>
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="system-alert window" onclick={(e) => e.stopPropagation()}>
+			<div class="system-alert-backdrop" role="presentation" onclick={(e) => e.stopPropagation()}>
+				<div
+					class="system-alert window"
+					role="alertdialog"
+					tabindex="-1"
+					onclick={(e) => e.stopPropagation()}
+					onkeydown={(e) => {
+						if (e.key === 'Escape') {
+							dismissAlert();
+						}
+					}}
+				>
 					<div class="window-titlebar" style="cursor: default;">
 						<div class="btns">
 							<button class="window-btn close" onclick={dismissAlert} aria-label="close"></button>
@@ -1226,6 +1245,12 @@
 	.desktop-context-item {
 		padding: 4px 12px;
 		cursor: pointer;
+		background: none;
+		border: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		width: 100%;
 	}
 	.desktop-context-item:hover {
 		background: var(--chrome-menubar-hover-bg, var(--ink));

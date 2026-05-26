@@ -22,17 +22,26 @@
 	} = $props();
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="desktop-icon"
 	class:disabled
 	class:alias
 	class:selected
+	role="button"
+	tabindex="0"
 	onclick={(e) => {
 		e.stopPropagation();
 		onselect?.();
 	}}
 	{ondblclick}
+	onkeydown={(e) => {
+		if (e.key === 'Enter') {
+			ondblclick();
+		} else if (e.key === ' ') {
+			e.preventDefault();
+			onselect?.();
+		}
+	}}
 	oncontextmenu={(e) => {
 		if (oncontextmenu) {
 			e.preventDefault();

@@ -19,13 +19,11 @@
 	let open = $state(false);
 	let wrapEl: HTMLDivElement | undefined = $state();
 
-	const selectedLabel = $derived(
-		options.find(o => o.value === value)?.label ?? value
-	);
+	const selectedLabel = $derived(options.find((o) => o.value === value)?.label ?? value);
 
 	onMount(() => {
 		const close = (e: MouseEvent) => {
-			if (open && wrapEl && !wrapEl.contains(e.target as Node)) {
+			if (open && wrapEl && !wrapEl.contains(e.target as HTMLElement)) {
 				open = false;
 			}
 		};
@@ -34,27 +32,24 @@
 	});
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="dropdown-wrap" bind:this={wrapEl}>
-	<button
-		class="dropdown-trigger"
-		class:open
-		onclick={() => (open = !open)}
-	>
+	<button class="dropdown-trigger" class:open onclick={() => (open = !open)}>
 		{selectedLabel} ▾
 	</button>
 	{#if open}
 		<div class="dropdown-menu">
 			{#each options as opt}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div
+				<button
 					class="dropdown-item"
 					class:selected={value === opt.value}
-					onclick={() => { value = opt.value; open = false; }}
+					onclick={() => {
+						value = opt.value;
+						open = false;
+					}}
 				>
 					<span class="dropdown-check">{value === opt.value ? '✓' : ''}</span>
 					<span>{opt.label}</span>
-				</div>
+				</button>
 				{#if separatorAfter.includes(opt.value)}
 					<div class="dropdown-sep"></div>
 				{/if}
@@ -78,7 +73,8 @@
 		white-space: nowrap;
 		letter-spacing: 0.02em;
 	}
-	.dropdown-trigger:hover, .dropdown-trigger.open {
+	.dropdown-trigger:hover,
+	.dropdown-trigger.open {
 		background: var(--chrome-menubar-hover-bg, var(--ink));
 		color: var(--chrome-menubar-hover-fg, var(--paper));
 	}
@@ -105,6 +101,12 @@
 		gap: 6px;
 		padding: 5px 10px;
 		cursor: pointer;
+		background: none;
+		border: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		width: 100%;
 	}
 	.dropdown-item:hover {
 		background: var(--chrome-menubar-hover-bg, var(--ink));

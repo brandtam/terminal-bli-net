@@ -159,26 +159,25 @@
 	onMount(() => {
 		const handler = (e: MouseEvent) => {
 			const target = e.target as HTMLElement;
-			if (tzOpen && !target.closest('.clock-wrap')) tzOpen = false;
+			if (tzOpen && !target.closest('.clock-wrap-outer')) tzOpen = false;
 		};
 		document.addEventListener('mousedown', handler);
 		return () => document.removeEventListener('mousedown', handler);
 	});
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="menubar" onmouseleave={() => (openMenu = null)}>
-	<!-- ● Apple menu — OS-owned, always present -->
+<div class="menubar" role="menubar" tabindex="-1" onmouseleave={() => (openMenu = null)}>
 	<div
 		class="menu-wrapper"
+		role="none"
 		onmouseenter={() => {
 			if (openMenu) openMenu = '__os';
 		}}
 	>
-		<span
+		<button
 			class="apple menu-item"
 			class:open={openMenu === '__os'}
-			onclick={() => (openMenu = openMenu === '__os' ? null : '__os')}>●</span
+			onclick={() => (openMenu = openMenu === '__os' ? null : '__os')}>●</button
 		>
 		{#if openMenu === '__os'}
 			<div class="dropdown">
@@ -186,8 +185,7 @@
 					{#if it.type === 'separator'}
 						<div class="dropdown-sep"></div>
 					{:else}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div
+						<button
 							class="dropdown-item"
 							class:disabled={'disabled' in it && it.disabled}
 							onclick={() => handleMenuItemClick(it)}
@@ -196,7 +194,7 @@
 								>{it.type === 'check' ? `${it.checked ? '✓ ' : '  '}${it.label}` : it.label}</span
 							>
 							{#if 'shortcut' in it && it.shortcut}<span class="shortcut">{it.shortcut}</span>{/if}
-						</div>
+						</button>
 					{/if}
 				{/each}
 			</div>
@@ -210,14 +208,16 @@
 	{#each appMenus as menu}
 		<div
 			class="menu-wrapper"
+			role="none"
 			onmouseenter={() => {
 				if (openMenu) openMenu = menu.label;
 			}}
 		>
-			<span
+			<button
 				class="menu-item"
 				class:open={openMenu === menu.label}
-				onclick={() => (openMenu = openMenu === menu.label ? null : menu.label)}>{menu.label}</span
+				onclick={() => (openMenu = openMenu === menu.label ? null : menu.label)}
+				>{menu.label}</button
 			>
 			{#if openMenu === menu.label}
 				<div class="dropdown">
@@ -225,8 +225,7 @@
 						{#if it.type === 'separator'}
 							<div class="dropdown-sep"></div>
 						{:else}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
+							<button
 								class="dropdown-item"
 								class:disabled={'disabled' in it && it.disabled}
 								onclick={() => handleMenuItemClick(it)}
@@ -239,7 +238,7 @@
 								</span>
 								{#if 'shortcut' in it && it.shortcut}<span class="shortcut">{it.shortcut}</span
 									>{/if}
-							</div>
+							</button>
 						{/if}
 					{/each}
 				</div>
@@ -262,29 +261,38 @@
 			<span class="rec"><span class="rec-dot"></span>REC</span>
 		{/if}
 
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div
-			class="clock-wrap"
-			class:open={tzOpen}
-			onclick={(e) => {
-				e.stopPropagation();
-				tzOpen = !tzOpen;
-				openMenu = null;
-			}}
-			title="Click to change time zone"
-		>
-			<span class="clock">{clock}</span>
-			<span class="tz-badge">{tzLabel}</span>
+		<div class="clock-wrap-outer">
+			<button
+				class="clock-toggle"
+				class:open={tzOpen}
+				onclick={(e) => {
+					e.stopPropagation();
+					tzOpen = !tzOpen;
+					openMenu = null;
+				}}
+				title="Click to change time zone"
+			>
+				<span class="clock">{clock}</span>
+				<span class="tz-badge">{tzLabel}</span>
+			</button>
 			{#if tzOpen}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="tz-picker" onclick={(e) => e.stopPropagation()}>
+				<div
+					class="tz-picker"
+					role="listbox"
+					tabindex="-1"
+					onkeydown={(e) => {
+						if (e.key === 'Escape') tzOpen = false;
+					}}
+					onclick={(e) => e.stopPropagation()}
+				>
 					<div class="tz-picker-head">Time zone</div>
 					{#each TZ_OPTIONS as opt}
 						{@const selected = isSelectedTz(opt.tz, timezone)}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div
+						<button
 							class="tz-item"
 							class:selected
+							role="option"
+							aria-selected={selected}
 							onclick={() => {
 								onSetTimezone?.(opt.tz);
 								tzOpen = false;
@@ -293,7 +301,7 @@
 							<span class="tz-check">{selected ? '✓' : ''}</span>
 							<span class="tz-item-label">{opt.label}</span>
 							<span class="tz-time">{formatTzTime(now, opt.tz)}</span>
-						</div>
+						</button>
 					{/each}
 				</div>
 			{/if}
@@ -441,8 +449,10 @@
 	}
 
 	/* Clock + TZ picker */
-	.clock-wrap {
+	.clock-wrap-outer {
 		position: relative;
+	}
+	.clock-toggle {
 		display: flex;
 		align-items: baseline;
 		gap: 6px;
@@ -452,9 +462,11 @@
 		font-family: var(--brand-font-body, 'VT323', monospace);
 		font-size: 16px;
 		user-select: none;
+		background: none;
+		color: inherit;
 	}
-	.clock-wrap:hover,
-	.clock-wrap.open {
+	.clock-toggle:hover,
+	.clock-toggle.open {
 		background: var(--chrome-menubar-hover-bg, var(--ink));
 		color: var(--chrome-menubar-hover-fg, var(--paper));
 		border-color: var(--chrome-menubar-hover-bg, var(--ink));
@@ -470,8 +482,8 @@
 		opacity: 0.5;
 		letter-spacing: 0.04em;
 	}
-	.clock-wrap:hover .tz-badge,
-	.clock-wrap.open .tz-badge {
+	.clock-toggle:hover .tz-badge,
+	.clock-toggle.open .tz-badge {
 		opacity: 0.8;
 	}
 	.tz-picker {
@@ -534,5 +546,36 @@
 	}
 	.tz-item:hover .tz-time {
 		opacity: 0.85;
+	}
+
+	button.menu-item {
+		background: none;
+		border: none;
+		font: inherit;
+		color: inherit;
+		cursor: pointer;
+		padding: 2px 6px;
+		margin: 0;
+		line-height: inherit;
+	}
+
+	button.dropdown-item {
+		background: none;
+		border: none;
+		font: inherit;
+		color: inherit;
+		cursor: pointer;
+		text-align: left;
+		width: 100%;
+	}
+
+	button.tz-item {
+		background: none;
+		border: none;
+		font: inherit;
+		color: inherit;
+		cursor: pointer;
+		text-align: left;
+		width: 100%;
 	}
 </style>
