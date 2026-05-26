@@ -34,13 +34,16 @@
 	let selectedId = $state<string | null>(null);
 
 	let folderView = $state<ReturnType<typeof createFolderView> | null>(null);
+	let prevFolderView: ReturnType<typeof createFolderView> | null = null;
 
 	$effect(() => {
-		folderView?.destroy();
-		folderView = createFolderView(fs, currentFolderId);
+		prevFolderView?.destroy();
+		const view = createFolderView(fs, currentFolderId);
+		prevFolderView = view;
+		folderView = view;
 	});
 
-	onDestroy(() => folderView?.destroy());
+	onDestroy(() => prevFolderView?.destroy());
 
 	const items = $derived(folderView?.items ?? []);
 
