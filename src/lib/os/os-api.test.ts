@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TerminalFS } from '$lib/terminalos';
 
 // Mock persistence so nothing touches localStorage

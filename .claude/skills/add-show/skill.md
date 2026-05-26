@@ -1,5 +1,5 @@
 ---
-description: "Add a new TV show with cast and episode catalog to the bots/ directory"
+description: 'Add a new TV show with cast and episode catalog to the bots/ directory'
 ---
 
 # Add Show
@@ -95,14 +95,14 @@ Note: Do NOT include a `schedule` field. That is legacy and not added to new sho
 
 ```json
 {
-  "id": "{character-id}",
-  "group": "{slug}",
-  "name": "{full name}",
-  "occupation": "{occupation}",
-  "image": "/bots/{slug}/{character-id}.jpg",
-  "bio": "{bio}",
-  "greeting": "{greeting}",
-  "prompt": "{the full prompt text}"
+	"id": "{character-id}",
+	"group": "{slug}",
+	"name": "{full name}",
+	"occupation": "{occupation}",
+	"image": "/bots/{slug}/{character-id}.jpg",
+	"bio": "{bio}",
+	"greeting": "{greeting}",
+	"prompt": "{the full prompt text}"
 }
 ```
 

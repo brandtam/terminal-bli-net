@@ -126,13 +126,11 @@
 	<!-- Dropdown -->
 	<section class="ds-section">
 		<h2>Dropdown</h2>
-		<p class="ds-desc">Reusable dropdown with checkmark selection. Supports separator lines between groups.</p>
+		<p class="ds-desc">
+			Reusable dropdown with checkmark selection. Supports separator lines between groups.
+		</p>
 		<div class="dropdown-demo">
-			<Dropdown
-				options={dropdownOptions}
-				bind:value={dropdownValue}
-				separatorAfter={['office']}
-			/>
+			<Dropdown options={dropdownOptions} bind:value={dropdownValue} separatorAfter={['office']} />
 			<span class="dropdown-status">Selected: <code>{dropdownValue}</code></span>
 		</div>
 	</section>
@@ -171,7 +169,10 @@
 			</div>
 			<div class="bubble bot">
 				<span class="who-label">JERRY SEINFELD</span>
-				<p>See, that's what I'm saying! They give you these tiny bags — you can't even get your fingers in there.</p>
+				<p>
+					See, that's what I'm saying! They give you these tiny bags — you can't even get your
+					fingers in there.
+				</p>
 			</div>
 			<div class="bubble bot typing">
 				<span class="who-label">GEORGE COSTANZA is typing</span>
@@ -510,11 +511,7 @@
 		align-items: center;
 		padding: 0 6px;
 		border-bottom: 2px solid var(--ink);
-		background: repeating-linear-gradient(
-			0deg,
-			var(--ink) 0 1px,
-			var(--paper) 1px 3px
-		);
+		background: repeating-linear-gradient(0deg, var(--ink) 0 1px, var(--paper) 1px 3px);
 	}
 	.demo-close-btn {
 		width: 14px;

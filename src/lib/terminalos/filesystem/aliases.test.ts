@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { TerminalFS, APPLICATIONS_ID, DOCUMENTS_ID, DESKTOP_ID, TRASH_ID } from './terminal-fs';
-import type { FsAlias, FsFile, FsFolder } from './types';
+import { TerminalFS, APPLICATIONS_ID, DOCUMENTS_ID, DESKTOP_ID } from './terminal-fs';
+import type { FsFile } from './types';
 
 function createDisk() {
 	return TerminalFS.createCleanDisk();

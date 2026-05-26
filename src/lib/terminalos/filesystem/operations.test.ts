@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	TerminalFS,
-	DOCUMENTS_ID,
-	DESKTOP_ID,
-	TRASH_ID,
-	ROOT_ID,
-	APPLICATIONS_ID
-} from './terminal-fs';
+import { TerminalFS, DOCUMENTS_ID, DESKTOP_ID, TRASH_ID } from './terminal-fs';
 import type { FsFolder, FsFile, FsAlias } from './types';
 
 function createDisk() {

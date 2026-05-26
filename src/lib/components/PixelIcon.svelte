@@ -50,7 +50,14 @@
 		<rect x="5" y="0" width="6" height="1" fill="#0a0a0a" />
 	{:else if kind === 'doc'}
 		<rect x="3" y="14" width="10" height="1" fill="rgba(0,0,0,0.25)" />
-		<rect x="2" y="2" width="10" height="12" fill={accent ? '#f9bd2b' : '#ffffff'} stroke="#0a0a0a" />
+		<rect
+			x="2"
+			y="2"
+			width="10"
+			height="12"
+			fill={accent ? '#f9bd2b' : '#ffffff'}
+			stroke="#0a0a0a"
+		/>
 		<polygon points="10,2 12,4 10,4" fill="#dcd6c8" stroke="#0a0a0a" />
 		<rect x="4" y="6" width="6" height="1" fill="#0a0a0a" />
 		<rect x="4" y="8" width="6" height="1" fill="#0a0a0a" />

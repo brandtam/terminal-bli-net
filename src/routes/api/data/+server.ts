@@ -6,7 +6,7 @@ export const GET: RequestHandler = async () => {
 	const bots = loadBots();
 	const groups = loadGroups();
 
-	const safeBots = bots.map(({ prompt, ...rest }) => rest);
+	const safeBots = bots.map(({ prompt: _, ...rest }) => rest);
 
 	return json({ groups, bots: safeBots, channels: loadChannels() });
 };

@@ -191,7 +191,13 @@ describe('getEpisodePremise', () => {
 			image: '/seinfeld.png',
 			active: true,
 			episodes: [
-				{ season: 1, episode: 1, title: 'The Pilot', year: '1989', premise: 'Jerry does stand-up.' },
+				{
+					season: 1,
+					episode: 1,
+					title: 'The Pilot',
+					year: '1989',
+					premise: 'Jerry does stand-up.'
+				},
 				{
 					season: 1,
 					episode: 2,

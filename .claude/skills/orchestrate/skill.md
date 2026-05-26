@@ -1,5 +1,5 @@
 ---
-description: "Multi-agent orchestrator mode for executing complex multi-step work across the codebase"
+description: 'Multi-agent orchestrator mode for executing complex multi-step work across the codebase'
 ---
 
 # Orchestrate
@@ -17,6 +17,7 @@ You are the orchestrator. Your job is to manage agents that write code — you d
 ### Delegating to agents
 
 Each agent gets a **self-contained prompt** that includes:
+
 - What to do and why (the agent has zero context from this conversation)
 - Exact file paths and current state of files being modified
 - Types, interfaces, and function signatures they'll need
@@ -68,6 +69,7 @@ Don't spin up an agent for a 30-second edit.
 ### When agents conflict
 
 If two parallel agents both modify the same file, the second commit may have merge issues. Handle this by:
+
 - Identifying which agent's changes are more complex
 - Applying the simpler changes manually after the complex ones land
 - Or: run conflicting work sequentially, not in parallel
@@ -93,6 +95,7 @@ If two parallel agents both modify the same file, the second commit may have mer
 When the user says `/orchestrate`, read their task description and begin orchestrating. If they provide a file path, read it first. If they describe the work inline, extract the steps and begin.
 
 Example invocations:
+
 - `/orchestrate` with a follow-up description of work
 - `/orchestrate local-docs/some-plan.md` — read the file, then execute
 - `/orchestrate "add dark mode support"` — plan the steps, then execute

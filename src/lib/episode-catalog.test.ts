@@ -17,7 +17,7 @@ interface Meta {
 }
 
 function loadAllMetas(): Meta[] {
-	const botsDir = resolve(process.cwd(), 'bots');
+	const botsDir = resolve(process.cwd(), 'bots'); // eslint-disable-line no-undef
 	const dirs = readdirSync(botsDir).filter((d) => statSync(join(botsDir, d)).isDirectory());
 	return dirs.map((d) => JSON.parse(readFileSync(join(botsDir, d, '_meta.json'), 'utf-8')));
 }
@@ -48,9 +48,15 @@ describe('episode catalog validation', () => {
 	it('season and episode are positive integers', () => {
 		for (const meta of metas) {
 			for (const ep of meta.episodes) {
-				expect(Number.isInteger(ep.season), `${meta.slug} "${ep.title}" season is not integer`).toBe(true);
+				expect(
+					Number.isInteger(ep.season),
+					`${meta.slug} "${ep.title}" season is not integer`
+				).toBe(true);
 				expect(ep.season, `${meta.slug} "${ep.title}" season <= 0`).toBeGreaterThan(0);
-				expect(Number.isInteger(ep.episode), `${meta.slug} "${ep.title}" episode is not integer`).toBe(true);
+				expect(
+					Number.isInteger(ep.episode),
+					`${meta.slug} "${ep.title}" episode is not integer`
+				).toBe(true);
 				expect(ep.episode, `${meta.slug} "${ep.title}" episode <= 0`).toBeGreaterThan(0);
 			}
 		}

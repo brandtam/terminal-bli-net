@@ -9,7 +9,8 @@
 	--accent: var(--brand-color-orange);
 	--accent-2: var(--brand-color-yellow);
 	--shadow: rgba(0, 0, 0, 0.35);
-	--dither: linear-gradient(45deg, #5e8585 25%, transparent 25%, transparent 75%, #5e8585 75%),
+	--dither:
+		linear-gradient(45deg, #5e8585 25%, transparent 25%, transparent 75%, #5e8585 75%),
 		linear-gradient(45deg, #5e8585 25%, transparent 25%, transparent 75%, #5e8585 75%);
 	--dither-size: 4px 4px, 4px 4px;
 	--dither-pos: 0 0, 2px 2px;

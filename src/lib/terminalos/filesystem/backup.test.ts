@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TerminalFS, DOCUMENTS_ID, APPLICATIONS_ID, ROOT_ID } from './terminal-fs';
-import { buildBackup, validateBackup, previewBackup, validateDiskForExport } from './backup';
+import { validateBackup, previewBackup, validateDiskForExport } from './backup';
 
 describe('exportBackup', () => {
 	it('produces a valid backup file', async () => {

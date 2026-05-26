@@ -11,7 +11,7 @@ When this skill is invoked, guide the user through creating or editing a channel
 Read all JSON files in `channels/` and display them as a table:
 
 | Slug | Name | Number | Network | Primary Show |
-|------|------|--------|---------|--------------|
+| ---- | ---- | ------ | ------- | ------------ |
 
 Then ask the user: **Do you want to edit an existing channel or create a new one?**
 
@@ -20,6 +20,7 @@ Then ask the user: **Do you want to edit an existing channel or create a new one
 ### If creating a new channel
 
 Ask the user for:
+
 - **Channel slug** — kebab-case, e.g. `ch7-hbo`
 - **Display name** — e.g. "HBO Classics"
 - **Channel number** — integer
@@ -34,7 +35,7 @@ Load the channel JSON and confirm which aspects to change (metadata, schedule, o
 Read the `bots/` directory. For each subdirectory that contains a `_meta.json` with an `episodes` array, list the show:
 
 | Show Slug | Name | Episode Count |
-|-----------|------|---------------|
+| --------- | ---- | ------------- |
 
 Present these to the user and ask which shows to include on this channel. At least one show must be selected.
 
@@ -47,6 +48,7 @@ Offer two modes:
 Automatically distribute selected shows across all 48 slots (each slot = 30 minutes, covering a full 24-hour day starting at midnight).
 
 Rules for auto-fill:
+
 - The **primary show** (first selected, or user-designated) gets ~60-70% of slots (roughly 29-34 slots).
 - Remaining shows split the rest roughly evenly.
 - Schedule in **blocks of 2-4 consecutive slots** per show to simulate real TV programming blocks.
@@ -56,6 +58,7 @@ Rules for auto-fill:
 ### Manual mode
 
 Walk through the day in time blocks and let the user assign shows:
+
 - **Early Morning** (slots 0-7, midnight-4am)
 - **Morning** (slots 8-15, 4am-8am)
 - **Daytime** (slots 16-23, 8am-12pm)
@@ -101,6 +104,7 @@ npx vitest run src/lib/channel-validation.test.ts
 ```
 
 If validation fails, read the error output and fix the channel JSON. Common issues:
+
 - Wrong episode reference (season/episode combo not in the show's `_meta.json`)
 - Missing slots (must be exactly 48)
 - Invalid show slug (must match a directory in `bots/` that has `_meta.json`)

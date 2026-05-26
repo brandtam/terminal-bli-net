@@ -6,7 +6,8 @@
 {@render children()}
 
 <style>
-	:global(html), :global(body) {
+	:global(html),
+	:global(body) {
 		overflow: auto;
 		height: auto;
 	}
