@@ -27,6 +27,7 @@ export type {
 	NodeFlags
 } from './filesystem/types';
 export { ok, fail, fsErr } from './filesystem/errors';
+export type { OperationKind, UndoRecord } from './filesystem/operations';
 export {
 	APP_LIBRARY,
 	getAppDef,

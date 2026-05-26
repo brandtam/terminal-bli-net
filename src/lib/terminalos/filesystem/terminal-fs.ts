@@ -1,8 +1,9 @@
 import type { NodeId, FsNode, FsFolder, FsFile, FsAlias, FsResult, TerminalVolume } from './types';
 import { ok, fail } from './errors';
-import { generateUniqueId } from './names';
+import { generateUniqueId, hasSiblingConflict } from './names';
 import { derivePath } from './paths';
 import { getDefaultInstalledApps, getDesktopAliasApps, getAppDef } from '../apps/app-library';
+import type { UndoRecord } from './operations';
 
 // Well-known IDs
 export const ROOT_ID: NodeId = 'root_terminal_hd';
@@ -79,9 +80,79 @@ const SYSTEM_FOLDER_APPS = new Set(['system-prefs', 'about-terminal']);
 /** IDs of system-folder apps that are always seeded regardless of defaultInstalled. */
 const SYSTEM_FOLDER_APP_IDS = ['system-prefs', 'about-terminal'];
 
+/**
+ * Generate a copy name: "Foo" -> "Foo copy", "Foo copy 2", etc.
+ * Avoids case-insensitive conflicts with existing siblings.
+ */
+function generateCopyName(baseName: string, siblings: { name: string }[]): string {
+	const copyName = `${baseName} copy`;
+	if (!hasSiblingConflict(copyName, siblings)) return copyName;
+	let i = 2;
+	while (hasSiblingConflict(`${baseName} copy ${i}`, siblings)) i++;
+	return `${baseName} copy ${i}`;
+}
+
+/**
+ * Deep-duplicate a node and all its descendants, assigning new IDs.
+ * Returns an array of all newly created nodes.
+ */
+function deepDuplicate(
+	nodeId: NodeId,
+	newParentId: NodeId,
+	nodes: Map<NodeId, FsNode>,
+	volumeId: string,
+	now: number
+): FsNode[] {
+	const source = nodes.get(nodeId);
+	if (!source) return [];
+
+	const newId = generateUniqueId();
+	const created: FsNode[] = [];
+
+	if (source.kind === 'folder') {
+		const clone: FsFolder = {
+			...source,
+			id: newId,
+			parentId: newParentId,
+			createdAt: now,
+			updatedAt: now
+		};
+		created.push(clone);
+
+		// Recursively clone children
+		for (const n of nodes.values()) {
+			if (n.parentId === nodeId) {
+				created.push(...deepDuplicate(n.id, newId, nodes, volumeId, now));
+			}
+		}
+	} else if (source.kind === 'file') {
+		const clone: FsFile = {
+			...source,
+			id: newId,
+			parentId: newParentId,
+			createdAt: now,
+			updatedAt: now
+		};
+		created.push(clone);
+	} else {
+		// alias
+		const clone: FsAlias = {
+			...source,
+			id: newId,
+			parentId: newParentId,
+			createdAt: now,
+			updatedAt: now
+		};
+		created.push(clone);
+	}
+
+	return created;
+}
+
 export class TerminalFS {
 	private volume: TerminalVolume;
 	private nodes: Map<NodeId, FsNode>;
+	private lastUndo: UndoRecord | null = null;
 
 	private constructor(volume: TerminalVolume, nodes: Map<NodeId, FsNode>) {
 		this.volume = volume;
@@ -295,5 +366,355 @@ export class TerminalFS {
 
 	getAllNodes(): Map<NodeId, FsNode> {
 		return new Map(this.nodes);
+	}
+
+	// --- Mutations ---
+
+	/** Return the children of a given parent as an array of {name} objects. */
+	private siblings(parentId: NodeId): { name: string }[] {
+		const result: { name: string }[] = [];
+		for (const n of this.nodes.values()) {
+			if (n.parentId === parentId) {
+				result.push({ name: n.name });
+			}
+		}
+		return result;
+	}
+
+	/** Check whether a node is protected or system-flagged. */
+	private isProtected(node: FsNode): boolean {
+		return node.flags?.protected === true || node.flags?.system === true;
+	}
+
+	/** Walk from nodeId up through parentId chain; returns true if ancestorId is found. */
+	private isAncestor(nodeId: NodeId, ancestorId: NodeId): boolean {
+		let current = this.nodes.get(nodeId);
+		while (current) {
+			if (current.id === ancestorId) return true;
+			current = current.parentId ? this.nodes.get(current.parentId) : undefined;
+		}
+		return false;
+	}
+
+	/** Collect a node and all its descendants recursively. */
+	private collectDescendants(nodeId: NodeId): NodeId[] {
+		const result: NodeId[] = [nodeId];
+		for (const n of this.nodes.values()) {
+			if (n.parentId === nodeId) {
+				result.push(...this.collectDescendants(n.id));
+			}
+		}
+		return result;
+	}
+
+	async createFolder(parentId: NodeId, name: string): Promise<FsResult<FsFolder>> {
+		const parent = this.nodes.get(parentId);
+		if (!parent) return fail('not_found', `Parent "${parentId}" not found`);
+		if (parent.kind !== 'folder') return fail('not_folder', `Parent "${parentId}" is not a folder`);
+
+		if (hasSiblingConflict(name, this.siblings(parentId))) {
+			return fail('duplicate_name', `A node named "${name}" already exists in this folder`);
+		}
+
+		const now = Date.now();
+		const nodeId = generateUniqueId();
+		const folder: FsFolder = {
+			id: nodeId,
+			volumeId: this.volume.id,
+			kind: 'folder',
+			parentId,
+			name,
+			createdAt: now,
+			updatedAt: now
+		};
+		this.nodes.set(nodeId, folder);
+
+		this.lastUndo = {
+			kind: 'create_folder',
+			label: `Create folder "${name}"`,
+			undoData: { type: 'delete_node', nodeId }
+		};
+
+		return ok(folder);
+	}
+
+	async createTextFile(parentId: NodeId, name: string, text: string): Promise<FsResult<FsFile>> {
+		const parent = this.nodes.get(parentId);
+		if (!parent) return fail('not_found', `Parent "${parentId}" not found`);
+		if (parent.kind !== 'folder') return fail('not_folder', `Parent "${parentId}" is not a folder`);
+
+		if (hasSiblingConflict(name, this.siblings(parentId))) {
+			return fail('duplicate_name', `A node named "${name}" already exists in this folder`);
+		}
+
+		const now = Date.now();
+		const nodeId = generateUniqueId();
+		const file: FsFile = {
+			id: nodeId,
+			volumeId: this.volume.id,
+			kind: 'file',
+			parentId,
+			name,
+			fileType: 'text',
+			opensWith: 'textedit',
+			bodyRef: { kind: 'inline-text', text },
+			createdAt: now,
+			updatedAt: now
+		};
+		this.nodes.set(nodeId, file);
+
+		this.lastUndo = {
+			kind: 'create_file',
+			label: `Create file "${name}"`,
+			undoData: { type: 'delete_node', nodeId }
+		};
+
+		return ok(file);
+	}
+
+	async writeText(fileId: NodeId, text: string): Promise<FsResult<FsFile>> {
+		const node = this.nodes.get(fileId);
+		if (!node) return fail('not_found', `Node "${fileId}" not found`);
+		if (node.kind !== 'file') return fail('not_found', `Node "${fileId}" is not a file`);
+
+		const updated: FsFile = {
+			...node,
+			bodyRef: { kind: 'inline-text', text },
+			updatedAt: Date.now()
+		};
+		this.nodes.set(fileId, updated);
+
+		// No undo for writes — text editors handle their own undo
+		return ok(updated);
+	}
+
+	async rename(nodeId: NodeId, newName: string): Promise<FsResult<FsNode>> {
+		const node = this.nodes.get(nodeId);
+		if (!node) return fail('not_found', `Node "${nodeId}" not found`);
+
+		if (this.isProtected(node)) {
+			return fail('protected_node', `Cannot rename protected node "${node.name}"`);
+		}
+
+		// Check sibling conflicts if the node has a parent
+		if (node.parentId) {
+			const siblingsExcludingSelf = this.siblings(node.parentId).filter(
+				(s) => s.name !== node.name
+			);
+			if (hasSiblingConflict(newName, siblingsExcludingSelf)) {
+				return fail(
+					'duplicate_name',
+					`A node named "${newName}" already exists in the parent folder`
+				);
+			}
+		}
+
+		const previousName = node.name;
+		const updated: FsNode = { ...node, name: newName, updatedAt: Date.now() };
+		this.nodes.set(nodeId, updated);
+
+		this.lastUndo = {
+			kind: 'rename',
+			label: `Rename "${previousName}" to "${newName}"`,
+			undoData: { type: 'rename_back', nodeId, previousName }
+		};
+
+		return ok(updated);
+	}
+
+	async move(nodeId: NodeId, targetFolderId: NodeId): Promise<FsResult<FsNode>> {
+		const node = this.nodes.get(nodeId);
+		if (!node) return fail('not_found', `Node "${nodeId}" not found`);
+
+		if (this.isProtected(node)) {
+			return fail('protected_node', `Cannot move protected node "${node.name}"`);
+		}
+
+		const target = this.nodes.get(targetFolderId);
+		if (!target) return fail('not_found', `Target folder "${targetFolderId}" not found`);
+		if (target.kind !== 'folder') {
+			return fail('not_folder', `Target "${targetFolderId}" is not a folder`);
+		}
+
+		// Cycle detection: walk from target up; if we hit nodeId, it's a cycle
+		if (node.kind === 'folder' && this.isAncestor(targetFolderId, nodeId)) {
+			return fail('invalid_move', 'Cannot move a folder into itself or its descendants');
+		}
+
+		// Name conflict in target
+		if (hasSiblingConflict(node.name, this.siblings(targetFolderId))) {
+			return fail(
+				'duplicate_name',
+				`A node named "${node.name}" already exists in the target folder`
+			);
+		}
+
+		const previousParentId = node.parentId;
+		if (!previousParentId) {
+			return fail('protected_node', 'Cannot move the root node');
+		}
+
+		const updated: FsNode = {
+			...node,
+			parentId: targetFolderId,
+			updatedAt: Date.now()
+		} as FsNode;
+		this.nodes.set(nodeId, updated);
+
+		this.lastUndo = {
+			kind: 'move',
+			label: `Move "${node.name}"`,
+			undoData: { type: 'move_back', nodeId, previousParentId }
+		};
+
+		return ok(updated);
+	}
+
+	async duplicate(nodeId: NodeId): Promise<FsResult<FsNode>> {
+		const node = this.nodes.get(nodeId);
+		if (!node) return fail('not_found', `Node "${nodeId}" not found`);
+
+		const parentId = node.parentId;
+		if (!parentId) return fail('protected_node', 'Cannot duplicate the root node');
+
+		const siblings = this.siblings(parentId);
+		const copyName = generateCopyName(node.name, siblings);
+		const now = Date.now();
+
+		const newNodes = deepDuplicate(nodeId, parentId, this.nodes, this.volume.id, now);
+		if (newNodes.length === 0) {
+			return fail('not_found', 'Failed to duplicate node');
+		}
+
+		// Set the top-level copy's name
+		const topNode = newNodes[0];
+		(topNode as FsNode & { name: string }).name = copyName;
+
+		// Add all new nodes to the map
+		const newIds: NodeId[] = [];
+		for (const n of newNodes) {
+			this.nodes.set(n.id, n);
+			newIds.push(n.id);
+		}
+
+		this.lastUndo = {
+			kind: 'duplicate',
+			label: `Duplicate "${node.name}"`,
+			undoData: { type: 'delete_nodes', nodeIds: newIds }
+		};
+
+		return ok(topNode);
+	}
+
+	async trash(nodeId: NodeId): Promise<FsResult<FsNode>> {
+		const node = this.nodes.get(nodeId);
+		if (!node) return fail('not_found', `Node "${nodeId}" not found`);
+
+		if (this.isProtected(node)) {
+			return fail('protected_node', `Cannot trash protected node "${node.name}"`);
+		}
+
+		if (nodeId === TRASH_ID) {
+			return fail('protected_node', 'Cannot trash the Trash folder');
+		}
+
+		const previousParentId = node.parentId;
+		if (!previousParentId) {
+			return fail('protected_node', 'Cannot trash the root node');
+		}
+
+		const updated: FsNode = {
+			...node,
+			parentId: TRASH_ID,
+			updatedAt: Date.now()
+		} as FsNode;
+		this.nodes.set(nodeId, updated);
+
+		this.lastUndo = {
+			kind: 'trash',
+			label: `Trash "${node.name}"`,
+			undoData: { type: 'move_back', nodeId, previousParentId }
+		};
+
+		return ok(updated);
+	}
+
+	async emptyTrash(): Promise<FsResult<{ deletedCount: number }>> {
+		// Collect all descendants of Trash (but not Trash itself)
+		const trashChildren: NodeId[] = [];
+		for (const n of this.nodes.values()) {
+			if (n.parentId === TRASH_ID) {
+				trashChildren.push(...this.collectDescendants(n.id));
+			}
+		}
+
+		for (const id of trashChildren) {
+			this.nodes.delete(id);
+		}
+
+		// Clear undo — emptyTrash is destructive and irreversible
+		this.lastUndo = null;
+
+		return ok({ deletedCount: trashChildren.length });
+	}
+
+	async undoLast(): Promise<FsResult<string>> {
+		const undo = this.lastUndo;
+		if (!undo) return fail('not_found', 'Nothing to undo');
+
+		const { undoData, label } = undo;
+
+		switch (undoData.type) {
+			case 'delete_node':
+				this.nodes.delete(undoData.nodeId);
+				break;
+
+			case 'delete_nodes':
+				for (const id of undoData.nodeIds) {
+					this.nodes.delete(id);
+				}
+				break;
+
+			case 'move_back': {
+				const node = this.nodes.get(undoData.nodeId);
+				if (node) {
+					const restored: FsNode = {
+						...node,
+						parentId: undoData.previousParentId,
+						updatedAt: Date.now()
+					} as FsNode;
+					this.nodes.set(undoData.nodeId, restored);
+				}
+				break;
+			}
+
+			case 'rename_back': {
+				const node = this.nodes.get(undoData.nodeId);
+				if (node) {
+					const restored: FsNode = {
+						...node,
+						name: undoData.previousName,
+						updatedAt: Date.now()
+					};
+					this.nodes.set(undoData.nodeId, restored);
+				}
+				break;
+			}
+
+			case 'restore_nodes':
+				for (const n of undoData.nodes) {
+					this.nodes.set(n.id, n);
+				}
+				break;
+		}
+
+		// One-level undo: clear after executing
+		this.lastUndo = null;
+		return ok(label);
+	}
+
+	async getUndoLabel(): Promise<FsResult<string>> {
+		if (!this.lastUndo) return fail('not_found', 'Nothing to undo');
+		return ok(this.lastUndo.label);
 	}
 }
