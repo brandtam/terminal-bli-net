@@ -19,14 +19,17 @@
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 
 	let {
-		folderId: initialFolderId = ROOT_ID,
+		folderId = ROOT_ID,
 		os
 	}: {
 		folderId?: string;
 		os: OsApi;
 	} = $props();
 
-	let currentFolderId = $state(initialFolderId);
+	function initialFolder() {
+		return folderId;
+	}
+	let currentFolderId = $state(initialFolder());
 	let selectedId = $state<string | null>(null);
 	let fsRev = $state(0);
 
@@ -199,8 +202,8 @@
 
 	<div class="finder-grid">
 		{#each items as node (node.id)}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
+			<button
+				type="button"
 				class="finder-item"
 				class:selected={selectedId === node.id}
 				onclick={() => handleSelect(node.id)}
@@ -211,7 +214,7 @@
 					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
 				</div>
 				<div class="finder-item-label">{node.name}</div>
-			</div>
+			</button>
 		{/each}
 		{#if items.length === 0}
 			<div class="finder-empty">This folder is empty</div>
@@ -223,28 +226,34 @@
 	</div>
 
 	{#if contextMenuNode}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="context-menu"
+			role="menu"
+			tabindex="-1"
 			bind:this={contextMenuEl}
 			style="left: {contextMenuX}px; top: {contextMenuY}px;"
 			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => {
+				if (e.key === 'Escape') closeContextMenu();
+			}}
 		>
 			{#if inTrash}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="context-menu-item" onclick={handleContextDelete}>Delete Permanently</div>
+				<button type="button" class="context-menu-item" onclick={handleContextDelete}
+					>Delete Permanently</button
+				>
 			{:else}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div class="context-menu-item" onclick={handleContextOpen}>Open</div>
+				<button type="button" class="context-menu-item" onclick={handleContextOpen}>Open</button>
 				{#if contextMenuNode.type === 'file'}
 					<div class="context-menu-sep"></div>
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="context-menu-item" onclick={handleContextMakeAlias}>Make Alias</div>
+					<button type="button" class="context-menu-item" onclick={handleContextMakeAlias}
+						>Make Alias</button
+					>
 				{/if}
 				{#if canTrash(contextMenuNode)}
 					<div class="context-menu-sep"></div>
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="context-menu-item" onclick={handleContextTrash}>Move to Trash</div>
+					<button type="button" class="context-menu-item" onclick={handleContextTrash}
+						>Move to Trash</button
+					>
 				{/if}
 			{/if}
 		</div>
@@ -313,6 +322,11 @@
 		padding: 6px 4px;
 		cursor: pointer;
 		border-radius: 0;
+		background: none;
+		border: none;
+		font: inherit;
+		color: inherit;
+		text-align: center;
 	}
 
 	.finder-item:hover {
@@ -391,6 +405,12 @@
 	.context-menu-item {
 		padding: 4px 12px;
 		cursor: pointer;
+		background: none;
+		border: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		width: 100%;
 	}
 
 	.context-menu-item:hover {

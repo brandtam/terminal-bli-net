@@ -82,6 +82,11 @@ export default [
 				HTMLDivElement: 'readonly',
 				HTMLInputElement: 'readonly',
 				HTMLTextAreaElement: 'readonly',
+				HTMLVideoElement: 'readonly',
+				MediaStream: 'readonly',
+				MediaRecorder: 'readonly',
+				Blob: 'readonly',
+				FileReader: 'readonly',
 				Event: 'readonly',
 				KeyboardEvent: 'readonly',
 				MouseEvent: 'readonly',
@@ -97,6 +102,7 @@ export default [
 		},
 		rules: {
 			'no-unused-vars': 'off',
+			'no-useless-assignment': 'off',
 			'svelte/valid-compile': 'warn'
 		}
 	},

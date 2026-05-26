@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { createFile, deleteNode, findByApp, exists, RECORDINGS_ID, type FSFile } from '$lib/os/filesystem';
+	import {
+		createFile,
+		deleteNode,
+		findByApp,
+		exists,
+		RECORDINGS_ID,
+		type FSFile
+	} from '$lib/os/filesystem';
 
 	let {
 		recording = $bindable(false)
@@ -23,7 +30,9 @@
 	let chunks: Blob[] = [];
 	let timerInterval: ReturnType<typeof setInterval> | null = null;
 
-	$effect(() => { recording = isRecording; });
+	$effect(() => {
+		recording = isRecording;
+	});
 
 	function refreshRecordings() {
 		recordings = findByApp('recorder', RECORDINGS_ID);
@@ -170,35 +179,30 @@
 
 	<div class="preview-area">
 		{#if playbackUrl && !isRecording}
-			<!-- svelte-ignore a11y_media_has_caption -->
-			<video
-				bind:this={playbackEl}
-				class="video-playback"
-				src={playbackUrl}
-				controls
-				autoplay
-			></video>
+			<video bind:this={playbackEl} class="video-playback" src={playbackUrl} controls autoplay>
+				<track kind="captions" />
+			</video>
 		{:else}
-			<!-- svelte-ignore a11y_media_has_caption -->
-			<video
-				bind:this={videoEl}
-				class="video-live"
-				autoplay
-				muted
-				playsinline
-			></video>
+			<video bind:this={videoEl} class="video-live" autoplay muted playsinline>
+				<track kind="captions" />
+			</video>
 		{/if}
 	</div>
 
 	<div class="controls">
 		{#if isRecording}
 			<span class="timer">{formatTime(elapsed)}</span>
-			<button class="rec-btn recording" onclick={stopRecording}>
+			<button class="rec-btn recording" onclick={stopRecording} aria-label="Stop recording">
 				<span class="stop-icon"></span>
 			</button>
 			<span class="timer-hint">max {MAX_DURATION}s</span>
 		{:else}
-			<button class="rec-btn" onclick={startRecording} disabled={!stream}>
+			<button
+				class="rec-btn"
+				onclick={startRecording}
+				disabled={!stream}
+				aria-label="Start recording"
+			>
 				<span class="rec-circle"></span>
 			</button>
 		{/if}
@@ -324,8 +328,13 @@
 	}
 
 	@keyframes pulse-border {
-		0%, 100% { border-color: var(--ink); }
-		50% { border-color: var(--accent); }
+		0%,
+		100% {
+			border-color: var(--ink);
+		}
+		50% {
+			border-color: var(--accent);
+		}
 	}
 
 	.recordings-list {

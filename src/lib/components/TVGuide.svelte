@@ -338,6 +338,8 @@
 	<!-- Timeline Grid: fixed left (CH + NOW) + scrolling right -->
 	<div
 		class="tvg-schedule"
+		role="region"
+		aria-label="TV schedule"
 		onmouseenter={pauseOnHover
 			? () => {
 					paused = true;
