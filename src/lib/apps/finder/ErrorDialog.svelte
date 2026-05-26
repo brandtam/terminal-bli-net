@@ -39,7 +39,10 @@
 		font-size: 28px;
 		flex-shrink: 0;
 	}
-	.body { flex: 1; min-width: 0; }
+	.body {
+		flex: 1;
+		min-width: 0;
+	}
 	.title {
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 11px;
@@ -52,5 +55,9 @@
 		margin-bottom: 14px;
 		line-height: 1.3;
 	}
-	.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+	.btns {
+		display: flex;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
 </style>

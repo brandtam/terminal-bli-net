@@ -16,8 +16,7 @@ const TEST_SECRET = 'test-hmac-secret-key-1234';
 const DEFAULT_PARAMS: ComposeReminderParams = {
 	showName: 'M*A*S*H',
 	characterName: 'Hawkeye',
-	characterPrompt:
-		'greeting": "Well, hello there. Pull up a martini, soldier." voice: sardonic',
+	characterPrompt: 'greeting": "Well, hello there. Pull up a martini, soldier." voice: sardonic',
 	recipientEmail: 'fan@example.com',
 	signedReplyAddr: 'unsub+abc123--fan@example.com@bli.net',
 	nextAirTime: '7:00 PM EST'
@@ -60,9 +59,7 @@ describe('composeReminder', () => {
 
 	it('sets List-Unsubscribe header with mailto format', () => {
 		const { headers } = composeReminder(DEFAULT_PARAMS);
-		expect(headers['List-Unsubscribe']).toBe(
-			'<mailto:unsub+abc123--fan@example.com@bli.net>'
-		);
+		expect(headers['List-Unsubscribe']).toBe('<mailto:unsub+abc123--fan@example.com@bli.net>');
 	});
 
 	it('sets List-Unsubscribe-Post header for one-click unsubscribe', () => {

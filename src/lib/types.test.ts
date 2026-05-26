@@ -43,9 +43,7 @@ describe('ChannelSlot type', () => {
 describe('Channel type', () => {
 	it('accepts a valid channel with 48 slots', () => {
 		const slots: (ChannelSlot | null)[] = Array.from({ length: 48 }, (_, i) =>
-			i % 3 === 0
-				? null
-				: { showSlug: 'test-show', season: 1, episode: i }
+			i % 3 === 0 ? null : { showSlug: 'test-show', season: 1, episode: i }
 		);
 
 		const channel = {
@@ -77,7 +75,13 @@ describe('Show / GroupMeta type', () => {
 			active: true,
 			color: '#3b82f6',
 			episodes: [
-				{ season: 1, episode: 1, title: 'The Seinfeld Chronicles', year: '1989', premise: 'Jerry does stand-up.' }
+				{
+					season: 1,
+					episode: 1,
+					title: 'The Seinfeld Chronicles',
+					year: '1989',
+					premise: 'Jerry does stand-up.'
+				}
 			]
 		} satisfies Show;
 

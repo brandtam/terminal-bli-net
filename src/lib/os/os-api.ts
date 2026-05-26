@@ -1,4 +1,4 @@
-import type { WindowState, TweaksState } from '$lib/types';
+import type { WindowState, TweaksState, GroupMeta } from '$lib/types';
 
 export interface AboutSection {
 	h: string;
@@ -107,7 +107,26 @@ export interface OsApi {
 	listWindows: () => WindowState[];
 
 	alert: (spec: AlertSpec) => void;
+	showAlert: (spec: AlertSpec) => void;
+	dismissAlert: () => void;
 	startNewConversation: () => void;
+
+	emptyTrash: () => Promise<void>;
+	exportBackup: () => void;
+	restoreBackup: () => void;
+	reinstallOS: () => void;
+
+	registerLaunchHandler: (
+		appId: string,
+		handler: (payload?: Record<string, unknown>) => void
+	) => void;
+
+	moveWindow: (id: string, x: number, y: number) => void;
+	resizeWindow: (id: string, w: number, h: number) => void;
+	getWindowDef: (id: string) => { title: string; w: number; h: number };
+
+	openChat: (group: GroupMeta) => void;
+	setTimezone: (tz: string) => void;
 }
 
 export interface AlertButton {
@@ -120,6 +139,7 @@ export interface AlertSpec {
 	title: string;
 	body: string;
 	buttons?: AlertButton[];
+	progress?: { durationMs: number };
 }
 
 export const WINDOW_APP_MAP: Record<string, string> = {
@@ -139,7 +159,9 @@ export const WINDOW_APP_MAP: Record<string, string> = {
 	error: 'finder',
 	trash: 'finder',
 	recorder: 'recorder',
-	'about-recorder': 'recorder'
+	'about-recorder': 'recorder',
+	'software-shop': 'software-shop',
+	'about-software-shop': 'software-shop'
 };
 
 export function windowAppId(windowId: string): string {
@@ -149,3 +171,9 @@ export function windowAppId(windowId: string): string {
 	if (windowId.startsWith('recorder-')) return 'recorder';
 	return WINDOW_APP_MAP[windowId] || 'finder';
 }
+
+export {
+	getAppWindowId,
+	getAppIconKind,
+	isSpecialLaunchApp
+} from '$lib/terminalos/apps/app-install';

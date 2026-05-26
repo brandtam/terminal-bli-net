@@ -137,7 +137,9 @@ async function streamOpenAICompletion(
 	});
 }
 
-export function streamCompletion(params: StreamCompletionParams): Promise<ReadableStream<TextChunk>> {
+export function streamCompletion(
+	params: StreamCompletionParams
+): Promise<ReadableStream<TextChunk>> {
 	const provider = params.provider ?? 'claude';
 
 	if (provider === 'openai') {

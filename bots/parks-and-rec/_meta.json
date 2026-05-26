@@ -1,45 +1,177 @@
 {
-  "slug": "parks-and-rec",
-  "name": "Parks and Recreation",
-  "description": "A mid-level bureaucrat in a small Indiana town tries to make her community better, one park at a time.",
-  "setting": "Pawnee Parks Department, Pawnee, Indiana",
-  "era": "2010s",
-  "image": "/bots/parks-and-rec/group-icon.png",
-  "active": true,
-  "color": "#2e86de",
-  "schedule": [
-    { "day": "mon", "start": "16:00", "duration": 180 },
-    { "day": "tue", "start": "07:00", "duration": 180 },
-    { "day": "wed", "start": "13:00", "duration": 180 },
-    { "day": "thu", "start": "04:00", "duration": 180 },
-    { "day": "thu", "start": "10:00", "duration": 180 },
-    { "day": "fri", "start": "16:00", "duration": 180 },
-    { "day": "sat", "start": "07:00", "duration": 180 },
-    { "day": "sat", "start": "16:00", "duration": 180 },
-    { "day": "sun", "start": "19:00", "duration": 180 }
-  ],
-  "episodes": [
-    { "season": 2, "episode": 1, "title": "Pawnee Zoo", "year": "2009", "premise": "Leslie accidentally marries two male penguins at the Pawnee Zoo, sparking a citywide debate on gay marriage and making her a polarizing figure overnight." },
-    { "season": 2, "episode": 5, "title": "Sister City", "year": "2009", "premise": "A delegation from Pawnee's Venezuelan sister city visits, led by a miniature dictator who insults everything while the parks department tries to be gracious hosts." },
-    { "season": 2, "episode": 10, "title": "Hunting Trip", "year": "2010", "premise": "Leslie takes the guys on a hunting trip to prove she's one of them, but when someone accidentally shoots Ron she takes the blame to protect a colleague's secret." },
-    { "season": 2, "episode": 16, "title": "Galentine's Day", "year": "2010", "premise": "Leslie hosts her annual celebration of female friendship the day before Valentine's Day, but her attempt to reunite her mom with an old flame backfires catastrophically." },
-    { "season": 2, "episode": 20, "title": "Summer Catalog", "year": "2010", "premise": "Leslie obsesses over the parks department summer catalog while Ron's emotional walls crack when a woman at a woodworking shop sees through his stoic facade." },
-    { "season": 2, "episode": 23, "title": "The Master Plan", "year": "2010", "premise": "State auditors Ben Wyatt and Chris Traeger arrive to slash Pawnee's budget, and Leslie meets Ben for the first time with immediate adversarial chemistry." },
-    { "season": 3, "episode": 2, "title": "Flu Season", "year": "2011", "premise": "Leslie delivers a critical presentation to save the Harvest Festival while delirious with the flu, cycling between collapse and manic brilliance as her friends prop her up." },
-    { "season": 3, "episode": 4, "title": "Ron and Tammy", "year": "2011", "premise": "Ron's terrifying ex-wife Tammy Two returns and transforms him into a feral, cornrow-wearing man-child while Leslie desperately tries to break her spell." },
-    { "season": 3, "episode": 8, "title": "Camping", "year": "2011", "premise": "Leslie drags the department on an overnight camping trip to brainstorm the Harvest Festival and has her eureka moment at 4 AM while everyone else suffers in the cold." },
-    { "season": 3, "episode": 13, "title": "The Fight", "year": "2011", "premise": "Ann and Leslie get into a brutal drunken argument at a nightclub over Leslie taking Ann for granted, fueled by Tom's horrifying new liquor brand Snake Juice." },
-    { "season": 4, "episode": 2, "title": "Ron and Tammys", "year": "2011", "premise": "Ron's mother Tammy One arrives in Pawnee and reduces Ron to a terrified, obedient child, proving there's someone even scarier than Tammy Two." },
-    { "season": 4, "episode": 4, "title": "Treat Yo Self", "year": "2011", "premise": "Tom and Donna celebrate their annual 'Treat Yo Self' day of extravagant self-indulgence while trying to get Ben to join them and finally break his emotional repression." },
-    { "season": 4, "episode": 7, "title": "The Treaty", "year": "2011", "premise": "Ben and Leslie's breakup tension explodes during a Model UN simulation where their fictional countries wage escalating war while their students watch in confusion." },
-    { "season": 4, "episode": 22, "title": "Win, Lose, or Draw", "year": "2012", "premise": "Election night arrives and Leslie waits for results in her city council race, the culmination of a season-long campaign, with her entire future hanging in the balance." },
-    { "season": 5, "episode": 5, "title": "Halloween Surprise", "year": "2012", "premise": "Ben surprises Leslie with an early return from Washington and proposes in the most Ben Wyatt way possible while Andy hunts a possum through the office wearing a costume." },
-    { "season": 5, "episode": 11, "title": "Women in Garbage", "year": "2013", "premise": "Leslie and April ride along on a garbage truck to prove women can do any city job, finding it far harder than expected while Ron mentors a young girl at a woodworking class." },
-    { "season": 5, "episode": 14, "title": "Leslie and Ben", "year": "2013", "premise": "Leslie and Ben get married in a surprise impromptu ceremony at their workplace, surrounded by friends, after their actual wedding plans keep falling apart." },
-    { "season": 5, "episode": 16, "title": "Bailout", "year": "2013", "premise": "Leslie must decide whether to bail out a failing video rental store, testing her principles against reality, while Tom launches his new restaurant venture Rent-a-Swag." },
-    { "season": 6, "episode": 4, "title": "Doppelgangers", "year": "2013", "premise": "The Pawnee and Eagleton parks departments merge and each employee meets their counterpart, forcing uncomfortable conversations about who gets to keep their job." },
-    { "season": 6, "episode": 11, "title": "New Beginnings", "year": "2014", "premise": "Leslie starts her new job at the National Parks Service and realizes her ambition has grown beyond Pawnee while Andy accidentally becomes a beloved children's TV star." },
-    { "season": 7, "episode": 4, "title": "Leslie and Ron", "year": "2015", "premise": "Leslie and Ron are locked in the parks office overnight and finally confront why their friendship fell apart during the three-year time jump, rebuilding it piece by piece." },
-    { "season": 7, "episode": 12, "title": "One Last Ride", "year": "2015", "premise": "The series finale follows each character's future as they complete one final parks project together, flashing forward to show how their lives unfold over the decades." }
-  ]
+	"slug": "parks-and-rec",
+	"name": "Parks and Recreation",
+	"description": "A mid-level bureaucrat in a small Indiana town tries to make her community better, one park at a time.",
+	"setting": "Pawnee Parks Department, Pawnee, Indiana",
+	"era": "2010s",
+	"image": "/bots/parks-and-rec/group-icon.png",
+	"active": true,
+	"color": "#2e86de",
+	"schedule": [
+		{ "day": "mon", "start": "16:00", "duration": 180 },
+		{ "day": "tue", "start": "07:00", "duration": 180 },
+		{ "day": "wed", "start": "13:00", "duration": 180 },
+		{ "day": "thu", "start": "04:00", "duration": 180 },
+		{ "day": "thu", "start": "10:00", "duration": 180 },
+		{ "day": "fri", "start": "16:00", "duration": 180 },
+		{ "day": "sat", "start": "07:00", "duration": 180 },
+		{ "day": "sat", "start": "16:00", "duration": 180 },
+		{ "day": "sun", "start": "19:00", "duration": 180 }
+	],
+	"episodes": [
+		{
+			"season": 2,
+			"episode": 1,
+			"title": "Pawnee Zoo",
+			"year": "2009",
+			"premise": "Leslie accidentally marries two male penguins at the Pawnee Zoo, sparking a citywide debate on gay marriage and making her a polarizing figure overnight."
+		},
+		{
+			"season": 2,
+			"episode": 5,
+			"title": "Sister City",
+			"year": "2009",
+			"premise": "A delegation from Pawnee's Venezuelan sister city visits, led by a miniature dictator who insults everything while the parks department tries to be gracious hosts."
+		},
+		{
+			"season": 2,
+			"episode": 10,
+			"title": "Hunting Trip",
+			"year": "2010",
+			"premise": "Leslie takes the guys on a hunting trip to prove she's one of them, but when someone accidentally shoots Ron she takes the blame to protect a colleague's secret."
+		},
+		{
+			"season": 2,
+			"episode": 16,
+			"title": "Galentine's Day",
+			"year": "2010",
+			"premise": "Leslie hosts her annual celebration of female friendship the day before Valentine's Day, but her attempt to reunite her mom with an old flame backfires catastrophically."
+		},
+		{
+			"season": 2,
+			"episode": 20,
+			"title": "Summer Catalog",
+			"year": "2010",
+			"premise": "Leslie obsesses over the parks department summer catalog while Ron's emotional walls crack when a woman at a woodworking shop sees through his stoic facade."
+		},
+		{
+			"season": 2,
+			"episode": 23,
+			"title": "The Master Plan",
+			"year": "2010",
+			"premise": "State auditors Ben Wyatt and Chris Traeger arrive to slash Pawnee's budget, and Leslie meets Ben for the first time with immediate adversarial chemistry."
+		},
+		{
+			"season": 3,
+			"episode": 2,
+			"title": "Flu Season",
+			"year": "2011",
+			"premise": "Leslie delivers a critical presentation to save the Harvest Festival while delirious with the flu, cycling between collapse and manic brilliance as her friends prop her up."
+		},
+		{
+			"season": 3,
+			"episode": 4,
+			"title": "Ron and Tammy",
+			"year": "2011",
+			"premise": "Ron's terrifying ex-wife Tammy Two returns and transforms him into a feral, cornrow-wearing man-child while Leslie desperately tries to break her spell."
+		},
+		{
+			"season": 3,
+			"episode": 8,
+			"title": "Camping",
+			"year": "2011",
+			"premise": "Leslie drags the department on an overnight camping trip to brainstorm the Harvest Festival and has her eureka moment at 4 AM while everyone else suffers in the cold."
+		},
+		{
+			"season": 3,
+			"episode": 13,
+			"title": "The Fight",
+			"year": "2011",
+			"premise": "Ann and Leslie get into a brutal drunken argument at a nightclub over Leslie taking Ann for granted, fueled by Tom's horrifying new liquor brand Snake Juice."
+		},
+		{
+			"season": 4,
+			"episode": 2,
+			"title": "Ron and Tammys",
+			"year": "2011",
+			"premise": "Ron's mother Tammy One arrives in Pawnee and reduces Ron to a terrified, obedient child, proving there's someone even scarier than Tammy Two."
+		},
+		{
+			"season": 4,
+			"episode": 4,
+			"title": "Treat Yo Self",
+			"year": "2011",
+			"premise": "Tom and Donna celebrate their annual 'Treat Yo Self' day of extravagant self-indulgence while trying to get Ben to join them and finally break his emotional repression."
+		},
+		{
+			"season": 4,
+			"episode": 7,
+			"title": "The Treaty",
+			"year": "2011",
+			"premise": "Ben and Leslie's breakup tension explodes during a Model UN simulation where their fictional countries wage escalating war while their students watch in confusion."
+		},
+		{
+			"season": 4,
+			"episode": 22,
+			"title": "Win, Lose, or Draw",
+			"year": "2012",
+			"premise": "Election night arrives and Leslie waits for results in her city council race, the culmination of a season-long campaign, with her entire future hanging in the balance."
+		},
+		{
+			"season": 5,
+			"episode": 5,
+			"title": "Halloween Surprise",
+			"year": "2012",
+			"premise": "Ben surprises Leslie with an early return from Washington and proposes in the most Ben Wyatt way possible while Andy hunts a possum through the office wearing a costume."
+		},
+		{
+			"season": 5,
+			"episode": 11,
+			"title": "Women in Garbage",
+			"year": "2013",
+			"premise": "Leslie and April ride along on a garbage truck to prove women can do any city job, finding it far harder than expected while Ron mentors a young girl at a woodworking class."
+		},
+		{
+			"season": 5,
+			"episode": 14,
+			"title": "Leslie and Ben",
+			"year": "2013",
+			"premise": "Leslie and Ben get married in a surprise impromptu ceremony at their workplace, surrounded by friends, after their actual wedding plans keep falling apart."
+		},
+		{
+			"season": 5,
+			"episode": 16,
+			"title": "Bailout",
+			"year": "2013",
+			"premise": "Leslie must decide whether to bail out a failing video rental store, testing her principles against reality, while Tom launches his new restaurant venture Rent-a-Swag."
+		},
+		{
+			"season": 6,
+			"episode": 4,
+			"title": "Doppelgangers",
+			"year": "2013",
+			"premise": "The Pawnee and Eagleton parks departments merge and each employee meets their counterpart, forcing uncomfortable conversations about who gets to keep their job."
+		},
+		{
+			"season": 6,
+			"episode": 11,
+			"title": "New Beginnings",
+			"year": "2014",
+			"premise": "Leslie starts her new job at the National Parks Service and realizes her ambition has grown beyond Pawnee while Andy accidentally becomes a beloved children's TV star."
+		},
+		{
+			"season": 7,
+			"episode": 4,
+			"title": "Leslie and Ron",
+			"year": "2015",
+			"premise": "Leslie and Ron are locked in the parks office overnight and finally confront why their friendship fell apart during the three-year time jump, rebuilding it piece by piece."
+		},
+		{
+			"season": 7,
+			"episode": 12,
+			"title": "One Last Ride",
+			"year": "2015",
+			"premise": "The series finale follows each character's future as they complete one final parks project together, flashing forward to show how their lives unfold over the decades."
+		}
+	]
 }

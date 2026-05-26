@@ -4,7 +4,7 @@ import type { Channel, Show } from '$lib/types';
 
 const basePrompt = 'You are George Costanza. Be neurotic.';
 
-function makeChannel(slug: string, schedule: (Channel['schedule'][number])[]): Channel {
+function makeChannel(slug: string, schedule: Channel['schedule'][number][]): Channel {
 	return { slug, name: `Channel ${slug}`, number: 1, network: 'NBC', schedule };
 }
 
@@ -105,7 +105,13 @@ describe('buildSystemPrompt', () => {
 		const channels = [makeChannel('ch1', schedule1), makeChannel('ch2', schedule2)];
 		const shows = [
 			makeShow('seinfeld', [
-				{ season: 1, episode: 1, title: 'The Seinfeld Chronicles', year: '1989', premise: 'Pilot episode.' },
+				{
+					season: 1,
+					episode: 1,
+					title: 'The Seinfeld Chronicles',
+					year: '1989',
+					premise: 'Pilot episode.'
+				},
 				{ season: 4, episode: 11, title: 'The Contest', year: '1992', premise: 'A bet is made.' }
 			])
 		];

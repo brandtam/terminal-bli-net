@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { TextChunk } from '$lib/types';
 
 // --- Anthropic mock ---
-const mockAnthropicStreamOn = vi.fn();
 const mockAnthropicMessagesStream = vi.fn();
 
 vi.mock('@anthropic-ai/sdk', () => {

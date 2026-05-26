@@ -145,3 +145,10 @@ export function appRead<T>(appId: string, key: string, fallback: T): T {
 export function appWrite<T>(appId: string, key: string, value: T): void {
 	set(`terminal.app.${appId}.${key}`, value);
 }
+
+export function clearAllPreferences(): void {
+	if (typeof localStorage === 'undefined') return;
+	for (const key of Object.values(KEYS)) {
+		localStorage.removeItem(key);
+	}
+}

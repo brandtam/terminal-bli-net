@@ -42,8 +42,7 @@ describe('validateBotPrompt', () => {
 	it('catches empty examples block', () => {
 		const bad = {
 			...validBot,
-			prompt:
-				'# Character\nTest\n\n# Voice\n- test\n\n# Examples\n\n# Format\nReply as test.'
+			prompt: '# Character\nTest\n\n# Voice\n- test\n\n# Examples\n\n# Format\nReply as test.'
 		};
 		const errors = validateBotPrompt(bad);
 		expect(errors.some((e) => e.includes('examples'))).toBe(true);

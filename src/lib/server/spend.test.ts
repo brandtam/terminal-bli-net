@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+/* eslint-disable no-undef */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
 	canRespond,
@@ -39,10 +40,18 @@ function createMockKV(): MockKV {
 
 		// Stubs for the rest of the KVNamespace interface — unused by spend.ts
 		async list() {
-			return { keys: [], list_complete: true, cacheStatus: null } as unknown as KVNamespaceListResult<unknown, string>;
+			return {
+				keys: [],
+				list_complete: true,
+				cacheStatus: null
+			} as unknown as KVNamespaceListResult<unknown, string>;
 		},
 		async getWithMetadata() {
-			return { value: null, metadata: null, cacheStatus: null } as unknown as KVNamespaceGetWithMetadataResult<string, unknown>;
+			return {
+				value: null,
+				metadata: null,
+				cacheStatus: null
+			} as unknown as KVNamespaceGetWithMetadataResult<string, unknown>;
 		}
 	} as unknown as MockKV;
 }

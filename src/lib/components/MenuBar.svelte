@@ -65,28 +65,10 @@
 			action: (os) => os.openSystemPreferences()
 		},
 		{ type: 'separator' },
-		{ type: 'action', label: 'Restart', action: (os) => os.openWindow('error') },
-		{ type: 'action', label: "Shut Down (don't)", action: (os) => os.openWindow('error') },
-		{ type: 'separator' },
 		{
 			type: 'action',
-			label: 'System Reset…',
-			action: (os) =>
-				os.alert({
-					title: 'System Reset',
-					body: 'This will erase all data and restore Terminal to factory defaults. Sticky notes, conversations, preferences, and saved files will be permanently deleted.',
-					buttons: [
-						{ label: 'Cancel' },
-						{
-							label: 'Erase Everything',
-							primary: true,
-							action: () => {
-								localStorage.clear();
-								window.location.reload();
-							}
-						}
-					]
-				})
+			label: 'Software Shop',
+			action: (os) => os.openWindow('software-shop')
 		}
 	];
 

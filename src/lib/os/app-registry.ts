@@ -1,6 +1,4 @@
-import type { AppDef, OsApi, AppMenuSpec } from './os-api';
-import { createDoc, listDocs, findDocByName } from '$lib/apps/textedit/textedit-docs';
-import { emptyTrash } from '$lib/os/filesystem';
+import type { AppDef } from './os-api';
 
 export const APPS: Record<string, AppDef> = {
 	finder: {
@@ -41,10 +39,7 @@ export const APPS: Record<string, AppDef> = {
 						type: 'action',
 						label: 'New Text Document',
 						shortcut: '⌘T',
-						action: () => {
-							const doc = createDoc();
-							os.openWindow(`textedit-${doc.id}`);
-						}
+						action: () => os.launchApp('textedit', { action: 'new' })
 					},
 					{ type: 'separator' },
 					{ type: 'action', label: 'Get Info', disabled: true },
@@ -70,10 +65,7 @@ export const APPS: Record<string, AppDef> = {
 					{
 						type: 'action',
 						label: 'Show Pricing',
-						action: () => {
-							const f = findDocByName('Pricing.txt');
-							if (f) os.openWindow(`textedit-${f.id}`);
-						}
+						action: () => os.launchApp('textedit', { open: 'Pricing.txt' })
 					}
 				]
 			},
@@ -92,10 +84,27 @@ export const APPS: Record<string, AppDef> = {
 									{
 										label: 'Empty',
 										primary: true,
-										action: () => emptyTrash()
+										action: () => os.emptyTrash()
 									}
 								]
 							})
+					},
+					{ type: 'separator' },
+					{
+						type: 'action',
+						label: 'Backup Terminal HD…',
+						action: () => os.exportBackup()
+					},
+					{
+						type: 'action',
+						label: 'Restore Terminal HD…',
+						action: () => os.restoreBackup()
+					},
+					{ type: 'separator' },
+					{
+						type: 'action',
+						label: 'Reinstall Terminal OS…',
+						action: () => os.reinstallOS()
 					},
 					{ type: 'separator' },
 					{ type: 'action', label: 'Restart', action: () => os.openWindow('error') },
@@ -109,10 +118,7 @@ export const APPS: Record<string, AppDef> = {
 					{
 						type: 'action',
 						label: 'README.txt',
-						action: () => {
-							const f = findDocByName('README.TXT');
-							if (f) os.openWindow(`textedit-${f.id}`);
-						}
+						action: () => os.launchApp('textedit', { open: 'README.TXT' })
 					}
 				]
 			}
@@ -200,10 +206,7 @@ export const APPS: Record<string, AppDef> = {
 					{
 						type: 'action',
 						label: 'How airing works',
-						action: () => {
-							const f = findDocByName('README.TXT');
-							if (f) os.openWindow(`textedit-${f.id}`);
-						}
+						action: () => os.launchApp('textedit', { open: 'README.TXT' })
 					}
 				]
 			}
@@ -468,6 +471,48 @@ export const APPS: Record<string, AppDef> = {
 		statusExtra: () => null
 	},
 
+	'software-shop': {
+		id: 'software-shop',
+		name: 'Software Shop',
+		filename: 'Software Shop.app',
+		about: {
+			title: 'Software Shop',
+			version: 'v1.0',
+			tagline: 'install and remove apps from your Terminal',
+			glyph: '💾',
+			glyphBg: 'var(--accent)',
+			glyphFg: 'var(--paper)',
+			sections: [
+				{
+					h: 'WHAT IT IS',
+					body: "The place to install and remove apps on your Terminal desktop. Core OS tools are protected — you can't strand yourself. Everything else is removable and restorable."
+				},
+				{
+					h: 'HOW IT WORKS',
+					body: 'Click "Install from Floppy" to add an app. Click "Uninstall" to remove one. Uninstalling an app never deletes your documents — just the app itself. You can always reinstall from here.'
+				}
+			]
+		},
+		preferences: null,
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }]
+			},
+			{
+				label: 'Help',
+				items: [
+					{
+						type: 'action',
+						label: 'About Software Shop',
+						action: () => os.openAbout('software-shop')
+					}
+				]
+			}
+		],
+		statusExtra: () => null
+	},
+
 	textedit: {
 		id: 'textedit',
 		name: 'TextEdit',
@@ -499,29 +544,13 @@ export const APPS: Record<string, AppDef> = {
 						type: 'action',
 						label: 'New',
 						shortcut: '⌘N',
-						action: () => {
-							const doc = createDoc();
-							os.openWindow(`textedit-${doc.id}`);
-						}
+						action: () => os.launchApp('textedit', { action: 'new' })
 					},
 					{
 						type: 'action',
 						label: 'Open…',
 						shortcut: '⌘O',
-						action: () => {
-							const docs = listDocs();
-							const buttons = docs.map((d) => ({
-								label: d.name,
-								action: () => {
-									os.openWindow(`textedit-${d.id}`);
-								}
-							}));
-							os.alert({
-								title: 'Open Document',
-								body: docs.length > 0 ? 'Choose a document to open:' : 'No documents found.',
-								buttons: [...buttons, { label: 'Cancel', primary: true }]
-							});
-						}
+						action: () => os.launchApp('textedit', { action: 'open' })
 					},
 					{ type: 'separator' },
 					{ type: 'action', label: 'Save', shortcut: '⌘S' },

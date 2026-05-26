@@ -30,20 +30,57 @@
 			</ul>
 		</div>
 	</div>
-	<p class="footnote">
-		Cancel any time. Pricing in fake dollars. Real dollars also fine.
-	</p>
+	<p class="footnote">Cancel any time. Pricing in fake dollars. Real dollars also fine.</p>
 </div>
 
 <style>
-	.pricing { padding: 14px; font-family: var(--brand-font-body, 'VT323', monospace); font-size: 18px; }
-	h2 { font-family: var(--brand-font-display, 'Press Start 2P', monospace); font-size: 12px; margin: 0 0 12px; font-weight: normal; }
-	.tiers { display: grid; gap: 10px; }
-	.tier { border: 2px solid var(--ink); padding: 10px 12px; background: var(--paper); }
-	.tier.featured { background: var(--accent-2); }
-	.name { font-family: var(--brand-font-display, 'Press Start 2P', monospace); font-size: 11px; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-	.price { font-size: 14px; }
-	ul { list-style: none; padding: 0; margin: 6px 0 0; font-size: 17px; line-height: 1.3; }
-	li::before { content: '▸ '; }
-	.footnote { margin-top: 12px; font-size: 16px; opacity: 0.75; }
+	.pricing {
+		padding: 14px;
+		font-family: var(--brand-font-body, 'VT323', monospace);
+		font-size: 18px;
+	}
+	h2 {
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
+		font-size: 12px;
+		margin: 0 0 12px;
+		font-weight: normal;
+	}
+	.tiers {
+		display: grid;
+		gap: 10px;
+	}
+	.tier {
+		border: 2px solid var(--ink);
+		padding: 10px 12px;
+		background: var(--paper);
+	}
+	.tier.featured {
+		background: var(--accent-2);
+	}
+	.name {
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
+		font-size: 11px;
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin-bottom: 6px;
+	}
+	.price {
+		font-size: 14px;
+	}
+	ul {
+		list-style: none;
+		padding: 0;
+		margin: 6px 0 0;
+		font-size: 17px;
+		line-height: 1.3;
+	}
+	li::before {
+		content: '▸ ';
+	}
+	.footnote {
+		margin-top: 12px;
+		font-size: 16px;
+		opacity: 0.75;
+	}
 </style>

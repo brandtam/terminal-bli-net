@@ -1,18 +1,14 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import {
-		createFile,
-		deleteNode,
-		findByApp,
-		exists,
-		RECORDINGS_ID,
-		type FSFile
-	} from '$lib/os/filesystem';
+	import type { TerminalFS, FsFile } from '$lib/terminalos';
+	import { RECORDINGS_ID } from '$lib/terminalos';
 
 	let {
-		recording = $bindable(false)
+		recording = $bindable(false),
+		fs
 	}: {
 		recording?: boolean;
+		fs: TerminalFS;
 	} = $props();
 
 	const MAX_DURATION = 10;
@@ -22,7 +18,7 @@
 	let recorder = $state<MediaRecorder | null>(null);
 	let isRecording = $state(false);
 	let elapsed = $state(0);
-	let recordings = $state<FSFile[]>(findByApp('recorder', RECORDINGS_ID));
+	let recordings = $state<FsFile[]>([]);
 	let playbackUrl = $state<string | null>(null);
 	let error = $state<string | null>(null);
 	let videoEl: HTMLVideoElement | undefined = $state(undefined);
@@ -35,7 +31,7 @@
 	});
 
 	function refreshRecordings() {
-		recordings = findByApp('recorder', RECORDINGS_ID);
+		recordings = fs.findByApp('recorder', RECORDINGS_ID);
 	}
 
 	function formatTime(s: number): string {
@@ -90,23 +86,27 @@
 		recorder.onstop = () => {
 			const blob = new Blob(chunks, { type: recorder?.mimeType || 'video/webm' });
 			const reader = new FileReader();
-			reader.onload = () => {
+			reader.onload = async () => {
 				const dataUrl = reader.result as string;
 				let clipNumber = recordings.length + 1;
 				let name = `Clip ${clipNumber} (${elapsed}s).webm`;
-				while (exists(RECORDINGS_ID, name)) {
+				while (fs.exists(RECORDINGS_ID, name)) {
 					clipNumber++;
 					name = `Clip ${clipNumber} (${elapsed}s).webm`;
 				}
-				try {
-					createFile(RECORDINGS_ID, name, 'recorder', dataUrl);
+				const result = await fs.createFile(RECORDINGS_ID, name, {
+					appId: 'recorder',
+					fileType: 'recording',
+					text: dataUrl
+				});
+				if (result.ok) {
 					refreshRecordings();
 					playbackUrl = dataUrl;
-				} catch (e) {
-					const msg = e instanceof Error ? e.message : '';
-					error = msg.includes('already exists')
-						? 'A recording with that name already exists.'
-						: 'Storage full — delete old recordings to free space.';
+				} else {
+					error =
+						result.error.code === 'duplicate_name'
+							? 'A recording with that name already exists.'
+							: 'Storage full — delete old recordings to free space.';
 				}
 			};
 			reader.readAsDataURL(blob);
@@ -136,16 +136,20 @@
 		}
 	}
 
-	function removeRecording(id: string) {
-		deleteNode(id);
+	async function removeRecording(id: string) {
+		await fs.deleteNode(id);
 		refreshRecordings();
-		if (playbackUrl && recordings.every((r) => r.data !== playbackUrl)) {
+		if (playbackUrl && recordings.every((r) => getFileText(r) !== playbackUrl)) {
 			playbackUrl = null;
 		}
 	}
 
-	function playRecording(rec: FSFile) {
-		playbackUrl = rec.data;
+	function getFileText(file: FsFile): string {
+		return file.bodyRef?.kind === 'inline-text' ? file.bodyRef.text : '';
+	}
+
+	function playRecording(rec: FsFile) {
+		playbackUrl = getFileText(rec);
 	}
 
 	function cleanup() {
@@ -157,6 +161,7 @@
 	}
 
 	onMount(() => {
+		refreshRecordings();
 		initCamera();
 	});
 

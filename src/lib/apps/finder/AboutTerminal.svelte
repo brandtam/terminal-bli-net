@@ -1,40 +1,65 @@
 <script lang="ts">
 	import type { OsApi } from '$lib/os/os-api';
-	import { windowAppId } from '$lib/os/os-api';
-	import { APPS } from '$lib/os/app-registry';
+	import type { TerminalFS } from '$lib/terminalos';
+	import type { DiskUsage } from '$lib/terminalos';
 
-	let { os }: { os: OsApi } = $props();
+	let { os, fs }: { os: OsApi; fs: TerminalFS } = $props();
 
 	const version = __APP_VERSION__;
 
-	/** Deterministic fake memory from app name — stable across re-renders */
-	function fakeMemory(name: string): number {
-		let hash = 0;
-		for (let i = 0; i < name.length; i++) {
-			hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
-		}
-		return 400 + Math.abs(hash % 1200);
-	}
-
-	const maxMem = 2048;
-
-	const openApps = $derived.by(() => {
-		const wins = os.listWindows();
-		const appCounts = new Map<string, number>();
-		for (const w of wins) {
-			const appId = windowAppId(w.id);
-			const app = APPS[appId];
-			if (app) {
-				appCounts.set(app.name, (appCounts.get(app.name) ?? 0) + 1);
+	function getLocalStorageBytes(): number {
+		let total = 0;
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i);
+			if (key) {
+				total += key.length * 2 + (localStorage.getItem(key)?.length ?? 0) * 2;
 			}
 		}
-		return Array.from(appCounts.entries()).map(([name, count]) => ({
-			name,
-			count,
-			memory: fakeMemory(name) * count,
-			pct: Math.min(100, ((fakeMemory(name) * count) / maxMem) * 100)
-		}));
+		return total;
+	}
+
+	const storageUsed = $derived(getLocalStorageBytes());
+	const storageQuota = 5 * 1024 * 1024; // 5MB typical localStorage quota
+
+	function formatK(bytes: number): string {
+		return `${Math.round(bytes / 1024).toLocaleString()}K`;
+	}
+
+	let diskUsage = $state<DiskUsage | null>(null);
+
+	$effect(() => {
+		fs.getDiskUsage().then((result) => {
+			if (result.ok) diskUsage = result.value;
+		});
 	});
+
+	const appUsage = $derived.by(() => {
+		if (!diskUsage) return [];
+		const apps = [
+			{ id: 'textedit', name: 'TextEdit' },
+			{ id: 'stickies', name: 'Stickies' },
+			{ id: 'recorder', name: 'Camera' }
+		];
+		const result: { name: string; bytes: number; count: number }[] = [];
+		for (const app of apps) {
+			const files = fs.findByApp(app.id);
+			let bytes = 0;
+			for (const f of files) {
+				if (f.bodyRef?.kind === 'inline-text') {
+					bytes += f.bodyRef.text.length * 2;
+				}
+			}
+			if (bytes > 0 || files.length > 0) {
+				result.push({ name: app.name, bytes, count: files.length });
+			}
+		}
+		const appTotal = result.reduce((s, a) => s + a.bytes, 0);
+		const systemBytes = diskUsage.totalEstimatedBytes - appTotal;
+		result.unshift({ name: 'System', bytes: Math.max(0, systemBytes), count: 0 });
+		return result;
+	});
+
+	const barMax = storageQuota;
 </script>
 
 <div class="about-terminal">
@@ -47,22 +72,32 @@
 		</div>
 	</div>
 	<div class="about-memory-header">
-		<span>Built-in Memory: &infin;</span>
-		<span>Total Memory: &infin;</span>
+		<span>Built-in Memory: {formatK(storageQuota)}</span>
+		<span>Disk Used: {formatK(storageUsed)}</span>
 	</div>
 	<div class="about-bars">
-		{#each openApps as app}
+		<div class="about-bar-row">
+			<span class="about-bar-name">Total</span>
+			<span class="about-bar-size">{formatK(storageUsed)}</span>
+			<div class="about-bar-track">
+				<div
+					class="about-bar-fill"
+					style="width: {Math.min(100, (storageUsed / storageQuota) * 100)}%"
+				></div>
+			</div>
+		</div>
+		{#each appUsage as app}
 			<div class="about-bar-row">
 				<span class="about-bar-name">{app.name}</span>
-				<span class="about-bar-size">{app.memory}K</span>
+				<span class="about-bar-size">{formatK(app.bytes)}</span>
 				<div class="about-bar-track">
-					<div class="about-bar-fill" style="width: {app.pct}%"></div>
+					<div
+						class="about-bar-fill"
+						style="width: {Math.min(100, (app.bytes / barMax) * 100)}%"
+					></div>
 				</div>
 			</div>
 		{/each}
-		{#if openApps.length === 0}
-			<div class="about-bar-empty">No apps open</div>
-		{/if}
 	</div>
 </div>
 
@@ -145,10 +180,5 @@
 	.about-bar-fill {
 		height: 100%;
 		background: var(--ink);
-	}
-	.about-bar-empty {
-		font-size: 16px;
-		opacity: 0.5;
-		padding: 12px 0;
 	}
 </style>

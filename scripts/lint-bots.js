@@ -51,15 +51,11 @@ function lint(filePath, bot) {
 }
 
 try {
-	const groups = readdirSync(BOTS_DIR).filter((d) =>
-		statSync(join(BOTS_DIR, d)).isDirectory()
-	);
+	const groups = readdirSync(BOTS_DIR).filter((d) => statSync(join(BOTS_DIR, d)).isDirectory());
 
 	for (const group of groups) {
 		const groupDir = join(BOTS_DIR, group);
-		const files = readdirSync(groupDir).filter(
-			(f) => f.endsWith('.json') && f !== '_meta.json'
-		);
+		const files = readdirSync(groupDir).filter((f) => f.endsWith('.json') && f !== '_meta.json');
 
 		for (const file of files) {
 			const filePath = join(groupDir, file);

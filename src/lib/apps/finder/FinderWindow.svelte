@@ -1,29 +1,30 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import type { OsApi } from '$lib/os/os-api';
 	import {
-		list,
-		getNode,
-		onFsChange,
-		createAlias,
-		resolveAlias,
-		trash,
-		deleteNode,
+		type TerminalFS,
 		ROOT_ID,
 		TRASH_ID,
 		SYSTEM_ID,
-		APPS_ID,
+		APPLICATIONS_ID,
 		DESKTOP_ID,
-		RECORDINGS_ID
-	} from '$lib/os/filesystem';
-	import type { FSNode, FSFile } from '$lib/os/filesystem';
+		RECORDINGS_ID,
+		createFolderView
+	} from '$lib/terminalos';
+	import type { FsNode, FsFile, FsAlias } from '$lib/terminalos';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
+	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import { getAppDef } from '$lib/terminalos/apps/app-library';
+	import { isInstalled } from '$lib/terminalos/apps/software-shop';
 
 	let {
 		folderId = ROOT_ID,
-		os
+		os,
+		fs
 	}: {
 		folderId?: string;
 		os: OsApi;
+		fs: TerminalFS;
 	} = $props();
 
 	function initialFolder() {
@@ -31,57 +32,66 @@
 	}
 	let currentFolderId = $state(initialFolder());
 	let selectedId = $state<string | null>(null);
-	let fsRev = $state(0);
 
-	$effect(() =>
-		onFsChange(() => {
-			fsRev++;
-		})
-	);
+	let folderView = $state<ReturnType<typeof createFolderView> | null>(null);
+	let prevFolderView: ReturnType<typeof createFolderView> | null = null;
 
-	const items = $derived.by(() => {
-		fsRev;
-		return list(currentFolderId);
+	$effect(() => {
+		prevFolderView?.destroy();
+		const view = createFolderView(fs, currentFolderId);
+		prevFolderView = view;
+		folderView = view;
 	});
+
+	onDestroy(() => prevFolderView?.destroy());
+
+	const items = $derived(folderView?.items ?? []);
+
 	const pathSegments = $derived.by(() => {
+		folderView?.items;
 		const segments: { id: string; name: string }[] = [];
-		let node = getNode(currentFolderId);
+		let node = fs.peekNode(currentFolderId);
 		while (node) {
 			segments.unshift({ id: node.id, name: node.name });
-			node = node.parentId ? getNode(node.parentId) : null;
+			node = node.parentId ? fs.peekNode(node.parentId) : undefined;
 		}
 		return segments;
 	});
 
-	function iconKind(node: FSNode): string {
-		if (node.type === 'alias') {
-			const target = resolveAlias(node);
+	function resolveNode(node: FsNode, seen?: Set<string>): FsNode | null {
+		if (node.kind !== 'alias') return node;
+		const alias = node as FsAlias;
+		const visited = seen ?? new Set<string>();
+		if (visited.has(alias.id)) return null;
+		visited.add(alias.id);
+		const target = fs.peekNode(alias.target.nodeId);
+		if (!target) return null;
+		if (target.kind === 'alias') return resolveNode(target, visited);
+		return target;
+	}
+
+	function iconKind(node: FsNode): string {
+		if (node.kind === 'alias') {
+			const target = resolveNode(node);
 			if (target) return iconKind(target);
 			return 'doc';
 		}
-		if (node.type === 'folder') {
+		if (node.kind === 'folder') {
 			if (node.id === TRASH_ID) return 'trash';
 			if (node.id === SYSTEM_ID) return 'hd';
-			if (node.id === APPS_ID) return 'folder';
+			if (node.id === APPLICATIONS_ID) return 'folder';
 			if (node.id === DESKTOP_ID) return 'folder';
 			if (node.id === RECORDINGS_ID) return 'floppy';
 			return 'folder';
 		}
-		const file = node as FSFile;
-		if (file.appId === 'recorder') return 'tv';
-		if (file.appId === 'stickies') return 'stickies';
-		if (file.appId === 'tvguide') return 'tvguide';
-		if (file.appId === 'stats') return 'calc';
-		if (file.appId === 'error') return 'floppy';
-		if (file.appId === 'system-prefs') return 'hd';
-		if (file.appId === 'about-terminal') return 'doc';
+		const file = node as FsFile;
+		if (file.appId) return getAppIconKind(file.appId);
 		return 'doc';
 	}
 
-	function iconAccent(node: FSNode): boolean {
-		if (node.type === 'file') {
-			const file = node as FSFile;
-			if (file.name.toLowerCase() === 'pricing.txt') return true;
+	function iconAccent(node: FsNode): boolean {
+		if (node.kind === 'file') {
+			if (node.name.toLowerCase() === 'pricing.txt') return true;
 		}
 		return false;
 	}
@@ -90,37 +100,74 @@
 		selectedId = id;
 	}
 
-	function handleOpen(node: FSNode) {
-		if (node.type === 'folder') {
-			currentFolderId = node.id;
-			selectedId = null;
-			return;
-		}
-		if (node.type === 'alias') {
-			const target = resolveAlias(node);
-			if (target) handleOpen(target);
-			return;
-		}
-		const file = node as FSFile;
+	function openDocFile(file: FsFile) {
 		if (file.appId === 'textedit') {
 			os.openWindow(`textedit-${file.id}`);
 		} else if (file.appId === 'recorder') {
 			os.openWindow(`recorder-${file.id}`);
 		} else if (file.appId === 'stickies') {
 			os.launchApp('stickies', { action: 'new' });
-		} else if (file.appId === 'tvguide') {
-			os.openWindow('tv-guide');
-		} else if (file.appId === 'stats') {
-			os.openWindow('stats');
-		} else if (file.appId === 'error') {
-			os.openWindow('error');
-		} else if (file.appId === 'system-prefs') {
-			os.openSystemPreferences();
-		} else if (file.appId === 'about-terminal') {
-			os.openAbout(null);
-		} else {
-			os.openWindow(file.id);
 		}
+	}
+
+	function handleOpen(node: FsNode) {
+		if (node.kind === 'folder') {
+			currentFolderId = node.id;
+			selectedId = null;
+			return;
+		}
+		if (node.kind === 'alias') {
+			const target = resolveNode(node);
+			if (target) handleOpen(target);
+			return;
+		}
+		const file = node as FsFile;
+		const appId = file.appId;
+		if (!appId) {
+			os.openWindow(file.id);
+			return;
+		}
+
+		// For document-type files, check if the owning app is still installed
+		const docApps = new Set(['textedit', 'recorder', 'stickies']);
+		if (docApps.has(appId)) {
+			const appDef = getAppDef(appId);
+			if (appDef) {
+				const nodes = fs.getAllNodes();
+				if (!isInstalled(appId, nodes)) {
+					os.alert({
+						title: `${appDef.name} is not installed`,
+						body: `The ${appDef.name} application has been uninstalled. You can reinstall it from the Software Shop.`,
+						buttons: [
+							{
+								label: 'Open Software Shop',
+								action: () => os.openWindow('software-shop')
+							},
+							{ label: 'OK', primary: true }
+						]
+					});
+				} else {
+					openDocFile(file);
+				}
+				return;
+			}
+		}
+
+		if (appId === 'system-prefs') {
+			os.openSystemPreferences();
+			return;
+		}
+		if (appId === 'about-terminal') {
+			os.openAbout(null);
+			return;
+		}
+		// Generic: look up window ID from AppLibrary
+		const windowId = getAppWindowId(appId);
+		if (windowId) {
+			os.openWindow(windowId);
+			return;
+		}
+		os.openWindow(file.id);
 	}
 
 	function navigateTo(id: string) {
@@ -128,12 +175,12 @@
 		selectedId = null;
 	}
 
-	let contextMenuNode = $state<FSNode | null>(null);
+	let contextMenuNode = $state<FsNode | null>(null);
 	let contextMenuX = $state(0);
 	let contextMenuY = $state(0);
 	let contextMenuEl = $state<HTMLDivElement | null>(null);
 
-	function handleContextMenu(e: MouseEvent, node: FSNode) {
+	function handleContextMenu(e: MouseEvent, node: FsNode) {
 		e.preventDefault();
 		contextMenuNode = node;
 		contextMenuX = e.clientX;
@@ -156,32 +203,35 @@
 		closeContextMenu();
 	}
 
-	function handleContextMakeAlias() {
+	async function handleContextMakeAlias() {
 		if (!contextMenuNode) return;
 		const name = contextMenuNode.name + ' alias';
-		try {
-			createAlias(currentFolderId, name, contextMenuNode.id);
-		} catch {
-			// alias already exists or other error
-		}
+		await fs.createAlias(currentFolderId, contextMenuNode.id, name);
 		closeContextMenu();
 	}
 
-	const PROTECTED_IDS = new Set([ROOT_ID, SYSTEM_ID, APPS_ID, DESKTOP_ID, RECORDINGS_ID, TRASH_ID]);
+	const PROTECTED_IDS = new Set([
+		ROOT_ID,
+		SYSTEM_ID,
+		APPLICATIONS_ID,
+		DESKTOP_ID,
+		RECORDINGS_ID,
+		TRASH_ID
+	]);
 
-	function canTrash(node: FSNode): boolean {
+	function canTrash(node: FsNode): boolean {
 		return !PROTECTED_IDS.has(node.id);
 	}
 
-	function handleContextTrash() {
+	async function handleContextTrash() {
 		if (!contextMenuNode || !canTrash(contextMenuNode)) return;
-		trash(contextMenuNode.id);
+		await fs.trash(contextMenuNode.id);
 		closeContextMenu();
 	}
 
-	function handleContextDelete() {
+	async function handleContextDelete() {
 		if (!contextMenuNode) return;
-		deleteNode(contextMenuNode.id);
+		await fs.deleteNode(contextMenuNode.id);
 		closeContextMenu();
 	}
 
@@ -210,7 +260,7 @@
 				ondblclick={() => handleOpen(node)}
 				oncontextmenu={(e) => handleContextMenu(e, node)}
 			>
-				<div class="finder-item-icon" class:alias={node.type === 'alias'}>
+				<div class="finder-item-icon" class:alias={node.kind === 'alias'}>
 					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
 				</div>
 				<div class="finder-item-label">{node.name}</div>
@@ -243,7 +293,7 @@
 				>
 			{:else}
 				<button type="button" class="context-menu-item" onclick={handleContextOpen}>Open</button>
-				{#if contextMenuNode.type === 'file'}
+				{#if contextMenuNode.kind === 'file'}
 					<div class="context-menu-sep"></div>
 					<button type="button" class="context-menu-item" onclick={handleContextMakeAlias}
 						>Make Alias</button

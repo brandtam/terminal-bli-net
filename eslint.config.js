@@ -42,6 +42,11 @@ export default [
 				ResizeObserver: 'readonly',
 				requestAnimationFrame: 'readonly',
 				KVNamespace: 'readonly',
+				indexedDB: 'readonly',
+				IDBDatabase: 'readonly',
+				BroadcastChannel: 'readonly',
+				MessageEvent: 'readonly',
+				Blob: 'readonly',
 				__APP_VERSION__: 'readonly'
 			}
 		},
@@ -104,6 +109,20 @@ export default [
 			'no-unused-vars': 'off',
 			'no-useless-assignment': 'off',
 			'svelte/valid-compile': 'warn'
+		}
+	},
+	{
+		files: ['**/*.svelte.ts', '**/*.svelte.js'],
+		languageOptions: {
+			globals: {
+				$state: 'readonly',
+				$derived: 'readonly',
+				$effect: 'readonly',
+				$props: 'readonly',
+				$bindable: 'readonly',
+				$inspect: 'readonly',
+				$host: 'readonly'
+			}
 		}
 	},
 	{

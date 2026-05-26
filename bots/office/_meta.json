@@ -1,45 +1,183 @@
 {
-  "slug": "office",
-  "name": "The Office",
-  "description": "A documentary crew captures the everyday absurdity of life at a mid-size paper company.",
-  "setting": "Dunder Mifflin, Scranton, Pennsylvania",
-  "era": "Mid-2000s",
-  "image": "/bots/office/group-icon.png",
-  "active": true,
-  "color": "#4a7c59",
-  "schedule": [
-    { "day": "mon", "start": "04:00", "duration": 180 },
-    { "day": "mon", "start": "10:00", "duration": 180 },
-    { "day": "tue", "start": "22:00", "duration": 180 },
-    { "day": "wed", "start": "00:00", "duration": 240 },
-    { "day": "thu", "start": "16:00", "duration": 180 },
-    { "day": "fri", "start": "13:00", "duration": 180 },
-    { "day": "sat", "start": "22:00", "duration": 180 },
-    { "day": "sun", "start": "00:00", "duration": 240 }
-  ],
-  "episodes": [
-    { "season": 1, "episode": 1, "title": "Pilot", "year": "2005", "premise": "Michael Scott learns corporate is sending someone to downsize the Scranton branch and spends the day trying to prove his office is one big happy family while making everyone miserable." },
-    { "season": 2, "episode": 1, "title": "The Dundies", "year": "2005", "premise": "Michael hosts his annual awards ceremony at a Chili's, where Pam gets drunk enough to kiss Jim and the entire restaurant turns hostile." },
-    { "season": 2, "episode": 3, "title": "Office Olympics", "year": "2005", "premise": "While Michael and Dwight close on a condo, Jim organizes a full Olympic games using office supplies, awarding yogurt-lid medals in a surprisingly touching closing ceremony." },
-    { "season": 2, "episode": 12, "title": "The Injury", "year": "2006", "premise": "Michael burns his foot on a George Foreman grill and demands the office pamper him, while Dwight gets a concussion and becomes weirdly nice to everyone." },
-    { "season": 2, "episode": 15, "title": "Boys and Girls", "year": "2006", "premise": "Jan holds a women-in-the-workplace seminar while Michael takes the warehouse guys upstairs for a competing men's session that immediately goes off the rails." },
-    { "season": 2, "episode": 18, "title": "Take Your Daughter to Work Day", "year": "2006", "premise": "Employees bring their kids to the office and a VHS tape of Michael's childhood appearance on a local TV show reveals his desperate need for attention started very young." },
-    { "season": 2, "episode": 19, "title": "Michael's Birthday", "year": "2006", "premise": "Michael demands attention for his birthday while Kevin waits for potentially devastating medical test results, and Jim struggles with whether to tell Michael." },
-    { "season": 2, "episode": 22, "title": "Casino Night", "year": "2006", "premise": "Michael invites two dates to the warehouse casino night, Dwight and Angela sneak away together, and Jim finally confesses his feelings to Pam in the parking lot." },
-    { "season": 3, "episode": 1, "title": "Gay Witch Hunt", "year": "2006", "premise": "Michael accidentally outs Oscar and then tries to prove he's not homophobic by kissing him in front of the entire office." },
-    { "season": 3, "episode": 6, "title": "Diwali", "year": "2006", "premise": "Michael misunderstands an invitation to Kelly's Diwali celebration and turns it into a disastrous proposal to Carol while wearing a paper-mache costume." },
-    { "season": 3, "episode": 16, "title": "Business School", "year": "2007", "premise": "Michael gives a rambling guest lecture at Ryan's business school while back at the office a bat terrorizes the staff and Dwight tries to kill it." },
-    { "season": 3, "episode": 23, "title": "Beach Games", "year": "2007", "premise": "Michael holds Survivor-style competitions at a lake beach to choose his replacement, and Pam finally walks across hot coals and tells the office how she really feels." },
-    { "season": 4, "episode": 9, "title": "Dinner Party", "year": "2008", "premise": "Michael and Jan host an excruciating couples dinner where their toxic relationship is on full display — Jan's candles fill every surface, the plasma TV is tiny, and Hunter's CD plays on repeat." },
-    { "season": 4, "episode": 14, "title": "Goodbye, Toby", "year": "2008", "premise": "Michael throws an ecstatic farewell party for his nemesis Toby, only for Holly Flax to arrive as the replacement HR rep and capture Michael's heart instantly." },
-    { "season": 5, "episode": 1, "title": "Weight Loss", "year": "2008", "premise": "The office enters a weight-loss competition against other branches, pushing everyone to extreme diets while Jim proposes to Pam at a gas station rest stop." },
-    { "season": 5, "episode": 14, "title": "Stress Relief", "year": "2009", "premise": "Dwight stages a fire drill that causes Stanley to have a heart attack, then Michael screens his own movie 'Threat Level Midnight' to boost morale." },
-    { "season": 5, "episode": 26, "title": "Company Picnic", "year": "2009", "premise": "Michael and Holly reunite to perform an HR-themed skit at the company picnic while Jim and Pam sneak off and discover they're expecting a baby." },
-    { "season": 6, "episode": 4, "title": "Niagara", "year": "2009", "premise": "Jim and Pam's wedding weekend at Niagara Falls becomes a spectacle as Michael gives an inappropriate rehearsal toast and the couple secretly marries on the Maid of the Mist." },
-    { "season": 6, "episode": 12, "title": "Scott's Tots", "year": "2009", "premise": "Michael must face a class of high schoolers he promised to pay through college ten years ago — with no money to give them — in the most painful scene ever filmed." },
-    { "season": 7, "episode": 17, "title": "Threat Level Midnight", "year": "2011", "premise": "Michael screens his completed action movie starring himself as Agent Michael Scarn, featuring the entire office in roles filmed over several years of production." },
-    { "season": 7, "episode": 19, "title": "Garage Sale", "year": "2011", "premise": "Michael proposes to Holly using a trail of treasured mementos from their relationship while the rest of the office haggles at a parking lot garage sale." },
-    { "season": 7, "episode": 22, "title": "Goodbye, Michael", "year": "2011", "premise": "Michael spends his final day at Dunder Mifflin saying goodbye to each person individually, giving away his possessions, and slipping away a day early so nobody has to watch him leave." },
-    { "season": 9, "episode": 23, "title": "Finale", "year": "2013", "premise": "The documentary airs and the entire office reunites for a panel discussion, where Dwight marries Angela, Michael returns with photos of his kids, and everyone reflects on what the cameras meant to them." }
-  ]
+	"slug": "office",
+	"name": "The Office",
+	"description": "A documentary crew captures the everyday absurdity of life at a mid-size paper company.",
+	"setting": "Dunder Mifflin, Scranton, Pennsylvania",
+	"era": "Mid-2000s",
+	"image": "/bots/office/group-icon.png",
+	"active": true,
+	"color": "#4a7c59",
+	"schedule": [
+		{ "day": "mon", "start": "04:00", "duration": 180 },
+		{ "day": "mon", "start": "10:00", "duration": 180 },
+		{ "day": "tue", "start": "22:00", "duration": 180 },
+		{ "day": "wed", "start": "00:00", "duration": 240 },
+		{ "day": "thu", "start": "16:00", "duration": 180 },
+		{ "day": "fri", "start": "13:00", "duration": 180 },
+		{ "day": "sat", "start": "22:00", "duration": 180 },
+		{ "day": "sun", "start": "00:00", "duration": 240 }
+	],
+	"episodes": [
+		{
+			"season": 1,
+			"episode": 1,
+			"title": "Pilot",
+			"year": "2005",
+			"premise": "Michael Scott learns corporate is sending someone to downsize the Scranton branch and spends the day trying to prove his office is one big happy family while making everyone miserable."
+		},
+		{
+			"season": 2,
+			"episode": 1,
+			"title": "The Dundies",
+			"year": "2005",
+			"premise": "Michael hosts his annual awards ceremony at a Chili's, where Pam gets drunk enough to kiss Jim and the entire restaurant turns hostile."
+		},
+		{
+			"season": 2,
+			"episode": 3,
+			"title": "Office Olympics",
+			"year": "2005",
+			"premise": "While Michael and Dwight close on a condo, Jim organizes a full Olympic games using office supplies, awarding yogurt-lid medals in a surprisingly touching closing ceremony."
+		},
+		{
+			"season": 2,
+			"episode": 12,
+			"title": "The Injury",
+			"year": "2006",
+			"premise": "Michael burns his foot on a George Foreman grill and demands the office pamper him, while Dwight gets a concussion and becomes weirdly nice to everyone."
+		},
+		{
+			"season": 2,
+			"episode": 15,
+			"title": "Boys and Girls",
+			"year": "2006",
+			"premise": "Jan holds a women-in-the-workplace seminar while Michael takes the warehouse guys upstairs for a competing men's session that immediately goes off the rails."
+		},
+		{
+			"season": 2,
+			"episode": 18,
+			"title": "Take Your Daughter to Work Day",
+			"year": "2006",
+			"premise": "Employees bring their kids to the office and a VHS tape of Michael's childhood appearance on a local TV show reveals his desperate need for attention started very young."
+		},
+		{
+			"season": 2,
+			"episode": 19,
+			"title": "Michael's Birthday",
+			"year": "2006",
+			"premise": "Michael demands attention for his birthday while Kevin waits for potentially devastating medical test results, and Jim struggles with whether to tell Michael."
+		},
+		{
+			"season": 2,
+			"episode": 22,
+			"title": "Casino Night",
+			"year": "2006",
+			"premise": "Michael invites two dates to the warehouse casino night, Dwight and Angela sneak away together, and Jim finally confesses his feelings to Pam in the parking lot."
+		},
+		{
+			"season": 3,
+			"episode": 1,
+			"title": "Gay Witch Hunt",
+			"year": "2006",
+			"premise": "Michael accidentally outs Oscar and then tries to prove he's not homophobic by kissing him in front of the entire office."
+		},
+		{
+			"season": 3,
+			"episode": 6,
+			"title": "Diwali",
+			"year": "2006",
+			"premise": "Michael misunderstands an invitation to Kelly's Diwali celebration and turns it into a disastrous proposal to Carol while wearing a paper-mache costume."
+		},
+		{
+			"season": 3,
+			"episode": 16,
+			"title": "Business School",
+			"year": "2007",
+			"premise": "Michael gives a rambling guest lecture at Ryan's business school while back at the office a bat terrorizes the staff and Dwight tries to kill it."
+		},
+		{
+			"season": 3,
+			"episode": 23,
+			"title": "Beach Games",
+			"year": "2007",
+			"premise": "Michael holds Survivor-style competitions at a lake beach to choose his replacement, and Pam finally walks across hot coals and tells the office how she really feels."
+		},
+		{
+			"season": 4,
+			"episode": 9,
+			"title": "Dinner Party",
+			"year": "2008",
+			"premise": "Michael and Jan host an excruciating couples dinner where their toxic relationship is on full display — Jan's candles fill every surface, the plasma TV is tiny, and Hunter's CD plays on repeat."
+		},
+		{
+			"season": 4,
+			"episode": 14,
+			"title": "Goodbye, Toby",
+			"year": "2008",
+			"premise": "Michael throws an ecstatic farewell party for his nemesis Toby, only for Holly Flax to arrive as the replacement HR rep and capture Michael's heart instantly."
+		},
+		{
+			"season": 5,
+			"episode": 1,
+			"title": "Weight Loss",
+			"year": "2008",
+			"premise": "The office enters a weight-loss competition against other branches, pushing everyone to extreme diets while Jim proposes to Pam at a gas station rest stop."
+		},
+		{
+			"season": 5,
+			"episode": 14,
+			"title": "Stress Relief",
+			"year": "2009",
+			"premise": "Dwight stages a fire drill that causes Stanley to have a heart attack, then Michael screens his own movie 'Threat Level Midnight' to boost morale."
+		},
+		{
+			"season": 5,
+			"episode": 26,
+			"title": "Company Picnic",
+			"year": "2009",
+			"premise": "Michael and Holly reunite to perform an HR-themed skit at the company picnic while Jim and Pam sneak off and discover they're expecting a baby."
+		},
+		{
+			"season": 6,
+			"episode": 4,
+			"title": "Niagara",
+			"year": "2009",
+			"premise": "Jim and Pam's wedding weekend at Niagara Falls becomes a spectacle as Michael gives an inappropriate rehearsal toast and the couple secretly marries on the Maid of the Mist."
+		},
+		{
+			"season": 6,
+			"episode": 12,
+			"title": "Scott's Tots",
+			"year": "2009",
+			"premise": "Michael must face a class of high schoolers he promised to pay through college ten years ago — with no money to give them — in the most painful scene ever filmed."
+		},
+		{
+			"season": 7,
+			"episode": 17,
+			"title": "Threat Level Midnight",
+			"year": "2011",
+			"premise": "Michael screens his completed action movie starring himself as Agent Michael Scarn, featuring the entire office in roles filmed over several years of production."
+		},
+		{
+			"season": 7,
+			"episode": 19,
+			"title": "Garage Sale",
+			"year": "2011",
+			"premise": "Michael proposes to Holly using a trail of treasured mementos from their relationship while the rest of the office haggles at a parking lot garage sale."
+		},
+		{
+			"season": 7,
+			"episode": 22,
+			"title": "Goodbye, Michael",
+			"year": "2011",
+			"premise": "Michael spends his final day at Dunder Mifflin saying goodbye to each person individually, giving away his possessions, and slipping away a day early so nobody has to watch him leave."
+		},
+		{
+			"season": 9,
+			"episode": 23,
+			"title": "Finale",
+			"year": "2013",
+			"premise": "The documentary airs and the entire office reunites for a panel discussion, where Dwight marries Angela, Michael returns with photos of his kids, and everyone reflects on what the cameras meant to them."
+		}
+	]
 }

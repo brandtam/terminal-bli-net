@@ -11,6 +11,7 @@ import { loadBots, loadGroups } from './bots';
 // Env — mirrors the bindings declared in wrangler.jsonc / app.d.ts
 // ---------------------------------------------------------------------------
 
+/* eslint-disable no-undef */
 interface Env {
 	KV: KVNamespace;
 	REMINDER_AGENT: DurableObjectNamespace;
@@ -94,10 +95,7 @@ export class ReminderAgent extends Agent<Env> {
 				const bot = bots[0];
 				if (!bot) continue;
 
-				const signedReplyAddr = await signUnsubscribeAddress(
-					sub.email,
-					this.env.EMAIL_SECRET
-				);
+				const signedReplyAddr = await signUnsubscribeAddress(sub.email, this.env.EMAIL_SECRET);
 
 				const { subject, body, headers } = composeReminder({
 					showName: group.name,

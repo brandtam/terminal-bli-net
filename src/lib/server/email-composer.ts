@@ -1,6 +1,7 @@
 /**
  * Email composition and HMAC-signed unsubscribe helpers for reminder emails.
  */
+/* eslint-disable no-undef */
 
 // ---------------------------------------------------------------------------
 // HMAC helpers
@@ -34,10 +35,7 @@ function hexToBuf(hex: string): ArrayBuffer {
  * The signature covers the subscriber email so that only a valid signature
  * can trigger an unsubscribe (prevents spoofed unsubscribe requests).
  */
-export async function signUnsubscribeAddress(
-	email: string,
-	secret: string
-): Promise<string> {
+export async function signUnsubscribeAddress(email: string, secret: string): Promise<string> {
 	const key = await importKey(secret);
 	const enc = new TextEncoder();
 	const sig = await crypto.subtle.sign('HMAC', key, enc.encode(email));

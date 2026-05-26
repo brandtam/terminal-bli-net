@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { Channel, ChannelSlot } from './types';
 
+/* eslint-disable no-undef */
 const CHANNELS_DIR = join(process.cwd(), 'channels');
 const BOTS_DIR = join(process.cwd(), 'bots');
 
@@ -77,9 +78,7 @@ describe('Channel schedule validation', () => {
 				for (const slot of channel.schedule) {
 					const s = slot as ChannelSlot;
 					const episodes = showEpisodes[s.showSlug];
-					const match = episodes.find(
-						(e) => e.season === s.season && e.episode === s.episode
-					);
+					const match = episodes.find((e) => e.season === s.season && e.episode === s.episode);
 					expect(
 						match,
 						`${s.showSlug} S${s.season}E${s.episode} not found in episode catalog`

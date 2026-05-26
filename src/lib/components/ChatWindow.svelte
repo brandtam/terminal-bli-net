@@ -35,7 +35,7 @@
 
 	const modeOptions = $derived([
 		{ value: 'group', label: 'Group Chat' },
-		...castBots.map(b => ({ value: b.id, label: b.name }))
+		...castBots.map((b) => ({ value: b.id, label: b.name }))
 	]);
 
 	const castNames = $derived(castBots.map((b) => b.name.split(' ')[0]).join(' · '));
@@ -79,26 +79,26 @@
 	});
 
 	const EXCUSES = [
-		"Sorry, I got distracted by something off-camera.",
+		'Sorry, I got distracted by something off-camera.',
 		"Hold on, someone's knocking at the door.",
-		"I just remembered I left something in the oven.",
-		"The phone is ringing, give me a second.",
-		"I think I hear my mother calling.",
-		"Wait — what year is it again?",
-		"My brain just did that thing where it completely shuts off.",
-		"I spaced out, can you say that again later?",
+		'I just remembered I left something in the oven.',
+		'The phone is ringing, give me a second.',
+		'I think I hear my mother calling.',
+		'Wait — what year is it again?',
+		'My brain just did that thing where it completely shuts off.',
+		'I spaced out, can you say that again later?',
 		"I'm having a moment, just... give me a minute.",
-		"Something came up, I gotta deal with this real quick.",
-		"I just got paged, hold that thought.",
+		'Something came up, I gotta deal with this real quick.',
+		'I just got paged, hold that thought.',
 		"There's some kind of situation happening over here.",
-		"Excuse me, I need to take this call.",
-		"I completely lost my train of thought.",
+		'Excuse me, I need to take this call.',
+		'I completely lost my train of thought.',
 		"The signal's bad, I'm getting static.",
-		"Can we pick this up in a minute? Something just came up.",
+		'Can we pick this up in a minute? Something just came up.',
 		"I think we're experiencing technical difficulties.",
-		"Hang on, the studio lights just went out.",
-		"Sorry, the teleprompter is broken.",
-		"We're on a commercial break, be right back.",
+		'Hang on, the studio lights just went out.',
+		'Sorry, the teleprompter is broken.',
+		"We're on a commercial break, be right back."
 	];
 
 	function randomExcuse(): string {
@@ -126,7 +126,7 @@
 		const respondingBot =
 			chatMode === 'group'
 				? castBots[Math.floor(Math.random() * castBots.length)]
-				: castBots.find((b) => b.id === chatMode) ?? castBots[0];
+				: (castBots.find((b) => b.id === chatMode) ?? castBots[0]);
 
 		streamingBotName = respondingBot.name;
 
@@ -139,15 +139,13 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					botId: respondingBot.id,
-					messages: messages
-						.slice(-20)
-						.map((m) => {
-							if (m.role === 'assistant') {
-								const { text: stripped } = parseResponder(m.content);
-								return { role: m.role, content: stripped };
-							}
-							return m;
-						}),
+					messages: messages.slice(-20).map((m) => {
+						if (m.role === 'assistant') {
+							const { text: stripped } = parseResponder(m.content);
+							return { role: m.role, content: stripped };
+						}
+						return m;
+					}),
 					sessionId: getSessionId()
 				})
 			});
@@ -181,7 +179,11 @@
 				for (const line of lines) {
 					if (!line.startsWith('data: ')) continue;
 					let chunk: TextChunk;
-					try { chunk = JSON.parse(line.slice(6)); } catch { continue; }
+					try {
+						chunk = JSON.parse(line.slice(6));
+					} catch {
+						continue;
+					}
 					if (chunk.type === 'text' && chunk.text) {
 						streamingText += chunk.text;
 					} else if (chunk.type === 'done') {
@@ -227,8 +229,25 @@
 	}
 
 	const ALLOWED_TAGS = [
-		'p', 'em', 'strong', 'code', 'pre', 'ul', 'ol', 'li', 'a', 'br',
-		'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'span', 'del'
+		'p',
+		'em',
+		'strong',
+		'code',
+		'pre',
+		'ul',
+		'ol',
+		'li',
+		'a',
+		'br',
+		'h1',
+		'h2',
+		'h3',
+		'h4',
+		'h5',
+		'h6',
+		'blockquote',
+		'span',
+		'del'
 	];
 	const ALLOWED_ATTR = ['href', 'title', 'target', 'rel'];
 
@@ -263,17 +282,14 @@
 			{#if minutesLeft !== null}
 				<span class="countdown">{formatTimeUntil(minutesLeft)} left</span>
 			{/if}
-			<Dropdown
-				options={modeOptions}
-				bind:value={chatMode}
-				separatorAfter={['group']}
-			/>
+			<Dropdown options={modeOptions} bind:value={chatMode} separatorAfter={['group']} />
 		</div>
 	</div>
 
 	<div class="chat-log" bind:this={logEl}>
 		<div class="bubble system">
-			— Switched to {showName}. {castBots.map((b) => b.name.split(' ')[0]).join(', ')} are now in the room. —
+			— Switched to {showName}. {castBots.map((b) => b.name.split(' ')[0]).join(', ')} are now in the
+			room. —
 		</div>
 		{#each messages as m}
 			{#if m.role === 'user'}
@@ -285,6 +301,7 @@
 				{@const parsed = parseResponder(m.content)}
 				<div class="bubble bot">
 					<span class="who-label">{parsed.name?.toUpperCase() ?? showName.toUpperCase()}</span>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html renderMarkdown(parsed.text)}
 				</div>
 			{/if}
@@ -292,6 +309,7 @@
 		{#if streamingText}
 			<div class="bubble bot streaming">
 				<span class="who-label">{streamingBotName.toUpperCase()}</span>
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 				{@html renderMarkdown(streamingText)}
 			</div>
 		{/if}
@@ -309,13 +327,17 @@
 		</div>
 	{/if}
 
-	<form class="chat-input" onsubmit={(e) => { e.preventDefault(); send(); }}>
-		<input
-			bind:value={input}
-			placeholder={inputPlaceholder}
-			disabled={busy || offAir}
-		/>
-		<button type="submit" disabled={busy || offAir}>{offAir ? 'OFF AIR' : busy ? '...' : 'SEND'}</button>
+	<form
+		class="chat-input"
+		onsubmit={(e) => {
+			e.preventDefault();
+			send();
+		}}
+	>
+		<input bind:value={input} placeholder={inputPlaceholder} disabled={busy || offAir} />
+		<button type="submit" disabled={busy || offAir}
+			>{offAir ? 'OFF AIR' : busy ? '...' : 'SEND'}</button
+		>
 	</form>
 </div>
 
@@ -426,8 +448,13 @@
 		font-size: 10px;
 	}
 	@keyframes blink {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0; }
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0;
+		}
 	}
 	.dot {
 		display: inline-block;

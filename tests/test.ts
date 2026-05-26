@@ -101,7 +101,7 @@ test('Applications folder contains seeded apps', async ({ page }) => {
 	await expect(page.locator('.finder-item:has-text("Stickies")')).toBeVisible();
 	await expect(page.locator('.finder-item:has-text("Camera")')).toBeVisible();
 	await expect(page.locator('.finder-item:has-text("Stats")')).toBeVisible();
-	await expect(page.locator('.finder-status')).toContainText('5 items');
+	await expect(page.locator('.finder-status')).toContainText('8 items');
 });
 
 test('System folder contains System Preferences and About', async ({ page }) => {
@@ -156,7 +156,7 @@ test('Make Alias creates alias file in the same folder', async ({ page }) => {
 
 	// Count items before
 	const statusBefore = page.locator('.finder-status');
-	await expect(statusBefore).toContainText('5 items');
+	await expect(statusBefore).toContainText('8 items');
 
 	// Right-click Stats.app and Make Alias
 	await page.locator('.finder-item:has-text("Stats.app")').click({ button: 'right' });
@@ -166,7 +166,7 @@ test('Make Alias creates alias file in the same folder', async ({ page }) => {
 
 	// Alias should appear in the same folder with "alias" suffix
 	await expect(page.locator('.finder-item:has-text("Stats.app alias")')).toBeVisible();
-	await expect(statusBefore).toContainText('6 items');
+	await expect(statusBefore).toContainText('9 items');
 
 	// Alias should have the alias class on the icon
 	const aliasItem = page.locator('.finder-item:has-text("Stats.app alias")');
