@@ -571,7 +571,7 @@
 			{#if os.alertSpec}
 				<div class="system-alert-backdrop" role="presentation" onclick={(e) => e.stopPropagation()}>
 					<div
-						class="system-alert window"
+						class="system-alert"
 						role="alertdialog"
 						tabindex="-1"
 						onclick={(e) => e.stopPropagation()}
@@ -579,17 +579,7 @@
 							if (e.key === 'Escape') os.dismissAlert();
 						}}
 					>
-						<div class="window-titlebar" style="cursor: default;">
-							<div class="btns">
-								<button
-									class="window-btn close"
-									onclick={() => os.dismissAlert()}
-									aria-label="close"
-								></button>
-							</div>
-							<div class="title">{os.alertSpec.title || 'System Alert'}</div>
-						</div>
-						<div class="window-body" style="padding: 18px; display: flex; gap: 14px;">
+						<div class="system-alert-body">
 							<div class="bomb">⚠</div>
 							<div style="flex: 1; min-width: 0;">
 								<div
@@ -775,10 +765,17 @@
 		justify-content: center;
 		z-index: 20000;
 	}
-	:global(.system-alert) {
-		position: relative !important;
+	.system-alert {
 		width: 420px;
 		max-width: calc(100vw - 40px);
+		background: var(--chrome-window-bg, var(--paper, #fff));
+		border: 2px solid var(--chrome-window-border-color, var(--ink, #0a0a0a));
+		box-shadow: 4px 4px 0 var(--shadow, rgba(0, 0, 0, 0.25));
+	}
+	.system-alert-body {
+		padding: 18px;
+		display: flex;
+		gap: 14px;
 	}
 
 	/* Progress bar */
