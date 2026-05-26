@@ -1,7 +1,7 @@
 import type { TerminalFS } from '$lib/terminalos';
 import type { FsFile } from '$lib/terminalos';
 import { DOCUMENTS_ID } from '$lib/terminalos';
-import type { StickyNote } from './StickiesNote.svelte';
+import type { StickyNote } from './types';
 
 function stickyFromFile(f: FsFile): StickyNote {
 	const text = f.bodyRef?.kind === 'inline-text' ? f.bodyRef.text : '';

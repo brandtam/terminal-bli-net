@@ -1,10 +1,5 @@
 <script lang="ts">
-	export interface StickyNote {
-		id: string;
-		title: string;
-		body: string;
-		color: string;
-	}
+	import type { StickyNote } from './types';
 
 	const COLORS: { label: string; bg: string }[] = [
 		{ label: 'Yellow', bg: '#f9bd2b' },
