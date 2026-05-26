@@ -2,6 +2,7 @@ import type { NodeId, FsNode, FsFolder, FsFile, FsAlias, FsResult, TerminalVolum
 import { ok, fail } from './errors';
 import { generateUniqueId, hasSiblingConflict } from './names';
 import { derivePath } from './paths';
+import { resolveAlias as resolveAliasTarget, buildFingerprint } from './aliases';
 import { getDefaultInstalledApps, getDesktopAliasApps, getAppDef } from '../apps/app-library';
 import type { UndoRecord } from './operations';
 
@@ -656,6 +657,79 @@ export class TerminalFS {
 		this.lastUndo = null;
 
 		return ok({ deletedCount: trashChildren.length });
+	}
+
+	async createAlias(
+		parentId: NodeId,
+		targetNodeId: NodeId,
+		name?: string
+	): Promise<FsResult<FsAlias>> {
+		const parent = this.nodes.get(parentId);
+		if (!parent) return fail('not_found', `Parent "${parentId}" not found`);
+		if (parent.kind !== 'folder') return fail('not_folder', `Parent "${parentId}" is not a folder`);
+
+		const target = this.nodes.get(targetNodeId);
+		if (!target) return fail('not_found', `Target "${targetNodeId}" not found`);
+
+		const aliasName = name ?? target.name;
+
+		if (hasSiblingConflict(aliasName, this.siblings(parentId))) {
+			return fail('duplicate_name', `A node named "${aliasName}" already exists in this folder`);
+		}
+
+		const targetKind: 'file' | 'folder' | 'app' =
+			target.kind === 'folder'
+				? 'folder'
+				: target.kind === 'file' && target.fileType === 'app'
+					? 'app'
+					: 'file';
+
+		const now = Date.now();
+		const aliasId = generateUniqueId();
+		const alias: FsAlias = {
+			id: aliasId,
+			volumeId: this.volume.id,
+			kind: 'alias',
+			parentId,
+			name: aliasName,
+			target: {
+				nodeId: targetNodeId,
+				originalPath: derivePath(targetNodeId, this.nodes),
+				originalName: target.name,
+				targetKind,
+				fingerprint: buildFingerprint(target)
+			},
+			createdAt: now,
+			updatedAt: now
+		};
+		this.nodes.set(aliasId, alias);
+
+		this.lastUndo = {
+			kind: 'create_alias',
+			label: `Create alias "${aliasName}"`,
+			undoData: { type: 'delete_node', nodeId: aliasId }
+		};
+
+		return ok(alias);
+	}
+
+	async resolveAlias(aliasId: NodeId): Promise<FsResult<FsNode>> {
+		const node = this.nodes.get(aliasId);
+		if (!node) return fail('not_found', `Node "${aliasId}" not found`);
+		if (node.kind !== 'alias') return fail('not_found', `Node "${aliasId}" is not an alias`);
+
+		const result = resolveAliasTarget(node, this.nodes);
+
+		switch (result.status) {
+			case 'resolved':
+				return ok(result.node);
+			case 'repaired':
+				// Apply the repair — update the alias in the node map
+				this.nodes.set(aliasId, result.alias);
+				return ok(result.node);
+			case 'broken':
+				return fail('broken_alias', result.reason);
+		}
 	}
 
 	async undoLast(): Promise<FsResult<string>> {
