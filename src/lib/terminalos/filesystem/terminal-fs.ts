@@ -178,20 +178,24 @@ export class TerminalFS {
 	private bodies: BodyStore;
 	private watcherRegistry = new WatcherRegistry();
 	private broadcastChannel: BroadcastChannel | null = null;
+	private persistTimer: ReturnType<typeof setTimeout> | null = null;
+	private persistResolvers: Array<{
+		resolve: (v: FsResult<void>) => void;
+	}> = [];
 
 	private constructor(
 		volume: TerminalVolume,
 		nodes: Map<NodeId, FsNode>,
 		manifest: ManifestStore,
-		bodies: BodyStore
+		bodies: BodyStore,
+		enableBroadcast = true
 	) {
 		this.volume = volume;
 		this.nodes = nodes;
 		this.manifest = manifest;
 		this.bodies = bodies;
 
-		// Set up cross-tab notifications (browser only)
-		if (typeof BroadcastChannel !== 'undefined') {
+		if (enableBroadcast && typeof BroadcastChannel !== 'undefined') {
 			this.broadcastChannel = new BroadcastChannel('terminalos-fs');
 			this.broadcastChannel.onmessage = (e: MessageEvent) => {
 				const event = e.data as FsChangeEvent;
@@ -209,7 +213,37 @@ export class TerminalFS {
 		return this.manifest.save(this.volume, nodes);
 	}
 
+	private debouncedPersist(): Promise<FsResult<void>> {
+		return new Promise((resolve) => {
+			this.persistResolvers.push({ resolve });
+			if (this.persistTimer) clearTimeout(this.persistTimer);
+			this.persistTimer = setTimeout(() => {
+				this.persistTimer = null;
+				const resolvers = this.persistResolvers.splice(0);
+				this.persist()
+					.then((result) => {
+						for (const r of resolvers) r.resolve(result);
+					})
+					.catch(() => {
+						const err = fail<void>('corrupt_disk', 'Persist failed unexpectedly');
+						for (const r of resolvers) r.resolve(err);
+					});
+			}, 250);
+		});
+	}
+
+	async flushPersist(): Promise<void> {
+		if (this.persistTimer) {
+			clearTimeout(this.persistTimer);
+			this.persistTimer = null;
+			const resolvers = this.persistResolvers.splice(0);
+			const result = await this.persist();
+			for (const r of resolvers) r.resolve(result);
+		}
+	}
+
 	private async reloadFromManifest(): Promise<void> {
+		await this.flushPersist();
 		const loaded = await this.manifest.load();
 		if (loaded) {
 			this.nodes.clear();
@@ -413,7 +447,7 @@ export class TerminalFS {
 		};
 		nodes.set(pricingId, pricingFile);
 
-		return new TerminalFS(volume, nodes, manifestStore, bodyStore);
+		return new TerminalFS(volume, nodes, manifestStore, bodyStore, false);
 	}
 
 	// --- Read-only API ---
@@ -463,6 +497,10 @@ export class TerminalFS {
 
 	getVolume(): TerminalVolume {
 		return this.volume;
+	}
+
+	peekNode(nodeId: NodeId): Readonly<FsNode> | undefined {
+		return this.nodes.get(nodeId);
 	}
 
 	getAllNodes(): Map<NodeId, FsNode> {
@@ -536,7 +574,7 @@ export class TerminalFS {
 			undoData: { type: 'delete_node', nodeId }
 		};
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFolder>;
 
 		this.notifyChange([nodeId], [parentId], 'create_folder');
@@ -574,7 +612,7 @@ export class TerminalFS {
 			undoData: { type: 'delete_node', nodeId }
 		};
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
 
 		this.notifyChange([nodeId], [parentId], 'create_file');
@@ -617,7 +655,7 @@ export class TerminalFS {
 			undoData: { type: 'delete_node', nodeId }
 		};
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
 
 		this.notifyChange([nodeId], [parentId], 'create_file');
@@ -637,7 +675,7 @@ export class TerminalFS {
 		this.nodes.set(fileId, updated);
 
 		// No undo for writes — text editors handle their own undo
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
 
 		this.notifyChange([fileId], [node.parentId], 'write');
@@ -675,7 +713,7 @@ export class TerminalFS {
 			undoData: { type: 'rename_back', nodeId, previousName }
 		};
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
 
 		this.notifyChange([nodeId], node.parentId ? [node.parentId] : [], 'rename');
@@ -727,7 +765,7 @@ export class TerminalFS {
 			undoData: { type: 'move_back', nodeId, previousParentId }
 		};
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
 
 		this.notifyChange([nodeId], [previousParentId, targetFolderId], 'move');
@@ -767,7 +805,7 @@ export class TerminalFS {
 			undoData: { type: 'delete_nodes', nodeIds: newIds }
 		};
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
 
 		this.notifyChange(newIds, [parentId], 'duplicate');
@@ -804,7 +842,7 @@ export class TerminalFS {
 			undoData: { type: 'move_back', nodeId, previousParentId }
 		};
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
 
 		this.notifyChange([nodeId], [previousParentId, TRASH_ID], 'trash');
@@ -827,6 +865,7 @@ export class TerminalFS {
 		// Clear undo — emptyTrash is destructive and irreversible
 		this.lastUndo = null;
 
+		await this.flushPersist();
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<{ deletedCount: number }>;
 
@@ -885,7 +924,7 @@ export class TerminalFS {
 			undoData: { type: 'delete_node', nodeId: aliasId }
 		};
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsAlias>;
 
 		this.notifyChange([aliasId], [parentId], 'create_alias');
@@ -905,7 +944,7 @@ export class TerminalFS {
 			case 'repaired': {
 				// Apply the repair — update the alias in the node map
 				this.nodes.set(aliasId, result.alias);
-				await this.persist();
+				await this.debouncedPersist();
 				this.notifyChange([aliasId], [], 'repair_alias');
 				return ok(result.node);
 			}
@@ -983,7 +1022,7 @@ export class TerminalFS {
 		// One-level undo: clear after executing
 		this.lastUndo = null;
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<string>;
 
 		this.notifyChange(affectedNodeIds, affectedFolderIds, 'undo');
@@ -1051,7 +1090,7 @@ export class TerminalFS {
 			}
 		}
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
 
 		this.notifyChange([fileId], [APPLICATIONS_ID, DESKTOP_ID], 'install_app');
@@ -1090,7 +1129,7 @@ export class TerminalFS {
 			this.nodes.delete(id);
 		}
 
-		const persistResult = await this.persist();
+		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<{ removedFiles: number }>;
 
 		this.notifyChange(
@@ -1118,12 +1157,8 @@ export class TerminalFS {
 		return ok(data);
 	}
 
-	async writeBody(
-		bodyId: BodyId,
-		data: ArrayBuffer,
-		contentType?: string
-	): Promise<FsResult<void>> {
-		return this.bodies.write(bodyId, data, contentType);
+	async writeBody(bodyId: BodyId, data: ArrayBuffer): Promise<FsResult<void>> {
+		return this.bodies.write(bodyId, data);
 	}
 
 	async deleteBody(bodyId: BodyId): Promise<FsResult<void>> {
@@ -1180,7 +1215,7 @@ export class TerminalFS {
 		const backup = validated.value;
 		const preview = previewBackup(backup);
 
-		// Replace current disk with backup contents
+		await this.flushPersist();
 		this.nodes.clear();
 		for (const node of backup.nodes) {
 			this.nodes.set(node.id, node as FsNode);
@@ -1203,7 +1238,7 @@ export class TerminalFS {
 	// --- Reinstall ---
 
 	async reinstallOS(): Promise<FsResult<void>> {
-		// Wipe everything
+		await this.flushPersist();
 		this.nodes.clear();
 		await this.bodies.clear();
 
@@ -1240,16 +1275,20 @@ export class TerminalFS {
 		const toDelete = this.collectDescendants(nodeId);
 		const parentId = node.parentId;
 
+		const deletedNodes: FsNode[] = [];
 		for (const id of toDelete) {
+			const n = this.nodes.get(id);
+			if (n) deletedNodes.push(n);
 			this.nodes.delete(id);
 		}
 
 		this.lastUndo = {
 			kind: 'trash',
 			label: `Delete "${node.name}"`,
-			undoData: { type: 'delete_node', nodeId }
+			undoData: { type: 'restore_nodes', nodes: deletedNodes }
 		};
 
+		await this.flushPersist();
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<void>;
 
@@ -1280,10 +1319,26 @@ export class TerminalFS {
 		return hasSiblingConflict(name, this.siblings(parentId));
 	}
 
-	/** Clean up BroadcastChannel and all watchers. */
+	/** Flush pending writes, clean up BroadcastChannel and all watchers. */
 	destroy(): void {
-		this.broadcastChannel?.close();
-		this.broadcastChannel = null;
+		if (this.persistTimer) {
+			clearTimeout(this.persistTimer);
+			this.persistTimer = null;
+			const resolvers = this.persistResolvers.splice(0);
+			this.persist()
+				.then((result) => {
+					for (const r of resolvers) r.resolve(result);
+				})
+				.catch(() => {
+					const err = fail<void>('corrupt_disk', 'Persist failed during destroy');
+					for (const r of resolvers) r.resolve(err);
+				});
+		}
+		if (this.broadcastChannel) {
+			this.broadcastChannel.onmessage = null;
+			this.broadcastChannel.close();
+			this.broadcastChannel = null;
+		}
 		this.watcherRegistry.clear();
 	}
 }

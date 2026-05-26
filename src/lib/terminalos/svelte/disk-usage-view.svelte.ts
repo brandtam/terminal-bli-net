@@ -4,6 +4,7 @@ import type { DiskUsage } from '../filesystem/usage';
 export function createDiskUsageView(fs: TerminalFS) {
 	let usage = $state<DiskUsage | null>(null);
 	let loading = $state(true);
+	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	async function load() {
 		loading = true;
@@ -16,12 +17,16 @@ export function createDiskUsageView(fs: TerminalFS) {
 
 	load();
 
-	// Refresh on any filesystem change
 	const unwatch = fs.watch(() => {
-		load();
+		if (debounceTimer) clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => {
+			debounceTimer = null;
+			load();
+		}, 1000);
 	});
 
 	function destroy() {
+		if (debounceTimer) clearTimeout(debounceTimer);
 		unwatch();
 	}
 

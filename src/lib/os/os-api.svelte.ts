@@ -282,7 +282,7 @@ export class OsApiClass implements OsApi {
 		}
 		if (id.startsWith('textedit-')) {
 			const fileId = id.replace('textedit-', '');
-			const node = this.fs.getAllNodes().get(fileId);
+			const node = this.fs.peekNode(fileId);
 			return { title: node?.name || 'Untitled.txt', w: 420, h: 400 };
 		}
 		if (id.startsWith('sticky-')) {
@@ -290,7 +290,7 @@ export class OsApiClass implements OsApi {
 		}
 		if (id.startsWith('recorder-')) {
 			const fileId = id.replace('recorder-', '');
-			const node = this.fs.getAllNodes().get(fileId);
+			const node = this.fs.peekNode(fileId);
 			return { title: node?.name || 'Recording', w: 360, h: 340 };
 		}
 		return defs[id] || { title: 'Unknown', w: 380, h: 320 };

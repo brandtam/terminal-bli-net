@@ -22,6 +22,7 @@ function openDB(): Promise<IDBDatabase> {
 
 export class IndexedDBBodyStore implements BodyStore {
 	private dbPromise: Promise<IDBDatabase> | null = null;
+	private cachedBytes: number | null = null;
 
 	private getDB(): Promise<IDBDatabase> {
 		if (!this.dbPromise) {
@@ -47,9 +48,19 @@ export class IndexedDBBodyStore implements BodyStore {
 			return new Promise((resolve, reject) => {
 				const tx = db.transaction(STORE_NAME, 'readwrite');
 				const store = tx.objectStore(STORE_NAME);
-				const request = store.put(data, bodyId);
-				request.onsuccess = () => resolve(ok(undefined));
-				request.onerror = () => reject(request.error);
+				const getReq = store.get(bodyId);
+				let oldSize = 0;
+				getReq.onsuccess = () => {
+					const buf = getReq.result;
+					oldSize = buf instanceof ArrayBuffer ? buf.byteLength : 0;
+					store.put(data, bodyId);
+				};
+				tx.oncomplete = () => {
+					if (this.cachedBytes !== null) {
+						this.cachedBytes += data.byteLength - oldSize;
+					}
+					resolve(ok(undefined));
+				};
 				tx.onerror = () => {
 					if (tx.error?.name === 'QuotaExceededError') {
 						resolve(fail('quota_exceeded', 'IndexedDB storage quota exceeded'));
@@ -68,9 +79,20 @@ export class IndexedDBBodyStore implements BodyStore {
 		return new Promise((resolve, reject) => {
 			const tx = db.transaction(STORE_NAME, 'readwrite');
 			const store = tx.objectStore(STORE_NAME);
-			const request = store.delete(bodyId);
-			request.onsuccess = () => resolve();
-			request.onerror = () => reject(request.error);
+			const getReq = store.get(bodyId);
+			let oldSize = 0;
+			getReq.onsuccess = () => {
+				const buf = getReq.result;
+				oldSize = buf instanceof ArrayBuffer ? buf.byteLength : 0;
+				store.delete(bodyId);
+			};
+			tx.oncomplete = () => {
+				if (this.cachedBytes !== null) {
+					this.cachedBytes = Math.max(0, this.cachedBytes - oldSize);
+				}
+				resolve();
+			};
+			tx.onerror = () => reject(tx.error);
 		});
 	}
 
@@ -79,27 +101,34 @@ export class IndexedDBBodyStore implements BodyStore {
 		return new Promise((resolve, reject) => {
 			const tx = db.transaction(STORE_NAME, 'readwrite');
 			const store = tx.objectStore(STORE_NAME);
-			const request = store.clear();
-			request.onsuccess = () => resolve();
-			request.onerror = () => reject(request.error);
+			store.clear();
+			tx.oncomplete = () => {
+				this.cachedBytes = 0;
+				resolve();
+			};
+			tx.onerror = () => reject(tx.error);
 		});
 	}
 
 	async getUsedBytes(): Promise<number> {
+		if (this.cachedBytes !== null) return this.cachedBytes;
+
 		const db = await this.getDB();
-		return new Promise((resolve, reject) => {
+		const total: number = await new Promise((resolve, reject) => {
 			const tx = db.transaction(STORE_NAME, 'readonly');
 			const store = tx.objectStore(STORE_NAME);
 			const request = store.getAll();
 			request.onsuccess = () => {
 				const buffers = request.result as ArrayBuffer[];
-				let total = 0;
+				let sum = 0;
 				for (const buf of buffers) {
-					if (buf instanceof ArrayBuffer) total += buf.byteLength;
+					if (buf instanceof ArrayBuffer) sum += buf.byteLength;
 				}
-				resolve(total);
+				resolve(sum);
 			};
 			request.onerror = () => reject(request.error);
 		});
+		this.cachedBytes = total;
+		return total;
 	}
 }

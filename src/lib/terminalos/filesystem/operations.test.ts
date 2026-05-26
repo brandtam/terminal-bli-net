@@ -527,6 +527,34 @@ describe('undoLast', () => {
 		expect(node.value.parentId).toBe(DOCUMENTS_ID);
 	});
 
+	it('undoes deleteNode — restores the deleted node and its descendants', async () => {
+		const fs = createDisk();
+		const folder = await fs.createFolder(DOCUMENTS_ID, 'Parent');
+		if (!folder.ok) throw new Error('setup');
+		const child = await fs.createTextFile(folder.value.id, 'child.txt', 'data');
+		if (!child.ok) throw new Error('setup');
+
+		await fs.deleteNode(folder.value.id);
+
+		// Both should be gone
+		const gone1 = await fs.getNode(folder.value.id);
+		expect(gone1.ok).toBe(false);
+		const gone2 = await fs.getNode(child.value.id);
+		expect(gone2.ok).toBe(false);
+
+		// Undo should restore both
+		const undoResult = await fs.undoLast();
+		expect(undoResult.ok).toBe(true);
+
+		const restored1 = await fs.getNode(folder.value.id);
+		expect(restored1.ok).toBe(true);
+		if (restored1.ok) expect(restored1.value.name).toBe('Parent');
+
+		const restored2 = await fs.getNode(child.value.id);
+		expect(restored2.ok).toBe(true);
+		if (restored2.ok) expect(restored2.value.name).toBe('child.txt');
+	});
+
 	it('returns not_found when no undo available', async () => {
 		const fs = createDisk();
 		const result = await fs.undoLast();

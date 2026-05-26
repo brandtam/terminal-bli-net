@@ -48,24 +48,25 @@
 	const items = $derived(folderView?.items ?? []);
 
 	const pathSegments = $derived.by(() => {
-		// Re-derive when folder contents change
 		folderView?.items;
-		const nodes = fs.getAllNodes();
 		const segments: { id: string; name: string }[] = [];
-		let node = nodes.get(currentFolderId);
+		let node = fs.peekNode(currentFolderId);
 		while (node) {
 			segments.unshift({ id: node.id, name: node.name });
-			node = node.parentId ? nodes.get(node.parentId) : undefined;
+			node = node.parentId ? fs.peekNode(node.parentId) : undefined;
 		}
 		return segments;
 	});
 
-	function resolveNode(node: FsNode): FsNode | null {
+	function resolveNode(node: FsNode, seen?: Set<string>): FsNode | null {
 		if (node.kind !== 'alias') return node;
 		const alias = node as FsAlias;
-		const target = fs.getAllNodes().get(alias.target.nodeId);
+		const visited = seen ?? new Set<string>();
+		if (visited.has(alias.id)) return null;
+		visited.add(alias.id);
+		const target = fs.peekNode(alias.target.nodeId);
 		if (!target) return null;
-		if (target.kind === 'alias') return resolveNode(target);
+		if (target.kind === 'alias') return resolveNode(target, visited);
 		return target;
 	}
 

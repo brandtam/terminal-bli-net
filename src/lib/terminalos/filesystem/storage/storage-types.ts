@@ -8,7 +8,7 @@ export interface ManifestStore {
 
 export interface BodyStore {
 	read(bodyId: BodyId): Promise<ArrayBuffer | null>;
-	write(bodyId: BodyId, data: ArrayBuffer, contentType?: string): Promise<FsResult<void>>;
+	write(bodyId: BodyId, data: ArrayBuffer): Promise<FsResult<void>>;
 	delete(bodyId: BodyId): Promise<void>;
 	clear(): Promise<void>;
 	getUsedBytes(): Promise<number>;

@@ -52,12 +52,15 @@
 	let stickies = $state<ReturnType<typeof createStickiesManager>>(undefined!);
 	let desktopView: ReturnType<typeof createFolderView> | null = $state(null);
 
-	function resolveAliasSync(node: FsNode): FsNode | null {
+	function resolveAliasSync(node: FsNode, seen?: Set<string>): FsNode | null {
 		if (node.kind !== 'alias') return null;
 		const alias = node as FsAlias;
-		const target = terminalFs.getAllNodes().get(alias.target.nodeId);
+		const visited = seen ?? new Set<string>();
+		if (visited.has(alias.id)) return null;
+		visited.add(alias.id);
+		const target = terminalFs.peekNode(alias.target.nodeId);
 		if (!target) return null;
-		if (target.kind === 'alias') return resolveAliasSync(target);
+		if (target.kind === 'alias') return resolveAliasSync(target, visited);
 		return target;
 	}
 
@@ -274,6 +277,7 @@
 	onDestroy(() => {
 		if (booted) os.destroy();
 		desktopView?.destroy();
+		terminalFs?.destroy();
 	});
 
 	// Accent CSS sync
@@ -312,12 +316,11 @@
 		if (!booted) return [];
 		const ids = os.windows.map((w) => w.id);
 		if (os.windows.some((w) => w.id.startsWith('chat-'))) ids.push('chat');
-		const allNodes = terminalFs.getAllNodes();
 		if (
 			os.windows.some((w) => {
 				if (!w.id.startsWith('textedit-')) return false;
 				const fileId = w.id.replace('textedit-', '');
-				return allNodes.get(fileId)?.name === 'Pricing.txt';
+				return terminalFs.peekNode(fileId)?.name === 'Pricing.txt';
 			})
 		)
 			ids.push('pricing');
@@ -325,7 +328,7 @@
 			os.windows.some((w) => {
 				if (!w.id.startsWith('textedit-')) return false;
 				const fileId = w.id.replace('textedit-', '');
-				return allNodes.get(fileId)?.name === 'README.TXT';
+				return terminalFs.peekNode(fileId)?.name === 'README.TXT';
 			})
 		)
 			ids.push('readme');
