@@ -2,6 +2,14 @@
 	"name": "terminal-bli-net",
 	"version": "1.0.0",
 	"private": true,
+	"description": "A retro TV terminal where AI-powered characters host shows you can chat with",
+	"author": "Brandt Milczewski <brandt@bli.dev>",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/brandtam/terminal-bli-net.git"
+	},
+	"homepage": "https://bli.net",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
