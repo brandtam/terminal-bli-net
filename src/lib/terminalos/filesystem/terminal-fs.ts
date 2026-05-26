@@ -1,10 +1,23 @@
-import type { NodeId, FsNode, FsFolder, FsFile, FsAlias, FsResult, TerminalVolume } from './types';
+import type {
+	NodeId,
+	BodyId,
+	FsNode,
+	FsFolder,
+	FsFile,
+	FsAlias,
+	FsResult,
+	TerminalVolume
+} from './types';
 import { ok, fail } from './errors';
 import { generateUniqueId, hasSiblingConflict } from './names';
 import { derivePath } from './paths';
 import { resolveAlias as resolveAliasTarget, buildFingerprint } from './aliases';
 import { getDefaultInstalledApps, getDesktopAliasApps, getAppDef } from '../apps/app-library';
 import type { UndoRecord } from './operations';
+import type { ManifestStore, BodyStore } from './storage/storage-types';
+import { InMemoryManifestStore, InMemoryBodyStore } from './storage/storage-types';
+import { computeDiskUsage } from './usage';
+import type { DiskUsage } from './usage';
 
 // Well-known IDs
 export const ROOT_ID: NodeId = 'root_terminal_hd';
@@ -154,13 +167,48 @@ export class TerminalFS {
 	private volume: TerminalVolume;
 	private nodes: Map<NodeId, FsNode>;
 	private lastUndo: UndoRecord | null = null;
+	private manifest: ManifestStore;
+	private bodies: BodyStore;
 
-	private constructor(volume: TerminalVolume, nodes: Map<NodeId, FsNode>) {
+	private constructor(
+		volume: TerminalVolume,
+		nodes: Map<NodeId, FsNode>,
+		manifest: ManifestStore,
+		bodies: BodyStore
+	) {
 		this.volume = volume;
 		this.nodes = nodes;
+		this.manifest = manifest;
+		this.bodies = bodies;
 	}
 
-	static createCleanDisk(): TerminalFS {
+	private async persist(): Promise<FsResult<void>> {
+		const nodes = Array.from(this.nodes.values());
+		return this.manifest.save(this.volume, nodes);
+	}
+
+	static async open(manifest?: ManifestStore, bodies?: BodyStore): Promise<TerminalFS> {
+		const manifestStore = manifest ?? new InMemoryManifestStore();
+		const bodyStore = bodies ?? new InMemoryBodyStore();
+
+		const loaded = await manifestStore.load();
+		if (loaded) {
+			const nodes = new Map<NodeId, FsNode>();
+			for (const node of loaded.nodes) {
+				nodes.set(node.id, node);
+			}
+			return new TerminalFS(loaded.volume, nodes, manifestStore, bodyStore);
+		}
+
+		// No existing disk — create a clean one
+		const fs = TerminalFS.createCleanDisk(manifestStore, bodyStore);
+		await fs.persist();
+		return fs;
+	}
+
+	static createCleanDisk(manifest?: ManifestStore, bodies?: BodyStore): TerminalFS {
+		const manifestStore = manifest ?? new InMemoryManifestStore();
+		const bodyStore = bodies ?? new InMemoryBodyStore();
 		const now = Date.now();
 		const nodes = new Map<NodeId, FsNode>();
 
@@ -313,7 +361,7 @@ export class TerminalFS {
 		};
 		nodes.set(pricingId, pricingFile);
 
-		return new TerminalFS(volume, nodes);
+		return new TerminalFS(volume, nodes, manifestStore, bodyStore);
 	}
 
 	// --- Read-only API ---
@@ -436,6 +484,9 @@ export class TerminalFS {
 			undoData: { type: 'delete_node', nodeId }
 		};
 
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsFolder>;
+
 		return ok(folder);
 	}
 
@@ -470,6 +521,9 @@ export class TerminalFS {
 			undoData: { type: 'delete_node', nodeId }
 		};
 
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+
 		return ok(file);
 	}
 
@@ -486,6 +540,9 @@ export class TerminalFS {
 		this.nodes.set(fileId, updated);
 
 		// No undo for writes — text editors handle their own undo
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+
 		return ok(updated);
 	}
 
@@ -519,6 +576,9 @@ export class TerminalFS {
 			label: `Rename "${previousName}" to "${newName}"`,
 			undoData: { type: 'rename_back', nodeId, previousName }
 		};
+
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
 
 		return ok(updated);
 	}
@@ -568,6 +628,9 @@ export class TerminalFS {
 			undoData: { type: 'move_back', nodeId, previousParentId }
 		};
 
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+
 		return ok(updated);
 	}
 
@@ -604,6 +667,9 @@ export class TerminalFS {
 			undoData: { type: 'delete_nodes', nodeIds: newIds }
 		};
 
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+
 		return ok(topNode);
 	}
 
@@ -637,6 +703,9 @@ export class TerminalFS {
 			undoData: { type: 'move_back', nodeId, previousParentId }
 		};
 
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+
 		return ok(updated);
 	}
 
@@ -655,6 +724,9 @@ export class TerminalFS {
 
 		// Clear undo — emptyTrash is destructive and irreversible
 		this.lastUndo = null;
+
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<{ deletedCount: number }>;
 
 		return ok({ deletedCount: trashChildren.length });
 	}
@@ -710,6 +782,9 @@ export class TerminalFS {
 			undoData: { type: 'delete_node', nodeId: aliasId }
 		};
 
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsAlias>;
+
 		return ok(alias);
 	}
 
@@ -723,10 +798,12 @@ export class TerminalFS {
 		switch (result.status) {
 			case 'resolved':
 				return ok(result.node);
-			case 'repaired':
+			case 'repaired': {
 				// Apply the repair — update the alias in the node map
 				this.nodes.set(aliasId, result.alias);
+				await this.persist();
 				return ok(result.node);
+			}
 			case 'broken':
 				return fail('broken_alias', result.reason);
 		}
@@ -784,11 +861,43 @@ export class TerminalFS {
 
 		// One-level undo: clear after executing
 		this.lastUndo = null;
+
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<string>;
+
 		return ok(label);
 	}
 
 	async getUndoLabel(): Promise<FsResult<string>> {
 		if (!this.lastUndo) return fail('not_found', 'Nothing to undo');
 		return ok(this.lastUndo.label);
+	}
+
+	// --- Body storage ---
+
+	async readBody(bodyId: BodyId): Promise<FsResult<ArrayBuffer>> {
+		const data = await this.bodies.read(bodyId);
+		if (!data) return fail('not_found', `Body "${bodyId}" not found`);
+		return ok(data);
+	}
+
+	async writeBody(
+		bodyId: BodyId,
+		data: ArrayBuffer,
+		contentType?: string
+	): Promise<FsResult<void>> {
+		return this.bodies.write(bodyId, data, contentType);
+	}
+
+	async deleteBody(bodyId: BodyId): Promise<FsResult<void>> {
+		await this.bodies.delete(bodyId);
+		return ok(undefined);
+	}
+
+	// --- Disk usage ---
+
+	async getDiskUsage(): Promise<FsResult<DiskUsage>> {
+		const blobBytes = await this.bodies.getUsedBytes();
+		return ok(computeDiskUsage(this.nodes, blobBytes));
 	}
 }

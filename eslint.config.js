@@ -42,6 +42,8 @@ export default [
 				ResizeObserver: 'readonly',
 				requestAnimationFrame: 'readonly',
 				KVNamespace: 'readonly',
+				indexedDB: 'readonly',
+				IDBDatabase: 'readonly',
 				__APP_VERSION__: 'readonly'
 			}
 		},

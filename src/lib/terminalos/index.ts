@@ -29,6 +29,11 @@ export type {
 export { ok, fail, fsErr } from './filesystem/errors';
 export type { AliasResolution } from './filesystem/aliases';
 export type { OperationKind, UndoRecord } from './filesystem/operations';
+export type { DiskUsage } from './filesystem/usage';
+export type { ManifestStore, BodyStore } from './filesystem/storage/storage-types';
+export { InMemoryManifestStore, InMemoryBodyStore } from './filesystem/storage/storage-types';
+export { LocalStorageManifestStore } from './filesystem/storage/local-storage-adapter';
+export { IndexedDBBodyStore } from './filesystem/storage/indexeddb-adapter';
 export {
 	APP_LIBRARY,
 	getAppDef,
