@@ -59,3 +59,7 @@ export {
 export type { SpecialLaunchApp } from './apps/app-install';
 export { getShopCatalog, isInstalled, canUninstall, findAppFile } from './apps/software-shop';
 export type { ShopItem } from './apps/software-shop';
+export { createFolderView } from './svelte/folder-view.svelte';
+export { createNodeView } from './svelte/node-view.svelte';
+export { createDiskUsageView } from './svelte/disk-usage-view.svelte';
+export { createAppLibraryView } from './svelte/app-library-view.svelte';

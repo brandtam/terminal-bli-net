@@ -111,6 +111,20 @@ export default [
 		}
 	},
 	{
+		files: ['**/*.svelte.ts', '**/*.svelte.js'],
+		languageOptions: {
+			globals: {
+				$state: 'readonly',
+				$derived: 'readonly',
+				$effect: 'readonly',
+				$props: 'readonly',
+				$bindable: 'readonly',
+				$inspect: 'readonly',
+				$host: 'readonly'
+			}
+		}
+	},
+	{
 		ignores: ['.svelte-kit/', 'build/', 'node_modules/', 'static/', 'bots/', 'scripts/']
 	}
 ];
