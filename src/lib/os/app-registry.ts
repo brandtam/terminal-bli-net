@@ -1,7 +1,4 @@
 import type { AppDef } from './os-api';
-import { createDoc, listDocs, findDocByName } from '$lib/apps/textedit/textedit-docs';
-import { emptyTrash } from '$lib/os/filesystem';
-import { TerminalFS, LocalStorageManifestStore } from '$lib/terminalos';
 
 export const APPS: Record<string, AppDef> = {
 	finder: {
@@ -42,10 +39,7 @@ export const APPS: Record<string, AppDef> = {
 						type: 'action',
 						label: 'New Text Document',
 						shortcut: '⌘T',
-						action: () => {
-							const doc = createDoc();
-							os.openWindow(`textedit-${doc.id}`);
-						}
+						action: () => os.launchApp('textedit', { action: 'new' })
 					},
 					{ type: 'separator' },
 					{ type: 'action', label: 'Get Info', disabled: true },
@@ -71,10 +65,7 @@ export const APPS: Record<string, AppDef> = {
 					{
 						type: 'action',
 						label: 'Show Pricing',
-						action: () => {
-							const f = findDocByName('Pricing.txt');
-							if (f) os.openWindow(`textedit-${f.id}`);
-						}
+						action: () => os.launchApp('textedit', { open: 'Pricing.txt' })
 					}
 				]
 			},
@@ -93,7 +84,7 @@ export const APPS: Record<string, AppDef> = {
 									{
 										label: 'Empty',
 										primary: true,
-										action: () => emptyTrash()
+										action: () => os.emptyTrash?.()
 									}
 								]
 							})
@@ -102,116 +93,18 @@ export const APPS: Record<string, AppDef> = {
 					{
 						type: 'action',
 						label: 'Backup Terminal HD…',
-						action: () => {
-							TerminalFS.open(new LocalStorageManifestStore()).then(async (liveFs) => {
-								const result = await liveFs.exportBackup();
-								if (!result.ok) {
-									os.alert({
-										title: 'Backup Failed',
-										body: result.error.message,
-										buttons: [{ label: 'OK', primary: true }]
-									});
-									return;
-								}
-								const json = JSON.stringify(result.value, null, 2);
-								const blob = new Blob([json], { type: 'application/json' });
-								const url = URL.createObjectURL(blob);
-								const a = document.createElement('a');
-								a.href = url;
-								a.download = `terminal-hd-${new Date().toISOString().slice(0, 10)}.terminal-hd`;
-								a.click();
-								URL.revokeObjectURL(url);
-								os.alert({
-									title: 'Backup Complete',
-									body: 'Terminal HD has been saved. This file is readable JSON — anyone who has it can see your files.',
-									buttons: [{ label: 'OK', primary: true }]
-								});
-							});
-						}
+						action: () => os.exportBackup?.()
 					},
 					{
 						type: 'action',
 						label: 'Restore Terminal HD…',
-						action: () => {
-							const input = document.createElement('input');
-							input.type = 'file';
-							input.accept = '.terminal-hd,.json';
-							input.onchange = () => {
-								const file = input.files?.[0];
-								if (!file) return;
-								file.text().then((text) => {
-									let data: unknown;
-									try {
-										data = JSON.parse(text);
-									} catch {
-										os.alert({
-											title: 'Invalid File',
-											body: 'That file is not valid JSON.',
-											buttons: [{ label: 'OK', primary: true }]
-										});
-										return;
-									}
-									TerminalFS.open(new LocalStorageManifestStore()).then(async (liveFs) => {
-										const preview = await liveFs.validateBackup(data);
-										if (!preview.ok) {
-											os.alert({
-												title: 'Invalid Backup',
-												body: preview.error.message,
-												buttons: [{ label: 'OK', primary: true }]
-											});
-											return;
-										}
-										const p = preview.value;
-										os.alert({
-											title: 'Restore Terminal HD?',
-											body: `This will replace your current disk with:\n${p.diskName} — exported ${new Date(p.exportedAt).toLocaleDateString()}\n${p.fileCount} files, ${p.folderCount} folders, ${p.appCount} apps`,
-											buttons: [
-												{ label: 'Cancel' },
-												{
-													label: 'Restore',
-													primary: true,
-													action: () => {
-														liveFs.restoreBackup(data).then((r) => {
-															if (r.ok) window.location.reload();
-															else
-																os.alert({
-																	title: 'Restore Failed',
-																	body: r.error.message,
-																	buttons: [{ label: 'OK', primary: true }]
-																});
-														});
-													}
-												}
-											]
-										});
-									});
-								});
-							};
-							input.click();
-						}
+						action: () => os.restoreBackup?.()
 					},
 					{ type: 'separator' },
 					{
 						type: 'action',
 						label: 'Reinstall Terminal OS…',
-						action: () =>
-							os.alert({
-								title: 'Reinstall Terminal OS',
-								body: 'This will erase everything on Terminal HD and rebuild the factory defaults. All your files, notes, and recordings will be permanently deleted.',
-								buttons: [
-									{ label: 'Cancel' },
-									{
-										label: 'Reinstall',
-										primary: true,
-										action: () => {
-											TerminalFS.open(new LocalStorageManifestStore()).then(async (liveFs) => {
-												await liveFs.reinstallOS();
-												window.location.reload();
-											});
-										}
-									}
-								]
-							})
+						action: () => os.reinstallOS?.()
 					},
 					{ type: 'separator' },
 					{ type: 'action', label: 'Restart', action: () => os.openWindow('error') },
@@ -225,10 +118,7 @@ export const APPS: Record<string, AppDef> = {
 					{
 						type: 'action',
 						label: 'README.txt',
-						action: () => {
-							const f = findDocByName('README.TXT');
-							if (f) os.openWindow(`textedit-${f.id}`);
-						}
+						action: () => os.launchApp('textedit', { open: 'README.TXT' })
 					}
 				]
 			}
@@ -316,10 +206,7 @@ export const APPS: Record<string, AppDef> = {
 					{
 						type: 'action',
 						label: 'How airing works',
-						action: () => {
-							const f = findDocByName('README.TXT');
-							if (f) os.openWindow(`textedit-${f.id}`);
-						}
+						action: () => os.launchApp('textedit', { open: 'README.TXT' })
 					}
 				]
 			}
@@ -657,29 +544,13 @@ export const APPS: Record<string, AppDef> = {
 						type: 'action',
 						label: 'New',
 						shortcut: '⌘N',
-						action: () => {
-							const doc = createDoc();
-							os.openWindow(`textedit-${doc.id}`);
-						}
+						action: () => os.launchApp('textedit', { action: 'new' })
 					},
 					{
 						type: 'action',
 						label: 'Open…',
 						shortcut: '⌘O',
-						action: () => {
-							const docs = listDocs();
-							const buttons = docs.map((d) => ({
-								label: d.name,
-								action: () => {
-									os.openWindow(`textedit-${d.id}`);
-								}
-							}));
-							os.alert({
-								title: 'Open Document',
-								body: docs.length > 0 ? 'Choose a document to open:' : 'No documents found.',
-								buttons: [...buttons, { label: 'Cancel', primary: true }]
-							});
-						}
+						action: () => os.launchApp('textedit', { action: 'open' })
 					},
 					{ type: 'separator' },
 					{ type: 'action', label: 'Save', shortcut: '⌘S' },

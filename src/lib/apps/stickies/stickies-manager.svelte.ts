@@ -1,11 +1,13 @@
-import { findByApp, createFile, writeFile, deleteNode, DOCS_ID } from '$lib/os/filesystem';
-import type { FSFile } from '$lib/os/filesystem';
+import type { TerminalFS } from '$lib/terminalos';
+import type { FsFile } from '$lib/terminalos';
+import { DOCUMENTS_ID } from '$lib/terminalos';
 import { appRead } from '$lib/persistence';
 import type { StickyNote } from './StickiesNote.svelte';
 
-function stickyFromFile(f: FSFile): StickyNote {
+function stickyFromFile(f: FsFile): StickyNote {
+	const text = f.bodyRef?.kind === 'inline-text' ? f.bodyRef.text : '';
 	try {
-		const parsed = JSON.parse(f.data) as { title?: string; body?: string; color?: string };
+		const parsed = JSON.parse(text) as { title?: string; body?: string; color?: string };
 		return {
 			id: f.id,
 			title: parsed.title ?? '',
@@ -17,11 +19,11 @@ function stickyFromFile(f: FSFile): StickyNote {
 	}
 }
 
-export function createStickiesManager() {
+export function createStickiesManager(fs: TerminalFS) {
 	let notes = $state<StickyNote[]>([]);
 
-	function load(): StickyNote[] {
-		const files = findByApp('stickies');
+	async function load(): Promise<StickyNote[]> {
+		const files = fs.findByApp('stickies');
 		if (files.length > 0) return files.map(stickyFromFile);
 
 		// Migrate from legacy appRead persistence if present
@@ -31,12 +33,20 @@ export function createStickiesManager() {
 			for (const note of legacy) {
 				const name = note.title || 'Untitled Note';
 				const data = JSON.stringify({ title: note.title, body: note.body, color: note.color });
-				try {
-					const file = createFile(DOCS_ID, name, 'stickies', data);
-					migrated.push({ ...note, id: file.id });
-				} catch {
-					const file = createFile(DOCS_ID, `${name} (${note.id.slice(-4)})`, 'stickies', data);
-					migrated.push({ ...note, id: file.id });
+				let result = await fs.createFile(DOCUMENTS_ID, name, {
+					appId: 'stickies',
+					fileType: 'sticky',
+					text: data
+				});
+				if (!result.ok) {
+					result = await fs.createFile(DOCUMENTS_ID, `${name} (${note.id.slice(-4)})`, {
+						appId: 'stickies',
+						fileType: 'sticky',
+						text: data
+					});
+				}
+				if (result.ok) {
+					migrated.push({ ...note, id: result.value.id });
 				}
 			}
 			return migrated;
@@ -48,45 +58,52 @@ export function createStickiesManager() {
 			body: '☑ ship Seinfeld\n☑ ship The Office\n☒ get sued\n☐ teach Kramer to type\n☐ figure out Joey/Phoebe\n☐ "try Succession?"',
 			color: '#f9bd2b'
 		});
-		const file = createFile(DOCS_ID, 'v1 launch — todo', 'stickies', defaultData);
-		return [stickyFromFile(file)];
+		const result = await fs.createFile(DOCUMENTS_ID, 'v1 launch — todo', {
+			appId: 'stickies',
+			fileType: 'sticky',
+			text: defaultData
+		});
+		if (result.ok) return [stickyFromFile(result.value)];
+		return [];
 	}
 
 	function refresh() {
-		notes = findByApp('stickies').map(stickyFromFile);
+		notes = fs.findByApp('stickies').map(stickyFromFile);
 	}
 
 	function init() {
-		notes = load();
+		load().then((loaded) => {
+			notes = loaded;
+		});
 	}
 
-	function create(): string {
+	async function create(): Promise<string> {
 		let name = 'Untitled Note';
 		let suffix = 1;
-		const existing = findByApp('stickies');
+		const existing = fs.findByApp('stickies');
 		const names = new Set(existing.map((f) => f.name));
 		while (names.has(name)) {
 			suffix++;
 			name = `Untitled Note ${suffix}`;
 		}
 		const data = JSON.stringify({ title: '', body: '', color: '#f9bd2b' });
-		const file = createFile(DOCS_ID, name, 'stickies', data);
+		const result = await fs.createFile(DOCUMENTS_ID, name, {
+			appId: 'stickies',
+			fileType: 'sticky',
+			text: data
+		});
 		refresh();
-		return file.id;
+		return result.ok ? result.value.id : '';
 	}
 
-	function remove(id: string) {
-		deleteNode(id);
+	async function remove(id: string) {
+		await fs.deleteNode(id);
 		refresh();
 	}
 
-	function update(updated: StickyNote) {
+	async function update(updated: StickyNote) {
 		const data = JSON.stringify({ title: updated.title, body: updated.body, color: updated.color });
-		try {
-			writeFile(updated.id, data);
-		} catch {
-			// file may have been deleted
-		}
+		await fs.writeText(updated.id, data);
 		refresh();
 	}
 

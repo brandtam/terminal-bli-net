@@ -3,7 +3,19 @@
 	import { isShowOnAir } from '$lib/schedule';
 	import { saveWindows } from '$lib/persistence';
 	import { OsApiClass } from '$lib/os/os-api.svelte';
-	import { TerminalFS, LocalStorageManifestStore, DOCUMENTS_ID } from '$lib/terminalos';
+	import {
+		TerminalFS,
+		LocalStorageManifestStore,
+		DOCUMENTS_ID,
+		DESKTOP_ID,
+		ROOT_ID,
+		SYSTEM_ID,
+		APPLICATIONS_ID,
+		RECORDINGS_ID,
+		TRASH_ID
+	} from '$lib/terminalos';
+	import type { FsFile, FsNode, FsAlias } from '$lib/terminalos';
+	import { createFolderView } from '$lib/terminalos';
 	import { APPS } from '$lib/os/app-registry';
 	import Window from './Window.svelte';
 	import MenuBar from './MenuBar.svelte';
@@ -15,22 +27,6 @@
 	import TVGuide from './TVGuide.svelte';
 	import WelcomeWindow from '$lib/apps/welcome/WelcomeWindow.svelte';
 	import TextEditWindow from '$lib/apps/textedit/TextEditWindow.svelte';
-	import {
-		readFile,
-		trash,
-		createAlias,
-		list,
-		resolveAlias,
-		onFsChange,
-		ensureSystemFolders,
-		DESKTOP_ID,
-		ROOT_ID,
-		SYSTEM_ID,
-		APPS_ID,
-		RECORDINGS_ID,
-		TRASH_ID
-	} from '$lib/os/filesystem';
-	import type { FSFile, FSNode } from '$lib/os/filesystem';
 	import StatsWindow from '$lib/apps/stats/StatsWindow.svelte';
 	import ErrorDialog from '$lib/apps/finder/ErrorDialog.svelte';
 	import AboutAppWindow from '$lib/apps/finder/AboutAppWindow.svelte';
@@ -53,18 +49,26 @@
 
 	let selectedIconId = $state<string | null>(null);
 
-	const stickies = createStickiesManager();
-	let desktopItems = $state<FSNode[]>([]);
-	let desktopFsRev = $state(0);
+	let stickies = $state<ReturnType<typeof createStickiesManager>>(undefined!);
+	let desktopView: ReturnType<typeof createFolderView> | null = $state(null);
 
-	function openDesktopNode(node: FSNode) {
-		if (node.type === 'alias') {
-			const target = resolveAlias(node);
+	function resolveAliasSync(node: FsNode): FsNode | null {
+		if (node.kind !== 'alias') return null;
+		const alias = node as FsAlias;
+		const target = terminalFs.getAllNodes().get(alias.target.nodeId);
+		if (!target) return null;
+		if (target.kind === 'alias') return resolveAliasSync(target);
+		return target;
+	}
+
+	async function openDesktopNode(node: FsNode) {
+		if (node.kind === 'alias') {
+			const target = resolveAliasSync(node);
 			if (target) openDesktopNode(target);
 			return;
 		}
-		if (node.type === 'file') {
-			const file = node as FSFile;
+		if (node.kind === 'file') {
+			const file = node as FsFile;
 			const appId = file.appId;
 			if (!appId) {
 				os.openWindow(file.id);
@@ -72,8 +76,8 @@
 			}
 			// Special apps need their own handling
 			if (appId === 'stickies') {
-				const id = stickies.create();
-				os.openWindow(`sticky-${id}`);
+				const id = await stickies.create();
+				if (id) os.openWindow(`sticky-${id}`);
 				return;
 			}
 			if (appId === 'system-prefs') {
@@ -95,21 +99,21 @@
 		}
 	}
 
-	function desktopIconKind(node: FSNode): string {
-		if (node.type === 'alias') {
-			const target = resolveAlias(node);
+	function desktopIconKind(node: FsNode): string {
+		if (node.kind === 'alias') {
+			const target = resolveAliasSync(node);
 			if (target) return desktopIconKind(target);
 			return 'doc';
 		}
-		if (node.type === 'file') {
-			const file = node as FSFile;
+		if (node.kind === 'file') {
+			const file = node as FsFile;
 			if (file.appId) return getAppIconKind(file.appId);
 			return 'doc';
 		}
 		return 'doc';
 	}
 
-	let deskCtxNode = $state<FSNode | null>(null);
+	let deskCtxNode = $state<FsNode | null>(null);
 	let deskCtxOpen_: (() => void) | null = $state(null);
 	let deskCtxCanAlias = $state(false);
 	let deskCtxCanTrash = $state(false);
@@ -119,7 +123,7 @@
 	const PROTECTED_DESKTOP_IDS = new Set([
 		ROOT_ID,
 		SYSTEM_ID,
-		APPS_ID,
+		APPLICATIONS_ID,
 		DESKTOP_ID,
 		RECORDINGS_ID,
 		TRASH_ID
@@ -127,7 +131,7 @@
 
 	function showDesktopCtx(
 		e: MouseEvent,
-		opts: { open: () => void; node?: FSNode; canAlias?: boolean; canTrash?: boolean }
+		opts: { open: () => void; node?: FsNode; canAlias?: boolean; canTrash?: boolean }
 	) {
 		deskCtxNode = opts.node ?? null;
 		deskCtxOpen_ = opts.open;
@@ -137,11 +141,11 @@
 		deskCtxY = e.clientY;
 	}
 
-	function handleDesktopContextMenu(e: MouseEvent, node: FSNode) {
+	function handleDesktopContextMenu(e: MouseEvent, node: FsNode) {
 		showDesktopCtx(e, {
 			open: () => openDesktopNode(node),
 			node,
-			canAlias: node.type === 'file',
+			canAlias: node.kind === 'file',
 			canTrash: !PROTECTED_DESKTOP_IDS.has(node.id)
 		});
 	}
@@ -156,19 +160,15 @@
 		closeDeskCtx();
 	}
 
-	function deskCtxMakeAlias() {
+	async function deskCtxMakeAlias() {
 		if (!deskCtxNode) return;
-		try {
-			createAlias(DESKTOP_ID, deskCtxNode.name + ' alias', deskCtxNode.id);
-		} catch {
-			/* alias already exists */
-		}
+		await terminalFs.createAlias(DESKTOP_ID, deskCtxNode.id, deskCtxNode.name + ' alias');
 		closeDeskCtx();
 	}
 
-	function deskCtxTrash() {
+	async function deskCtxTrash() {
 		if (!deskCtxNode) return;
-		trash(deskCtxNode.id);
+		await terminalFs.trash(deskCtxNode.id);
 		closeDeskCtx();
 	}
 
@@ -190,16 +190,16 @@
 		// Create OS API
 		os = new OsApiClass(fs);
 
-		// Load stickies and desktop items (still uses compat shim)
-		ensureSystemFolders();
+		// Initialize stickies manager and desktop folder view
+		stickies = createStickiesManager(fs);
 		stickies.init();
-		desktopItems = list(DESKTOP_ID);
+		desktopView = createFolderView(fs, DESKTOP_ID);
 
 		// Register app launch handlers
-		os.registerLaunchHandler('stickies', (payload) => {
+		os.registerLaunchHandler('stickies', async (payload) => {
 			if (payload?.action === 'new') {
-				const id = stickies.create();
-				os.openWindow(`sticky-${id}`);
+				const id = await stickies.create();
+				if (id) os.openWindow(`sticky-${id}`);
 				return;
 			}
 			if (payload?.action === 'color' && payload?.color) {
@@ -209,11 +209,38 @@
 				}
 				return;
 			}
-			const id = stickies.create();
-			os.openWindow(`sticky-${id}`);
+			const id = await stickies.create();
+			if (id) os.openWindow(`sticky-${id}`);
 		});
 
 		os.registerLaunchHandler('textedit', (payload) => {
+			if (payload?.action === 'new') {
+				const base = 'Untitled';
+				const ext = '.txt';
+				let name = `${base}${ext}`;
+				if (terminalFs.exists(DOCUMENTS_ID, name)) {
+					let i = 2;
+					while (terminalFs.exists(DOCUMENTS_ID, `${base} ${i}${ext}`)) i++;
+					name = `${base} ${i}${ext}`;
+				}
+				terminalFs.createTextFile(DOCUMENTS_ID, name, '').then((result) => {
+					if (result.ok) os.openWindow(`textedit-${result.value.id}`);
+				});
+				return;
+			}
+			if (payload?.action === 'open') {
+				const docs = terminalFs.findByApp('textedit', DOCUMENTS_ID);
+				const buttons = docs.map((d) => ({
+					label: d.name,
+					action: () => os.openWindow(`textedit-${d.id}`)
+				}));
+				os.alert({
+					title: 'Open Document',
+					body: docs.length > 0 ? 'Choose a document to open:' : 'No documents found.',
+					buttons: [...buttons, { label: 'Cancel', primary: true }]
+				});
+				return;
+			}
 			if (payload?.open) {
 				openTextEditFile(payload.open as string);
 				return;
@@ -246,6 +273,7 @@
 
 	onDestroy(() => {
 		if (booted) os.destroy();
+		desktopView?.destroy();
 	});
 
 	// Accent CSS sync
@@ -267,18 +295,6 @@
 		const snapshot = os.windows;
 		const tid = setTimeout(() => saveWindows(snapshot), 300);
 		return () => clearTimeout(tid);
-	});
-
-	// Filesystem change watcher (stays the same -- still uses compat shim)
-	$effect(() =>
-		onFsChange(() => {
-			desktopFsRev++;
-		})
-	);
-
-	$effect(() => {
-		desktopFsRev;
-		if (booted) desktopItems = list(DESKTOP_ID);
 	});
 
 	const chatContextInfo = $derived.by((): string | undefined => {
@@ -387,10 +403,10 @@
 				</div>
 
 				<div class="desktop-icons right">
-					{#each desktopItems as node (node.id)}
+					{#each desktopView?.items ?? [] as node (node.id)}
 						<DesktopIcon
 							label={node.name}
-							alias={node.type === 'alias'}
+							alias={node.kind === 'alias'}
 							selected={selectedIconId === node.id}
 							onselect={() => {
 								selectedIconId = node.id;
@@ -515,10 +531,10 @@
 						<RecorderWindow bind:recording={cameraRecording} fs={terminalFs} />
 					{:else if w.id.startsWith('recorder-')}
 						{@const recFileId = w.id.replace('recorder-', '')}
-						{@const recFile = readFile(recFileId)}
-						{#if recFile?.data}
+						{@const recText = terminalFs.readText(recFileId)}
+						{#if recText}
 							<div class="recording-playback">
-								<video src={recFile.data} controls autoplay class="recording-video">
+								<video src={recText} controls autoplay class="recording-video">
 									<track kind="captions" />
 								</video>
 							</div>
@@ -533,8 +549,8 @@
 						{#if note}
 							<StickiesNote
 								{note}
-								ondelete={(id) => {
-									stickies.remove(id);
+								ondelete={async (id) => {
+									await stickies.remove(id);
 									os.closeWindow(`sticky-${id}`);
 								}}
 								onupdate={(n) => stickies.update(n)}

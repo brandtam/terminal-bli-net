@@ -27,7 +27,10 @@
 		fs: TerminalFS;
 	} = $props();
 
-	let currentFolderId = $state(folderId);
+	function initialFolder() {
+		return folderId;
+	}
+	let currentFolderId = $state(initialFolder());
 	let selectedId = $state<string | null>(null);
 
 	let folderView = $state<ReturnType<typeof createFolderView> | null>(null);
