@@ -139,6 +139,7 @@ export interface AlertSpec {
 	title: string;
 	body: string;
 	buttons?: AlertButton[];
+	progress?: { durationMs: number };
 }
 
 export const WINDOW_APP_MAP: Record<string, string> = {

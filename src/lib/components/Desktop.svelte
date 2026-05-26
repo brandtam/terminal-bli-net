@@ -602,17 +602,26 @@
 								>
 									{os.alertSpec.body}
 								</div>
-								<div style="display: flex; gap: 8px; flex-wrap: wrap;">
-									{#each os.alertSpec.buttons || [{ label: 'OK', primary: true }] as b}
-										<button
-											class="btn {b.primary ? 'primary' : ''}"
-											onclick={() => {
-												os.dismissAlert();
-												b.action?.();
-											}}>{b.label}</button
-										>
-									{/each}
-								</div>
+								{#if os.alertSpec.progress}
+									<div class="progress-track">
+										<div
+											class="progress-fill"
+											style="animation-duration: {os.alertSpec.progress.durationMs}ms;"
+										></div>
+									</div>
+								{:else}
+									<div style="display: flex; gap: 8px; flex-wrap: wrap;">
+										{#each os.alertSpec.buttons || [{ label: 'OK', primary: true }] as b}
+											<button
+												class="btn {b.primary ? 'primary' : ''}"
+												onclick={() => {
+													os.dismissAlert();
+													b.action?.();
+												}}>{b.label}</button
+											>
+										{/each}
+									</div>
+								{/if}
 							</div>
 						</div>
 					</div>
@@ -770,6 +779,29 @@
 		position: relative !important;
 		width: 420px;
 		max-width: calc(100vw - 40px);
+	}
+
+	/* Progress bar */
+	.progress-track {
+		height: 18px;
+		border: 2px solid var(--ink, #0a0a0a);
+		background: var(--paper, #fff);
+		overflow: hidden;
+	}
+	.progress-fill {
+		height: 100%;
+		width: 100%;
+		background: var(--ink, #0a0a0a);
+		transform-origin: left;
+		animation: progress-fill-anim linear forwards;
+	}
+	@keyframes progress-fill-anim {
+		from {
+			transform: scaleX(0);
+		}
+		to {
+			transform: scaleX(1);
+		}
 	}
 
 	/* Recording playback */

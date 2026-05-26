@@ -468,7 +468,16 @@ export class OsApiClass implements OsApi {
 	}
 
 	exportBackup(): void {
-		this.fs.exportBackup().then((result) => {
+		const PROGRESS_MS = 2000;
+		this.showAlert({
+			title: 'Backing Up',
+			body: 'Writing Terminal HD to disk…',
+			progress: { durationMs: PROGRESS_MS }
+		});
+
+		const wait = new Promise((r) => setTimeout(r, PROGRESS_MS));
+
+		Promise.all([this.fs.exportBackup(), wait]).then(([result]) => {
 			if (!result.ok) {
 				this.showAlert({
 					title: 'Backup Failed',
@@ -479,16 +488,25 @@ export class OsApiClass implements OsApi {
 			}
 			const json = JSON.stringify(result.value, null, 2);
 			const blob = new Blob([json], { type: 'application/json' });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `terminal-hd-${new Date().toISOString().slice(0, 10)}.terminal-hd`;
-			a.click();
-			URL.revokeObjectURL(url);
+			const filename = `terminal-hd-${new Date().toISOString().slice(0, 10)}.terminal-hd`;
 			this.showAlert({
 				title: 'Backup Complete',
 				body: 'Terminal HD has been saved. This file is readable JSON — anyone who has it can see your files.',
-				buttons: [{ label: 'OK', primary: true }]
+				buttons: [
+					{ label: 'Cancel' },
+					{
+						label: 'Download',
+						primary: true,
+						action: () => {
+							const url = URL.createObjectURL(blob);
+							const a = document.createElement('a');
+							a.href = url;
+							a.download = filename;
+							a.click();
+							URL.revokeObjectURL(url);
+						}
+					}
+				]
 			});
 		});
 	}
