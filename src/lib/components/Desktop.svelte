@@ -499,11 +499,13 @@
 		'about-stats',
 		'about-stickies',
 		'about-recorder',
+		'about-software-shop',
 		'stats',
 		'error',
 		'trash',
 		'recorder',
-		'finder'
+		'finder',
+		'software-shop'
 	]);
 
 	function isKnownWindowId(id: string): boolean {
@@ -534,6 +536,8 @@
 			trash: { title: 'Trash', w: 380, h: 320 },
 			recorder: { title: 'Camera.app', w: 360, h: 480 },
 			'about-recorder': { title: 'About Recorder', w: 420, h: 360 },
+			'software-shop': { title: 'Software Shop', w: 420, h: 520 },
+			'about-software-shop': { title: 'About Software Shop', w: 420, h: 380 },
 			finder: { title: 'Terminal HD', w: 480, h: 420 }
 		};
 		if (id.startsWith('chat-')) {
@@ -753,6 +757,7 @@
 			if (appId === 'stats') return openWindow('about-stats');
 			if (appId === 'stickies') return openWindow('about-stickies');
 			if (appId === 'recorder') return openWindow('about-recorder');
+			if (appId === 'software-shop') return openWindow('about-software-shop');
 			return openWindow('about');
 		},
 		get now() {
@@ -1025,6 +1030,10 @@
 					{#if aboutApp?.about}
 						<AboutAppWindow about={aboutApp.about} />
 					{/if}
+				{:else if w.id === 'software-shop'}
+					<div class="window-content">
+						<p>Software Shop — coming soon</p>
+					</div>
 				{:else if w.id === 'stats'}
 					<StatsWindow showCount={groups.filter((g) => g.active).length} botCount={bots.length} />
 				{:else if w.id === 'error'}

@@ -468,6 +468,48 @@ export const APPS: Record<string, AppDef> = {
 		statusExtra: () => null
 	},
 
+	'software-shop': {
+		id: 'software-shop',
+		name: 'Software Shop',
+		filename: 'Software Shop.app',
+		about: {
+			title: 'Software Shop',
+			version: 'v1.0',
+			tagline: 'install and remove apps from your Terminal',
+			glyph: '💾',
+			glyphBg: 'var(--accent)',
+			glyphFg: 'var(--paper)',
+			sections: [
+				{
+					h: 'WHAT IT IS',
+					body: "The place to install and remove apps on your Terminal desktop. Core OS tools are protected — you can't strand yourself. Everything else is removable and restorable."
+				},
+				{
+					h: 'HOW IT WORKS',
+					body: 'Click "Install from Floppy" to add an app. Click "Uninstall" to remove one. Uninstalling an app never deletes your documents — just the app itself. You can always reinstall from here.'
+				}
+			]
+		},
+		preferences: null,
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }]
+			},
+			{
+				label: 'Help',
+				items: [
+					{
+						type: 'action',
+						label: 'About Software Shop',
+						action: () => os.openAbout('software-shop')
+					}
+				]
+			}
+		],
+		statusExtra: () => null
+	},
+
 	textedit: {
 		id: 'textedit',
 		name: 'TextEdit',

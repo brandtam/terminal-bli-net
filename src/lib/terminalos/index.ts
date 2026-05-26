@@ -27,6 +27,13 @@ export type {
 	NodeFlags
 } from './filesystem/types';
 export { ok, fail, fsErr } from './filesystem/errors';
+export {
+	buildBackup,
+	validateBackup,
+	previewBackup,
+	validateDiskForExport
+} from './filesystem/backup';
+export type { BackupFile, BackupPreview } from './filesystem/backup';
 export type { AliasResolution } from './filesystem/aliases';
 export type { OperationKind, UndoRecord } from './filesystem/operations';
 export type { DiskUsage } from './filesystem/usage';
@@ -50,3 +57,5 @@ export {
 	isSpecialLaunchApp
 } from './apps/app-install';
 export type { SpecialLaunchApp } from './apps/app-install';
+export { getShopCatalog, isInstalled, canUninstall, findAppFile } from './apps/software-shop';
+export type { ShopItem } from './apps/software-shop';

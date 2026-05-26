@@ -1,6 +1,7 @@
 import type {
 	NodeId,
 	BodyId,
+	AppId,
 	FsNode,
 	FsFolder,
 	FsFile,
@@ -13,7 +14,10 @@ import { generateUniqueId, hasSiblingConflict } from './names';
 import { derivePath } from './paths';
 import { resolveAlias as resolveAliasTarget, buildFingerprint } from './aliases';
 import { getDefaultInstalledApps, getDesktopAliasApps, getAppDef } from '../apps/app-library';
+import { findAppFile } from '../apps/software-shop';
 import type { UndoRecord } from './operations';
+import { buildBackup, validateBackup, previewBackup, validateDiskForExport } from './backup';
+import type { BackupFile, BackupPreview } from './backup';
 import type { ManifestStore, BodyStore } from './storage/storage-types';
 import { InMemoryManifestStore, InMemoryBodyStore } from './storage/storage-types';
 import { computeDiskUsage } from './usage';
@@ -947,6 +951,116 @@ export class TerminalFS {
 		return ok(this.lastUndo.label);
 	}
 
+	// --- App install/uninstall ---
+
+	async installApp(appId: AppId): Promise<FsResult<FsFile>> {
+		const appDef = getAppDef(appId);
+		if (!appDef) return fail('missing_app', `App "${appId}" not found in AppLibrary`);
+
+		// Check if already installed
+		const existing = findAppFile(appId, this.nodes);
+		if (existing) return fail('duplicate_name', `App "${appDef.name}" is already installed`);
+
+		const now = Date.now();
+		const fileId = generateUniqueId();
+
+		// Create app file in /Applications
+		const file: FsFile = {
+			id: fileId,
+			volumeId: this.volume.id,
+			kind: 'file',
+			parentId: APPLICATIONS_ID,
+			name: appDef.fileName,
+			fileType: 'app',
+			opensWith: appId,
+			appId: appId,
+			flags: {
+				system: appDef.category === 'system',
+				protected: !appDef.removable
+			},
+			createdAt: now,
+			updatedAt: now
+		};
+		this.nodes.set(fileId, file);
+
+		// Create desktop alias if configured
+		if (appDef.desktopAliasByDefault) {
+			if (!hasSiblingConflict(appDef.fileName, this.siblings(DESKTOP_ID))) {
+				const aliasId = generateUniqueId();
+				const alias: FsAlias = {
+					id: aliasId,
+					volumeId: this.volume.id,
+					kind: 'alias',
+					parentId: DESKTOP_ID,
+					name: appDef.fileName,
+					target: {
+						nodeId: fileId,
+						originalPath: derivePath(fileId, this.nodes),
+						originalName: appDef.fileName,
+						targetKind: 'app',
+						fingerprint: appId
+					},
+					createdAt: now,
+					updatedAt: now
+				};
+				this.nodes.set(aliasId, alias);
+			}
+		}
+
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+
+		this.notifyChange([fileId], [APPLICATIONS_ID, DESKTOP_ID], 'install_app');
+
+		return ok(file);
+	}
+
+	async uninstallApp(appId: AppId): Promise<FsResult<{ removedFiles: number }>> {
+		const appDef = getAppDef(appId);
+		if (!appDef) return fail('missing_app', `App "${appId}" not found in AppLibrary`);
+
+		if (!appDef.removable) {
+			return fail('protected_node', `"${appDef.name}" is a core OS app and cannot be uninstalled`);
+		}
+
+		// Find and remove app file (NOT user documents created by the app)
+		const appFile = findAppFile(appId, this.nodes);
+		if (!appFile) return fail('not_found', `App "${appDef.name}" is not installed`);
+
+		// Remove the app file
+		this.nodes.delete(appFile.id);
+
+		// Remove desktop aliases that point to this app file
+		const removedAliasIds: NodeId[] = [];
+		for (const node of this.nodes.values()) {
+			if (node.kind === 'alias' && node.target.nodeId === appFile.id) {
+				removedAliasIds.push(node.id);
+			}
+		}
+		for (const id of removedAliasIds) {
+			this.nodes.delete(id);
+		}
+
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<{ removedFiles: number }>;
+
+		this.notifyChange(
+			[appFile.id, ...removedAliasIds],
+			[APPLICATIONS_ID, DESKTOP_ID],
+			'uninstall_app'
+		);
+
+		// Clear undo since uninstall involves multiple nodes
+		this.lastUndo = null;
+
+		return ok({ removedFiles: 1 + removedAliasIds.length });
+	}
+
+	async isAppInstalled(appId: AppId): Promise<FsResult<boolean>> {
+		const installed = findAppFile(appId, this.nodes) !== undefined;
+		return ok(installed);
+	}
+
 	// --- Body storage ---
 
 	async readBody(bodyId: BodyId): Promise<FsResult<ArrayBuffer>> {
@@ -990,6 +1104,80 @@ export class TerminalFS {
 	/** Watch changes to a folder's children. Returns unsubscribe function. */
 	watchFolder(folderId: NodeId, callback: FsWatchCallback): () => void {
 		return this.watcherRegistry.watchFolder(folderId, callback);
+	}
+
+	// --- Backup / Restore ---
+
+	async exportBackup(): Promise<FsResult<BackupFile>> {
+		const validation = validateDiskForExport(this.volume, this.nodes);
+		if (!validation.ok) return validation as FsResult<BackupFile>;
+
+		const backup = buildBackup(this.volume, this.nodes);
+		return ok(backup);
+	}
+
+	async validateBackup(data: unknown): Promise<FsResult<BackupPreview>> {
+		const validated = validateBackup(data);
+		if (!validated.ok) return validated as FsResult<BackupPreview>;
+
+		const preview = previewBackup(validated.value);
+		return ok(preview);
+	}
+
+	async restoreBackup(data: unknown): Promise<FsResult<BackupPreview>> {
+		const validated = validateBackup(data);
+		if (!validated.ok) return validated as FsResult<BackupPreview>;
+
+		const backup = validated.value;
+		const preview = previewBackup(backup);
+
+		// Replace current disk with backup contents
+		this.nodes.clear();
+		for (const node of backup.nodes) {
+			this.nodes.set(node.id, node as FsNode);
+		}
+
+		// Persist the restored state
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<BackupPreview>;
+
+		// Clear undo — restore is a full disk replacement
+		this.lastUndo = null;
+
+		// Notify watchers
+		const allNodeIds = Array.from(this.nodes.keys());
+		this.notifyChange(allNodeIds, allNodeIds, 'restore');
+
+		return ok(preview);
+	}
+
+	// --- Reinstall ---
+
+	async reinstallOS(): Promise<FsResult<void>> {
+		// Wipe everything
+		this.nodes.clear();
+		await this.bodies.clear();
+
+		// Rebuild factory defaults by creating a fresh disk and copying its state
+		const fresh = TerminalFS.createCleanDisk(this.manifest, this.bodies);
+		const freshNodes = fresh.getAllNodes();
+		for (const [id, node] of freshNodes) {
+			this.nodes.set(id, node);
+		}
+		this.volume = fresh.getVolume();
+
+		// Persist
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult;
+
+		// Clear undo
+		this.lastUndo = null;
+
+		// Notify watchers
+		const allNodeIds = Array.from(this.nodes.keys());
+		this.notifyChange(allNodeIds, allNodeIds, 'reinstall');
+
+		return ok(undefined);
 	}
 
 	/** Clean up BroadcastChannel and all watchers. */

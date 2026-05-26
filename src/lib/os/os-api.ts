@@ -139,7 +139,9 @@ export const WINDOW_APP_MAP: Record<string, string> = {
 	error: 'finder',
 	trash: 'finder',
 	recorder: 'recorder',
-	'about-recorder': 'recorder'
+	'about-recorder': 'recorder',
+	'software-shop': 'software-shop',
+	'about-software-shop': 'software-shop'
 };
 
 export function windowAppId(windowId: string): string {
