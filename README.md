@@ -4,7 +4,7 @@ A retro desktop you visit in a browser. It looks like what the inside of a compu
 
 Open TV Guide to see what's on. Channels run shows on a schedule like mid-80s cable. If a show is airing, you can chat with the characters — they know what episode they're in.
 
-Built with SvelteKit, deployed on Cloudflare Pages, powered by Claude.
+Built with SvelteKit, deployed on Cloudflare Pages.
 
 ## Setup
 
