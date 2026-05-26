@@ -46,6 +46,7 @@ export default [
 				IDBDatabase: 'readonly',
 				BroadcastChannel: 'readonly',
 				MessageEvent: 'readonly',
+				Blob: 'readonly',
 				__APP_VERSION__: 'readonly'
 			}
 		},

@@ -59,6 +59,7 @@
 	import TVGuidePrefs from './TVGuidePrefs.svelte';
 	import ChatrbotPrefs from './ChatrbotPrefs.svelte';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import SoftwareShopWindow from '$lib/apps/software-shop/SoftwareShopWindow.svelte';
 
 	const SYS7_PATTERNS = [
 		'128',
@@ -1031,9 +1032,7 @@
 						<AboutAppWindow about={aboutApp.about} />
 					{/if}
 				{:else if w.id === 'software-shop'}
-					<div class="window-content">
-						<p>Software Shop — coming soon</p>
-					</div>
+					<SoftwareShopWindow {os} />
 				{:else if w.id === 'stats'}
 					<StatsWindow showCount={groups.filter((g) => g.active).length} botCount={bots.length} />
 				{:else if w.id === 'error'}
