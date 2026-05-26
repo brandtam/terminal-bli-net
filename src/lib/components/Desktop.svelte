@@ -3,7 +3,7 @@
 	import { isShowOnAir } from '$lib/schedule';
 	import { saveWindows } from '$lib/persistence';
 	import { OsApiClass } from '$lib/os/os-api.svelte';
-	import { TerminalFS, LocalStorageManifestStore } from '$lib/terminalos';
+	import { TerminalFS, LocalStorageManifestStore, DOCUMENTS_ID } from '$lib/terminalos';
 	import { APPS } from '$lib/os/app-registry';
 	import Window from './Window.svelte';
 	import MenuBar from './MenuBar.svelte';
@@ -15,7 +15,6 @@
 	import TVGuide from './TVGuide.svelte';
 	import WelcomeWindow from '$lib/apps/welcome/WelcomeWindow.svelte';
 	import TextEditWindow from '$lib/apps/textedit/TextEditWindow.svelte';
-	import { findDocByName } from '$lib/apps/textedit/textedit-docs';
 	import {
 		readFile,
 		trash,
@@ -50,6 +49,7 @@
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
+	let terminalFs = $state<TerminalFS>(undefined!);
 
 	let selectedIconId = $state<string | null>(null);
 
@@ -173,7 +173,8 @@
 	}
 
 	function openTextEditFile(name: string) {
-		const file = findDocByName(name);
+		const files = terminalFs.findByApp('textedit', DOCUMENTS_ID);
+		const file = files.find((f) => f.name === name);
 		if (file) os.openWindow(`textedit-${file.id}`);
 	}
 
@@ -184,6 +185,7 @@
 
 		// Open filesystem
 		const fs = await TerminalFS.open(new LocalStorageManifestStore());
+		terminalFs = fs;
 
 		// Create OS API
 		os = new OsApiClass(fs);
@@ -294,12 +296,12 @@
 		if (!booted) return [];
 		const ids = os.windows.map((w) => w.id);
 		if (os.windows.some((w) => w.id.startsWith('chat-'))) ids.push('chat');
+		const allNodes = terminalFs.getAllNodes();
 		if (
 			os.windows.some((w) => {
 				if (!w.id.startsWith('textedit-')) return false;
 				const fileId = w.id.replace('textedit-', '');
-				const file = readFile(fileId);
-				return file?.name === 'Pricing.txt';
+				return allNodes.get(fileId)?.name === 'Pricing.txt';
 			})
 		)
 			ids.push('pricing');
@@ -307,8 +309,7 @@
 			os.windows.some((w) => {
 				if (!w.id.startsWith('textedit-')) return false;
 				const fileId = w.id.replace('textedit-', '');
-				const file = readFile(fileId);
-				return file?.name === 'README.TXT';
+				return allNodes.get(fileId)?.name === 'README.TXT';
 			})
 		)
 			ids.push('readme');
@@ -490,7 +491,7 @@
 						<ChatrbotPrefs />
 					{:else if w.id.startsWith('textedit-')}
 						{@const fileId = w.id.replace('textedit-', '')}
-						<TextEditWindow docId={fileId} />
+						<TextEditWindow docId={fileId} fs={terminalFs} />
 					{:else if w.id === 'about'}
 						<AboutTerminal {os} />
 					{:else if w.id.startsWith('about-')}
@@ -509,9 +510,9 @@
 					{:else if w.id === 'error'}
 						<ErrorDialog onclose={() => os.closeWindow('error')} />
 					{:else if w.id === 'trash'}
-						<FinderWindow {os} folderId="trash" />
+						<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
 					{:else if w.id === 'recorder'}
-						<RecorderWindow bind:recording={cameraRecording} />
+						<RecorderWindow bind:recording={cameraRecording} fs={terminalFs} />
 					{:else if w.id.startsWith('recorder-')}
 						{@const recFileId = w.id.replace('recorder-', '')}
 						{@const recFile = readFile(recFileId)}
@@ -540,7 +541,7 @@
 							/>
 						{/if}
 					{:else if w.id === 'finder'}
-						<FinderWindow {os} />
+						<FinderWindow {os} fs={terminalFs} />
 					{:else}
 						<div class="window-content">
 							<p>Coming soon...</p>

@@ -1,85 +1,90 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import type { OsApi } from '$lib/os/os-api';
 	import {
-		list,
-		getNode,
-		onFsChange,
-		createAlias,
-		resolveAlias,
-		trash,
-		deleteNode,
+		type TerminalFS,
 		ROOT_ID,
 		TRASH_ID,
 		SYSTEM_ID,
-		APPS_ID,
+		APPLICATIONS_ID,
 		DESKTOP_ID,
-		RECORDINGS_ID
-	} from '$lib/os/filesystem';
-	import type { FSNode, FSFile } from '$lib/os/filesystem';
+		RECORDINGS_ID,
+		createFolderView
+	} from '$lib/terminalos';
+	import type { FsNode, FsFile, FsAlias } from '$lib/terminalos';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import { getAppDef } from '$lib/terminalos/apps/app-library';
 	import { isInstalled } from '$lib/terminalos/apps/software-shop';
-	import { TerminalFS, LocalStorageManifestStore } from '$lib/terminalos';
 
 	let {
 		folderId = ROOT_ID,
-		os
+		os,
+		fs
 	}: {
 		folderId?: string;
 		os: OsApi;
+		fs: TerminalFS;
 	} = $props();
 
-	function initialFolder() {
-		return folderId;
-	}
-	let currentFolderId = $state(initialFolder());
+	let currentFolderId = $state(folderId);
 	let selectedId = $state<string | null>(null);
-	let fsRev = $state(0);
 
-	$effect(() =>
-		onFsChange(() => {
-			fsRev++;
-		})
-	);
+	let folderView = $state<ReturnType<typeof createFolderView> | null>(null);
 
-	const items = $derived.by(() => {
-		fsRev;
-		return list(currentFolderId);
+	$effect(() => {
+		folderView?.destroy();
+		folderView = createFolderView(fs, currentFolderId);
 	});
+
+	onDestroy(() => folderView?.destroy());
+
+	const items = $derived(folderView?.items ?? []);
+
 	const pathSegments = $derived.by(() => {
+		// Re-derive when folder contents change
+		folderView?.items;
+		const nodes = fs.getAllNodes();
 		const segments: { id: string; name: string }[] = [];
-		let node = getNode(currentFolderId);
+		let node = nodes.get(currentFolderId);
 		while (node) {
 			segments.unshift({ id: node.id, name: node.name });
-			node = node.parentId ? getNode(node.parentId) : null;
+			node = node.parentId ? nodes.get(node.parentId) : undefined;
 		}
 		return segments;
 	});
 
-	function iconKind(node: FSNode): string {
-		if (node.type === 'alias') {
-			const target = resolveAlias(node);
+	function resolveNode(node: FsNode): FsNode | null {
+		if (node.kind !== 'alias') return node;
+		const alias = node as FsAlias;
+		const target = fs.getAllNodes().get(alias.target.nodeId);
+		if (!target) return null;
+		if (target.kind === 'alias') return resolveNode(target);
+		return target;
+	}
+
+	function iconKind(node: FsNode): string {
+		if (node.kind === 'alias') {
+			const target = resolveNode(node);
 			if (target) return iconKind(target);
 			return 'doc';
 		}
-		if (node.type === 'folder') {
+		if (node.kind === 'folder') {
 			if (node.id === TRASH_ID) return 'trash';
 			if (node.id === SYSTEM_ID) return 'hd';
-			if (node.id === APPS_ID) return 'folder';
+			if (node.id === APPLICATIONS_ID) return 'folder';
 			if (node.id === DESKTOP_ID) return 'folder';
 			if (node.id === RECORDINGS_ID) return 'floppy';
 			return 'folder';
 		}
-		const file = node as FSFile;
+		const file = node as FsFile;
 		if (file.appId) return getAppIconKind(file.appId);
 		return 'doc';
 	}
 
-	function iconAccent(node: FSNode): boolean {
-		if (node.type === 'file') {
-			const file = node as FSFile;
-			if (file.name.toLowerCase() === 'pricing.txt') return true;
+	function iconAccent(node: FsNode): boolean {
+		if (node.kind === 'file') {
+			if (node.name.toLowerCase() === 'pricing.txt') return true;
 		}
 		return false;
 	}
@@ -88,7 +93,7 @@
 		selectedId = id;
 	}
 
-	function openDocFile(file: FSFile) {
+	function openDocFile(file: FsFile) {
 		if (file.appId === 'textedit') {
 			os.openWindow(`textedit-${file.id}`);
 		} else if (file.appId === 'recorder') {
@@ -98,18 +103,18 @@
 		}
 	}
 
-	function handleOpen(node: FSNode) {
-		if (node.type === 'folder') {
+	function handleOpen(node: FsNode) {
+		if (node.kind === 'folder') {
 			currentFolderId = node.id;
 			selectedId = null;
 			return;
 		}
-		if (node.type === 'alias') {
-			const target = resolveAlias(node);
+		if (node.kind === 'alias') {
+			const target = resolveNode(node);
 			if (target) handleOpen(target);
 			return;
 		}
-		const file = node as FSFile;
+		const file = node as FsFile;
 		const appId = file.appId;
 		if (!appId) {
 			os.openWindow(file.id);
@@ -121,24 +126,22 @@
 		if (docApps.has(appId)) {
 			const appDef = getAppDef(appId);
 			if (appDef) {
-				TerminalFS.open(new LocalStorageManifestStore()).then((fs) => {
-					const nodes = fs.getAllNodes();
-					if (!isInstalled(appId, nodes)) {
-						os.alert({
-							title: `${appDef.name} is not installed`,
-							body: `The ${appDef.name} application has been uninstalled. You can reinstall it from the Software Shop.`,
-							buttons: [
-								{
-									label: 'Open Software Shop',
-									action: () => os.openWindow('software-shop')
-								},
-								{ label: 'OK', primary: true }
-							]
-						});
-					} else {
-						openDocFile(file);
-					}
-				});
+				const nodes = fs.getAllNodes();
+				if (!isInstalled(appId, nodes)) {
+					os.alert({
+						title: `${appDef.name} is not installed`,
+						body: `The ${appDef.name} application has been uninstalled. You can reinstall it from the Software Shop.`,
+						buttons: [
+							{
+								label: 'Open Software Shop',
+								action: () => os.openWindow('software-shop')
+							},
+							{ label: 'OK', primary: true }
+						]
+					});
+				} else {
+					openDocFile(file);
+				}
 				return;
 			}
 		}
@@ -165,12 +168,12 @@
 		selectedId = null;
 	}
 
-	let contextMenuNode = $state<FSNode | null>(null);
+	let contextMenuNode = $state<FsNode | null>(null);
 	let contextMenuX = $state(0);
 	let contextMenuY = $state(0);
 	let contextMenuEl = $state<HTMLDivElement | null>(null);
 
-	function handleContextMenu(e: MouseEvent, node: FSNode) {
+	function handleContextMenu(e: MouseEvent, node: FsNode) {
 		e.preventDefault();
 		contextMenuNode = node;
 		contextMenuX = e.clientX;
@@ -193,32 +196,35 @@
 		closeContextMenu();
 	}
 
-	function handleContextMakeAlias() {
+	async function handleContextMakeAlias() {
 		if (!contextMenuNode) return;
 		const name = contextMenuNode.name + ' alias';
-		try {
-			createAlias(currentFolderId, name, contextMenuNode.id);
-		} catch {
-			// alias already exists or other error
-		}
+		await fs.createAlias(currentFolderId, contextMenuNode.id, name);
 		closeContextMenu();
 	}
 
-	const PROTECTED_IDS = new Set([ROOT_ID, SYSTEM_ID, APPS_ID, DESKTOP_ID, RECORDINGS_ID, TRASH_ID]);
+	const PROTECTED_IDS = new Set([
+		ROOT_ID,
+		SYSTEM_ID,
+		APPLICATIONS_ID,
+		DESKTOP_ID,
+		RECORDINGS_ID,
+		TRASH_ID
+	]);
 
-	function canTrash(node: FSNode): boolean {
+	function canTrash(node: FsNode): boolean {
 		return !PROTECTED_IDS.has(node.id);
 	}
 
-	function handleContextTrash() {
+	async function handleContextTrash() {
 		if (!contextMenuNode || !canTrash(contextMenuNode)) return;
-		trash(contextMenuNode.id);
+		await fs.trash(contextMenuNode.id);
 		closeContextMenu();
 	}
 
-	function handleContextDelete() {
+	async function handleContextDelete() {
 		if (!contextMenuNode) return;
-		deleteNode(contextMenuNode.id);
+		await fs.deleteNode(contextMenuNode.id);
 		closeContextMenu();
 	}
 
@@ -247,7 +253,7 @@
 				ondblclick={() => handleOpen(node)}
 				oncontextmenu={(e) => handleContextMenu(e, node)}
 			>
-				<div class="finder-item-icon" class:alias={node.type === 'alias'}>
+				<div class="finder-item-icon" class:alias={node.kind === 'alias'}>
 					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
 				</div>
 				<div class="finder-item-label">{node.name}</div>
@@ -280,7 +286,7 @@
 				>
 			{:else}
 				<button type="button" class="context-menu-item" onclick={handleContextOpen}>Open</button>
-				{#if contextMenuNode.type === 'file'}
+				{#if contextMenuNode.kind === 'file'}
 					<div class="context-menu-sep"></div>
 					<button type="button" class="context-menu-item" onclick={handleContextMakeAlias}
 						>Make Alias</button

@@ -1,28 +1,26 @@
 <script lang="ts">
-	import { readFile, writeFile } from '$lib/os/filesystem';
+	import type { TerminalFS } from '$lib/terminalos';
 
 	interface Props {
 		docId: string;
+		fs: TerminalFS;
 	}
 
-	let { docId }: Props = $props();
+	let { docId, fs }: Props = $props();
 
 	let content = $state('');
 	let dirty = $state(false);
 
 	$effect(() => {
-		const file = readFile(docId);
-		if (file) {
-			content = file.data;
+		const text = fs.readText(docId);
+		if (text !== null) {
+			content = text;
 			dirty = false;
 		}
 	});
 
-	function flushSave() {
-		const file = readFile(docId);
-		if (file) {
-			writeFile(docId, content);
-		}
+	async function flushSave() {
+		await fs.writeText(docId, content);
 		dirty = false;
 	}
 
@@ -47,12 +45,7 @@
 	}
 </script>
 
-<textarea
-	class="textedit-area"
-	value={content}
-	oninput={handleInput}
-	spellcheck="false"
-></textarea>
+<textarea class="textedit-area" value={content} oninput={handleInput} spellcheck="false"></textarea>
 
 <style>
 	.textedit-area {
