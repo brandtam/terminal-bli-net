@@ -1,3 +1,10 @@
+## PR and commit rules
+
+- Never add "Generated with Claude Code" or any AI attribution lines to PR descriptions or commit messages.
+- Never add Co-Authored-By trailer lines to commits.
+
+## Svelte MCP
+
 You are able to use the Svelte MCP server, where you have access to comprehensive Svelte 5 and SvelteKit documentation. Here's how to use the available tools effectively:
 
 ## Available Svelte MCP Tools:
