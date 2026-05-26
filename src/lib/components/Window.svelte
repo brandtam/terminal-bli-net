@@ -151,7 +151,6 @@
 	}
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="window {active ? '' : 'inactive'} {className}"
 	class:chromeless
@@ -164,6 +163,7 @@
 	{#if !chromeless}
 		<div
 			class="window-titlebar"
+			role="presentation"
 			onpointerdown={onTitlePointerDown}
 			onpointermove={onTitlePointerMove}
 			onpointerup={onTitlePointerUp}
@@ -184,6 +184,7 @@
 				{#if resizable}
 					<div
 						class="window-growbox-ne"
+						role="separator"
 						onpointerdown={onGrowNEDown}
 						onpointermove={onGrowNEMove}
 						onpointerup={onGrowNEUp}
@@ -215,6 +216,7 @@
 	{/if}
 	<div
 		class="window-body"
+		role="presentation"
 		onpointerdown={chromeless ? onTitlePointerDown : undefined}
 		onpointermove={chromeless ? onTitlePointerMove : undefined}
 		onpointerup={chromeless ? onTitlePointerUp : undefined}
@@ -225,6 +227,7 @@
 	{#if resizable}
 		<div
 			class="window-growbox"
+			role="separator"
 			onpointerdown={onGrowSEDown}
 			onpointermove={onGrowSEMove}
 			onpointerup={onGrowSEUp}

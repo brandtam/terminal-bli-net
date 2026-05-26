@@ -23,7 +23,11 @@
 	];
 
 	function onPointerDown(e: PointerEvent) {
-		if ((e.target as HTMLElement).closest('.dock-item') || (e.target as HTMLElement).closest('.dock-btn')) return;
+		if (
+			(e.target as HTMLElement).closest('.dock-item') ||
+			(e.target as HTMLElement).closest('.dock-btn')
+		)
+			return;
 		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 		dragRef = { offX: e.clientX - rect.left, offY: e.clientY - rect.top };
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -36,13 +40,18 @@
 
 	function onPointerUp(e: PointerEvent) {
 		dragRef = null;
-		try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+		try {
+			(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+		} catch {
+			/* pointer already released */
+		}
 	}
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="dock"
+	role="toolbar"
+	tabindex="-1"
 	class:collapsed
 	style={pos ? `left: ${pos.x}px; top: ${pos.y}px; bottom: auto; transform: none;` : ''}
 	onpointerdown={onPointerDown}
@@ -66,7 +75,10 @@
 	{/if}
 	<button
 		class="dock-btn"
-		onclick={(e) => { e.stopPropagation(); collapsed = !collapsed; }}
+		onclick={(e) => {
+			e.stopPropagation();
+			collapsed = !collapsed;
+		}}
 		title={collapsed ? 'expand' : 'collapse'}
 	>
 		{collapsed ? '▸' : '◂'}
@@ -99,7 +111,9 @@
 		opacity: 0.55;
 		letter-spacing: -2px;
 	}
-	.dock-handle:active { cursor: grabbing; }
+	.dock-handle:active {
+		cursor: grabbing;
+	}
 	.dock-btn {
 		appearance: none;
 		margin-left: 3px;
@@ -113,8 +127,13 @@
 		padding: 0;
 		line-height: 1;
 	}
-	.dock-btn:hover { background: var(--accent-2); }
-	.dock.collapsed { padding: 5px 7px; gap: 3px; }
+	.dock-btn:hover {
+		background: var(--accent-2);
+	}
+	.dock.collapsed {
+		padding: 5px 7px;
+		gap: 3px;
+	}
 	.dock-item {
 		width: 32px;
 		height: 32px;
@@ -128,7 +147,9 @@
 		font-size: 16px;
 		padding: 0;
 	}
-	.dock-item:hover { background: var(--accent-2); }
+	.dock-item:hover {
+		background: var(--accent-2);
+	}
 	.dock-item.active::after {
 		content: '';
 		position: absolute;
@@ -158,5 +179,7 @@
 		pointer-events: none;
 		transition: opacity 0.1s;
 	}
-	.dock-item:hover .tooltip { opacity: 1; }
+	.dock-item:hover .tooltip {
+		opacity: 1;
+	}
 </style>
