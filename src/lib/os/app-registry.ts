@@ -84,7 +84,7 @@ export const APPS: Record<string, AppDef> = {
 									{
 										label: 'Empty',
 										primary: true,
-										action: () => os.emptyTrash?.()
+										action: () => os.emptyTrash()
 									}
 								]
 							})
@@ -93,18 +93,18 @@ export const APPS: Record<string, AppDef> = {
 					{
 						type: 'action',
 						label: 'Backup Terminal HD…',
-						action: () => os.exportBackup?.()
+						action: () => os.exportBackup()
 					},
 					{
 						type: 'action',
 						label: 'Restore Terminal HD…',
-						action: () => os.restoreBackup?.()
+						action: () => os.restoreBackup()
 					},
 					{ type: 'separator' },
 					{
 						type: 'action',
 						label: 'Reinstall Terminal OS…',
-						action: () => os.reinstallOS?.()
+						action: () => os.reinstallOS()
 					},
 					{ type: 'separator' },
 					{ type: 'action', label: 'Restart', action: () => os.openWindow('error') },

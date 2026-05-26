@@ -1,7 +1,6 @@
 import type { TerminalFS } from '$lib/terminalos';
 import type { FsFile } from '$lib/terminalos';
 import { DOCUMENTS_ID } from '$lib/terminalos';
-import { appRead } from '$lib/persistence';
 import type { StickyNote } from './StickiesNote.svelte';
 
 function stickyFromFile(f: FsFile): StickyNote {
@@ -26,33 +25,6 @@ export function createStickiesManager(fs: TerminalFS) {
 		const files = fs.findByApp('stickies');
 		if (files.length > 0) return files.map(stickyFromFile);
 
-		// Migrate from legacy appRead persistence if present
-		const legacy = appRead<StickyNote[] | null>('stickies', 'notes', null);
-		if (legacy && legacy.length > 0) {
-			const migrated: StickyNote[] = [];
-			for (const note of legacy) {
-				const name = note.title || 'Untitled Note';
-				const data = JSON.stringify({ title: note.title, body: note.body, color: note.color });
-				let result = await fs.createFile(DOCUMENTS_ID, name, {
-					appId: 'stickies',
-					fileType: 'sticky',
-					text: data
-				});
-				if (!result.ok) {
-					result = await fs.createFile(DOCUMENTS_ID, `${name} (${note.id.slice(-4)})`, {
-						appId: 'stickies',
-						fileType: 'sticky',
-						text: data
-					});
-				}
-				if (result.ok) {
-					migrated.push({ ...note, id: result.value.id });
-				}
-			}
-			return migrated;
-		}
-
-		// Seed a default note for first-time users
 		const defaultData = JSON.stringify({
 			title: 'v1 launch — todo',
 			body: '☑ ship Seinfeld\n☑ ship The Office\n☒ get sued\n☐ teach Kramer to type\n☐ figure out Joey/Phoebe\n☐ "try Succession?"',

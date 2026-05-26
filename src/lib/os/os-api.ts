@@ -107,26 +107,26 @@ export interface OsApi {
 	listWindows: () => WindowState[];
 
 	alert: (spec: AlertSpec) => void;
+	showAlert: (spec: AlertSpec) => void;
+	dismissAlert: () => void;
 	startNewConversation: () => void;
 
-	emptyTrash?: () => Promise<void>;
-	exportBackup?: () => void;
-	restoreBackup?: () => void;
-	reinstallOS?: () => void;
+	emptyTrash: () => Promise<void>;
+	exportBackup: () => void;
+	restoreBackup: () => void;
+	reinstallOS: () => void;
 
-	registerLaunchHandler?: (
+	registerLaunchHandler: (
 		appId: string,
 		handler: (payload?: Record<string, unknown>) => void
 	) => void;
 
-	moveWindow?: (id: string, x: number, y: number) => void;
-	resizeWindow?: (id: string, w: number, h: number) => void;
-	getWindowDef?: (id: string) => { title: string; w: number; h: number };
+	moveWindow: (id: string, x: number, y: number) => void;
+	resizeWindow: (id: string, w: number, h: number) => void;
+	getWindowDef: (id: string) => { title: string; w: number; h: number };
 
-	openChat?: (group: GroupMeta) => void;
-	setTimezone?: (tz: string) => void;
-	showAlert?: (spec: AlertSpec) => void;
-	dismissAlert?: () => void;
+	openChat: (group: GroupMeta) => void;
+	setTimezone: (tz: string) => void;
 }
 
 export interface AlertButton {
