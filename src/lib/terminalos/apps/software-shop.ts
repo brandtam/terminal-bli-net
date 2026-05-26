@@ -24,11 +24,12 @@ export function getShopCatalog(nodes: Map<NodeId, FsNode>): ShopItem[] {
 }
 
 /**
- * Check if an app is currently installed (has a file node in the filesystem).
+ * Check if an app is currently installed (has an app file node in the filesystem).
+ * Only matches fileType: 'app' — not user documents created by the app.
  */
 export function isInstalled(appId: AppId, nodes: Map<NodeId, FsNode>): boolean {
 	for (const node of nodes.values()) {
-		if (node.kind === 'file' && node.appId === appId) {
+		if (node.kind === 'file' && node.fileType === 'app' && node.appId === appId) {
 			return true;
 		}
 	}
@@ -37,10 +38,11 @@ export function isInstalled(appId: AppId, nodes: Map<NodeId, FsNode>): boolean {
 
 /**
  * Find the app file node for a given appId.
+ * Only matches fileType: 'app' — not user documents created by the app.
  */
 export function findAppFile(appId: AppId, nodes: Map<NodeId, FsNode>): FsFile | undefined {
 	for (const node of nodes.values()) {
-		if (node.kind === 'file' && node.appId === appId) {
+		if (node.kind === 'file' && node.fileType === 'app' && node.appId === appId) {
 			return node;
 		}
 	}

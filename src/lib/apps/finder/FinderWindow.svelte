@@ -18,6 +18,9 @@
 	import type { FSNode, FSFile } from '$lib/os/filesystem';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import { getAppDef } from '$lib/terminalos/apps/app-library';
+	import { isInstalled } from '$lib/terminalos/apps/software-shop';
+	import { TerminalFS, LocalStorageManifestStore } from '$lib/terminalos';
 
 	let {
 		folderId = ROOT_ID,
@@ -85,6 +88,16 @@
 		selectedId = id;
 	}
 
+	function openDocFile(file: FSFile) {
+		if (file.appId === 'textedit') {
+			os.openWindow(`textedit-${file.id}`);
+		} else if (file.appId === 'recorder') {
+			os.openWindow(`recorder-${file.id}`);
+		} else if (file.appId === 'stickies') {
+			os.launchApp('stickies', { action: 'new' });
+		}
+	}
+
 	function handleOpen(node: FSNode) {
 		if (node.type === 'folder') {
 			currentFolderId = node.id;
@@ -102,19 +115,34 @@
 			os.openWindow(file.id);
 			return;
 		}
-		// Files that open by their file ID (documents)
-		if (appId === 'textedit') {
-			os.openWindow(`textedit-${file.id}`);
-			return;
+
+		// For document-type files, check if the owning app is still installed
+		const docApps = new Set(['textedit', 'recorder', 'stickies']);
+		if (docApps.has(appId)) {
+			const appDef = getAppDef(appId);
+			if (appDef) {
+				TerminalFS.open(new LocalStorageManifestStore()).then((fs) => {
+					const nodes = fs.getAllNodes();
+					if (!isInstalled(appId, nodes)) {
+						os.alert({
+							title: `${appDef.name} is not installed`,
+							body: `The ${appDef.name} application has been uninstalled. You can reinstall it from the Software Shop.`,
+							buttons: [
+								{
+									label: 'Open Software Shop',
+									action: () => os.openWindow('software-shop')
+								},
+								{ label: 'OK', primary: true }
+							]
+						});
+					} else {
+						openDocFile(file);
+					}
+				});
+				return;
+			}
 		}
-		if (appId === 'recorder') {
-			os.openWindow(`recorder-${file.id}`);
-			return;
-		}
-		if (appId === 'stickies') {
-			os.launchApp('stickies', { action: 'new' });
-			return;
-		}
+
 		if (appId === 'system-prefs') {
 			os.openSystemPreferences();
 			return;

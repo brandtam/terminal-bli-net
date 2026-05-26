@@ -1023,9 +1023,14 @@ export class TerminalFS {
 			return fail('protected_node', `"${appDef.name}" is a core OS app and cannot be uninstalled`);
 		}
 
-		// Find and remove app file (NOT user documents created by the app)
+		// Find the app file (fileType: 'app' only — never user documents)
 		const appFile = findAppFile(appId, this.nodes);
 		if (!appFile) return fail('not_found', `App "${appDef.name}" is not installed`);
+
+		// Safety: only delete files in /Applications or /System
+		if (appFile.parentId !== APPLICATIONS_ID && appFile.parentId !== SYSTEM_ID) {
+			return fail('protected_node', `Cannot uninstall: file is not in Applications`);
+		}
 
 		// Remove the app file
 		this.nodes.delete(appFile.id);
