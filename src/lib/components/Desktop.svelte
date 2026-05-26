@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { isShowOnAir } from '$lib/schedule';
-	import { saveWindows, appRead } from '$lib/persistence';
+	import { saveWindows } from '$lib/persistence';
 	import { OsApiClass } from '$lib/os/os-api.svelte';
 	import { TerminalFS, LocalStorageManifestStore } from '$lib/terminalos';
 	import { APPS } from '$lib/os/app-registry';
@@ -18,17 +18,12 @@
 	import { findDocByName } from '$lib/apps/textedit/textedit-docs';
 	import {
 		readFile,
-		findByApp,
-		createFile,
-		writeFile,
-		deleteNode,
 		trash,
 		createAlias,
 		list,
 		resolveAlias,
 		onFsChange,
 		ensureSystemFolders,
-		DOCS_ID,
 		DESKTOP_ID,
 		ROOT_ID,
 		SYSTEM_ID,
@@ -43,187 +38,24 @@
 	import AboutTerminal from '$lib/apps/finder/AboutTerminal.svelte';
 	import RecorderWindow from '$lib/apps/recorder/RecorderWindow.svelte';
 	import StickiesNote from '$lib/apps/stickies/StickiesNote.svelte';
-	import type { StickyNote } from '$lib/apps/stickies/StickiesNote.svelte';
+	import { createStickiesManager } from '$lib/apps/stickies/stickies-manager.svelte';
 	import FinderWindow from '$lib/apps/finder/FinderWindow.svelte';
 	import TerminalPrefs from './TerminalPrefs.svelte';
+	import DesktopContextMenu from './DesktopContextMenu.svelte';
+	import { SYS7_PATTERNS } from './wallpaper-patterns';
 	import TVGuidePrefs from './TVGuidePrefs.svelte';
 	import ChatrbotPrefs from './ChatrbotPrefs.svelte';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import SoftwareShopWindow from '$lib/apps/software-shop/SoftwareShopWindow.svelte';
-
-	const SYS7_PATTERNS = [
-		'128',
-		'129',
-		'130',
-		'131',
-		'132',
-		'133',
-		'134',
-		'136',
-		'137',
-		'139',
-		'141',
-		'142',
-		'144',
-		'145',
-		'146',
-		'147',
-		'148',
-		'149',
-		'150',
-		'151',
-		'547',
-		'870',
-		'987',
-		'1111',
-		'1969',
-		'1970',
-		'1971',
-		'1972',
-		'1973',
-		'1974',
-		'1975',
-		'1976',
-		'1977',
-		'1978',
-		'2767',
-		'3727',
-		'4193',
-		'6006',
-		'6741',
-		'7041',
-		'7321',
-		'7344',
-		'7527',
-		'8388',
-		'8448',
-		'9695',
-		'10042',
-		'11703',
-		'12484',
-		'12593',
-		'12821',
-		'13096',
-		'13665',
-		'16825',
-		'16974',
-		'17803',
-		'18078',
-		'19688',
-		'20318',
-		'20446',
-		'21225',
-		'22348',
-		'23295',
-		'24517',
-		'24642',
-		'24817',
-		'28851',
-		'28920',
-		'29907',
-		'30711',
-		'30930',
-		'31689',
-		'32307',
-		'32623'
-	];
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
 
 	let selectedIconId = $state<string | null>(null);
 
-	let stickyNotes = $state<StickyNote[]>([]);
+	const stickies = createStickiesManager();
 	let desktopItems = $state<FSNode[]>([]);
 	let desktopFsRev = $state(0);
-
-	function stickyFromFile(f: FSFile): StickyNote {
-		try {
-			const parsed = JSON.parse(f.data) as { title?: string; body?: string; color?: string };
-			return {
-				id: f.id,
-				title: parsed.title ?? '',
-				body: parsed.body ?? '',
-				color: parsed.color ?? '#f9bd2b'
-			};
-		} catch {
-			return { id: f.id, title: '', body: '', color: '#f9bd2b' };
-		}
-	}
-
-	function loadStickyNotes(): StickyNote[] {
-		const files = findByApp('stickies');
-		if (files.length > 0) return files.map(stickyFromFile);
-
-		// Migrate from legacy appRead persistence if present
-		const legacy = appRead<StickyNote[] | null>('stickies', 'notes', null);
-		if (legacy && legacy.length > 0) {
-			const migrated: StickyNote[] = [];
-			for (const note of legacy) {
-				const name = note.title || 'Untitled Note';
-				const data = JSON.stringify({ title: note.title, body: note.body, color: note.color });
-				try {
-					const file = createFile(DOCS_ID, name, 'stickies', data);
-					migrated.push({ ...note, id: file.id });
-				} catch {
-					// duplicate name -- append a suffix
-					const file = createFile(DOCS_ID, `${name} (${note.id.slice(-4)})`, 'stickies', data);
-					migrated.push({ ...note, id: file.id });
-				}
-			}
-			return migrated;
-		}
-
-		// Seed a default note for first-time users
-		const defaultData = JSON.stringify({
-			title: 'v1 launch — todo',
-			body: '☑ ship Seinfeld\n☑ ship The Office\n☒ get sued\n☐ teach Kramer to type\n☐ figure out Joey/Phoebe\n☐ "try Succession?"',
-			color: '#f9bd2b'
-		});
-		const file = createFile(DOCS_ID, 'v1 launch — todo', 'stickies', defaultData);
-		return [stickyFromFile(file)];
-	}
-
-	function refreshStickyNotes() {
-		stickyNotes = findByApp('stickies').map(stickyFromFile);
-	}
-
-	function createStickyNote() {
-		let name = 'Untitled Note';
-		let suffix = 1;
-		const existing = findByApp('stickies');
-		const names = new Set(existing.map((f) => f.name));
-		while (names.has(name)) {
-			suffix++;
-			name = `Untitled Note ${suffix}`;
-		}
-		const data = JSON.stringify({ title: '', body: '', color: '#f9bd2b' });
-		const file = createFile(DOCS_ID, name, 'stickies', data);
-		refreshStickyNotes();
-		os.openWindow(`sticky-${file.id}`);
-	}
-
-	function deleteStickyNote(id: string) {
-		deleteNode(id);
-		refreshStickyNotes();
-		os.closeWindow(`sticky-${id}`);
-	}
-
-	function updateStickyNote(updated: StickyNote) {
-		const data = JSON.stringify({ title: updated.title, body: updated.body, color: updated.color });
-		try {
-			writeFile(updated.id, data);
-		} catch {
-			// file may have been deleted
-		}
-		refreshStickyNotes();
-	}
-
-	function colorStickyNote(noteId: string, color: string) {
-		const note = stickyNotes.find((n) => n.id === noteId);
-		if (!note) return;
-		updateStickyNote({ ...note, color });
-	}
 
 	function openDesktopNode(node: FSNode) {
 		if (node.type === 'alias') {
@@ -240,7 +72,8 @@
 			}
 			// Special apps need their own handling
 			if (appId === 'stickies') {
-				createStickyNote();
+				const id = stickies.create();
+				os.openWindow(`sticky-${id}`);
 				return;
 			}
 			if (appId === 'system-prefs') {
@@ -282,7 +115,6 @@
 	let deskCtxCanTrash = $state(false);
 	let deskCtxX = $state(0);
 	let deskCtxY = $state(0);
-	let deskCtxEl = $state<HTMLDivElement | null>(null);
 
 	const PROTECTED_DESKTOP_IDS = new Set([
 		ROOT_ID,
@@ -303,12 +135,6 @@
 		deskCtxCanTrash = opts.canTrash ?? false;
 		deskCtxX = e.clientX;
 		deskCtxY = e.clientY;
-		requestAnimationFrame(() => {
-			if (!deskCtxEl) return;
-			const rect = deskCtxEl.getBoundingClientRect();
-			if (rect.right > window.innerWidth) deskCtxX = e.clientX - rect.width;
-			if (rect.bottom > window.innerHeight) deskCtxY = e.clientY - rect.height;
-		});
 	}
 
 	function handleDesktopContextMenu(e: MouseEvent, node: FSNode) {
@@ -364,23 +190,25 @@
 
 		// Load stickies and desktop items (still uses compat shim)
 		ensureSystemFolders();
-		stickyNotes = loadStickyNotes();
+		stickies.init();
 		desktopItems = list(DESKTOP_ID);
 
 		// Register app launch handlers
 		os.registerLaunchHandler('stickies', (payload) => {
 			if (payload?.action === 'new') {
-				createStickyNote();
+				const id = stickies.create();
+				os.openWindow(`sticky-${id}`);
 				return;
 			}
 			if (payload?.action === 'color' && payload?.color) {
 				if (os.activeId?.startsWith('sticky-')) {
 					const noteId = os.activeId.replace('sticky-', '');
-					colorStickyNote(noteId, payload.color as string);
+					stickies.setColor(noteId, payload.color as string);
 				}
 				return;
 			}
-			createStickyNote();
+			const id = stickies.create();
+			os.openWindow(`sticky-${id}`);
 		});
 
 		os.registerLaunchHandler('textedit', (payload) => {
@@ -586,36 +414,22 @@
 				</div>
 			{/if}
 
-			{#if deskCtxOpen_}
-				<div
-					class="desktop-context-menu"
-					role="menu"
-					tabindex="-1"
-					bind:this={deskCtxEl}
-					style="left: {deskCtxX}px; top: {deskCtxY}px;"
-					onclick={(e) => e.stopPropagation()}
-					onkeydown={(e) => {
-						if (e.key === 'Escape') {
-							closeDeskCtx();
-						}
-					}}
-				>
-					<button class="desktop-context-item" onclick={deskCtxOpen}>Open</button>
-					{#if deskCtxCanAlias}
-						<div class="desktop-context-sep"></div>
-						<button class="desktop-context-item" onclick={deskCtxMakeAlias}>Make Alias</button>
-					{/if}
-					{#if deskCtxCanTrash}
-						<div class="desktop-context-sep"></div>
-						<button class="desktop-context-item" onclick={deskCtxTrash}>Move to Trash</button>
-					{/if}
-				</div>
-			{/if}
+			<DesktopContextMenu
+				visible={deskCtxOpen_ !== null}
+				x={deskCtxX}
+				y={deskCtxY}
+				canAlias={deskCtxCanAlias}
+				canTrash={deskCtxCanTrash}
+				onopen={deskCtxOpen}
+				onalias={deskCtxMakeAlias}
+				ontrash={deskCtxTrash}
+				onclose={closeDeskCtx}
+			/>
 
 			{#each os.windows as w (w.id)}
 				{@const def = os.getWindowDef(w.id)}
 				{@const stickyNote = w.id.startsWith('sticky-')
-					? stickyNotes.find((n) => n.id === w.id.replace('sticky-', ''))
+					? stickies.notes.find((n) => n.id === w.id.replace('sticky-', ''))
 					: null}
 				<Window
 					id={w.id}
@@ -714,9 +528,16 @@
 						{/if}
 					{:else if w.id.startsWith('sticky-')}
 						{@const noteId = w.id.replace('sticky-', '')}
-						{@const note = stickyNotes.find((n) => n.id === noteId)}
+						{@const note = stickies.notes.find((n) => n.id === noteId)}
 						{#if note}
-							<StickiesNote {note} ondelete={deleteStickyNote} onupdate={updateStickyNote} />
+							<StickiesNote
+								{note}
+								ondelete={(id) => {
+									stickies.remove(id);
+									os.closeWindow(`sticky-${id}`);
+								}}
+								onupdate={(n) => stickies.update(n)}
+							/>
 						{/if}
 					{:else if w.id === 'finder'}
 						<FinderWindow {os} />
@@ -910,38 +731,6 @@
 	}
 	.desktop-icons.right {
 		right: 16px;
-	}
-	.desktop-context-menu {
-		position: fixed;
-		background: var(--chrome-menubar-bg, var(--paper));
-		color: var(--chrome-menubar-fg, var(--ink));
-		border: 2px solid var(--chrome-window-border-color, var(--ink));
-		box-shadow: 3px 3px 0 var(--shadow);
-		min-width: 160px;
-		padding: 4px 0;
-		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
-		font-size: 14px;
-		z-index: 12000;
-	}
-	.desktop-context-item {
-		padding: 4px 12px;
-		cursor: pointer;
-		background: none;
-		border: none;
-		font: inherit;
-		color: inherit;
-		text-align: left;
-		width: 100%;
-	}
-	.desktop-context-item:hover {
-		background: var(--chrome-menubar-hover-bg, var(--ink));
-		color: var(--chrome-menubar-hover-fg, var(--paper));
-	}
-	.desktop-context-sep {
-		height: 1px;
-		background: var(--chrome-menubar-fg, var(--ink));
-		margin: 4px 8px;
-		opacity: 0.2;
 	}
 	.window-content {
 		padding: 14px;
