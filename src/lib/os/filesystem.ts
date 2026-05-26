@@ -140,7 +140,7 @@ function toNewNode(node: FSNode): FsNode {
 				kind: 'file',
 				parentId: node.parentId,
 				name: node.name,
-				fileType: inferFileType(node.appId),
+				fileType: inferFileType(node.appId, node.parentId),
 				opensWith: node.appId || undefined,
 				appId: node.appId || undefined,
 				bodyRef: node.data ? { kind: 'inline-text', text: node.data } : undefined,
@@ -167,8 +167,10 @@ function toNewNode(node: FSNode): FsNode {
 }
 
 function inferFileType(
-	appId: string
+	appId: string,
+	parentId: string
 ): 'text' | 'sticky' | 'recording' | 'app' | 'data' | 'unknown' {
+	if (parentId === APPS_ID || parentId === SYSTEM_ID) return 'app';
 	if (!appId) return 'unknown';
 	if (appId === 'textedit') return 'text';
 	if (appId === 'stickies') return 'sticky';
