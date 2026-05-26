@@ -36,6 +36,7 @@
 		list,
 		resolveAlias,
 		onFsChange,
+		ensureSystemFolders,
 		DOCS_ID,
 		DESKTOP_ID,
 		ROOT_ID,
@@ -57,7 +58,6 @@
 	import TerminalPrefs from './TerminalPrefs.svelte';
 	import TVGuidePrefs from './TVGuidePrefs.svelte';
 	import ChatrbotPrefs from './ChatrbotPrefs.svelte';
-	import { seedFilesystem } from '$lib/os/filesystem-seed';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 
 	const SYS7_PATTERNS = [
@@ -375,7 +375,7 @@
 		tweaks = loadTweaks();
 		timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 		isMobile = window.innerWidth < 720;
-		seedFilesystem(); // seed filesystem default files
+		ensureSystemFolders();
 		stickyNotes = loadStickyNotes();
 		desktopItems = list(DESKTOP_ID);
 

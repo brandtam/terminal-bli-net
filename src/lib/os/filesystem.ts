@@ -1,4 +1,32 @@
-const STORAGE_KEY = 'terminal.fs';
+/**
+ * Compatibility shim: exposes the original synchronous filesystem API
+ * while storing data in the TerminalFS manifest format.
+ *
+ * Reads and mutations operate on an in-memory Record<string, FSNode> cache.
+ * Persistence targets the `terminalos.manifest` localStorage key in the
+ * same { volume, nodes } shape that TerminalFS.open() / LocalStorageManifestStore
+ * expects. This means both the compat layer and any future TerminalFS-based
+ * code see the same data.
+ *
+ * The old filesystem-seed.ts is replaced by TerminalFS.createCleanDisk(),
+ * which produces the full default disk including app files and desktop aliases.
+ */
+
+import {
+	TerminalFS,
+	ROOT_ID as TFS_ROOT_ID,
+	APPLICATIONS_ID as TFS_APPS_ID,
+	DOCUMENTS_ID as TFS_DOCS_ID,
+	DESKTOP_ID as TFS_DESKTOP_ID,
+	SYSTEM_ID as TFS_SYSTEM_ID,
+	RECORDINGS_ID as TFS_RECORDINGS_ID,
+	TRASH_ID as TFS_TRASH_ID
+} from '$lib/terminalos';
+import type { FsNode, TerminalVolume } from '$lib/terminalos';
+
+// ---------------------------------------------------------------------------
+// Compat types — identical signatures to the old API
+// ---------------------------------------------------------------------------
 
 export interface FSFolder {
 	id: string;
@@ -32,65 +60,214 @@ export interface FSAlias {
 
 export type FSNode = FSFolder | FSFile | FSAlias;
 
-export const ROOT_ID = 'root';
-export const SYSTEM_ID = 'system';
-export const APPS_ID = 'applications';
-export const DOCS_ID = 'documents';
-export const RECORDINGS_ID = 'recordings';
-export const TRASH_ID = 'trash';
-export const DESKTOP_ID = 'desktop';
+// ---------------------------------------------------------------------------
+// Well-known IDs (re-export from TerminalFS so consumers keep the same names)
+// ---------------------------------------------------------------------------
 
-function uid(): string {
-	return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+export const ROOT_ID = TFS_ROOT_ID;
+export const SYSTEM_ID = TFS_SYSTEM_ID;
+export const APPS_ID = TFS_APPS_ID;
+export const DOCS_ID = TFS_DOCS_ID;
+export const RECORDINGS_ID = TFS_RECORDINGS_ID;
+export const TRASH_ID = TFS_TRASH_ID;
+export const DESKTOP_ID = TFS_DESKTOP_ID;
+
+// ---------------------------------------------------------------------------
+// Conversion helpers: FsNode (new) <-> FSNode (old)
+// ---------------------------------------------------------------------------
+
+function toOldNode(node: FsNode): FSNode {
+	switch (node.kind) {
+		case 'folder':
+			return {
+				id: node.id,
+				name: node.name,
+				type: 'folder',
+				parentId: node.parentId,
+				createdAt: node.createdAt,
+				updatedAt: node.updatedAt
+			};
+		case 'file': {
+			const text = node.bodyRef?.kind === 'inline-text' ? node.bodyRef.text : '';
+			return {
+				id: node.id,
+				name: node.name,
+				type: 'file',
+				parentId: node.parentId,
+				appId: node.appId ?? node.opensWith ?? '',
+				data: text,
+				createdAt: node.createdAt,
+				updatedAt: node.updatedAt
+			};
+		}
+		case 'alias':
+			return {
+				id: node.id,
+				name: node.name,
+				type: 'alias',
+				parentId: node.parentId,
+				targetId: node.target.nodeId,
+				createdAt: node.createdAt,
+				updatedAt: node.updatedAt
+			};
+	}
 }
 
-function seed(): Record<string, FSNode> {
-	const now = Date.now();
-	const f = (id: string, name: string, parentId: string | null): FSFolder => ({
-		id,
-		name,
-		type: 'folder',
-		parentId,
-		createdAt: now,
-		updatedAt: now
-	});
-	const store: Record<string, FSNode> = {
-		[ROOT_ID]: f(ROOT_ID, 'Terminal HD', null),
-		[SYSTEM_ID]: f(SYSTEM_ID, 'System', ROOT_ID),
-		[APPS_ID]: f(APPS_ID, 'Applications', ROOT_ID),
-		[DOCS_ID]: f(DOCS_ID, 'Documents', ROOT_ID),
-		[RECORDINGS_ID]: f(RECORDINGS_ID, 'Recordings', ROOT_ID),
-		[TRASH_ID]: f(TRASH_ID, 'Trash', ROOT_ID),
-		[DESKTOP_ID]: f(DESKTOP_ID, 'Desktop', ROOT_ID)
-	};
-	return store;
+/** Default volume definition for the compat layer. */
+const COMPAT_VOLUME: TerminalVolume = {
+	id: 'volume_terminal_hd',
+	name: 'Terminal HD',
+	kind: 'local',
+	rootNodeId: ROOT_ID
+};
+
+function toNewNode(node: FSNode): FsNode {
+	switch (node.type) {
+		case 'folder':
+			return {
+				id: node.id,
+				volumeId: COMPAT_VOLUME.id,
+				kind: 'folder',
+				parentId: node.parentId,
+				name: node.name,
+				createdAt: node.createdAt,
+				updatedAt: node.updatedAt
+			};
+		case 'file':
+			return {
+				id: node.id,
+				volumeId: COMPAT_VOLUME.id,
+				kind: 'file',
+				parentId: node.parentId,
+				name: node.name,
+				fileType: inferFileType(node.appId),
+				opensWith: node.appId || undefined,
+				appId: node.appId || undefined,
+				bodyRef: node.data ? { kind: 'inline-text', text: node.data } : undefined,
+				createdAt: node.createdAt,
+				updatedAt: node.updatedAt
+			};
+		case 'alias':
+			return {
+				id: node.id,
+				volumeId: COMPAT_VOLUME.id,
+				kind: 'alias',
+				parentId: node.parentId,
+				name: node.name,
+				target: {
+					nodeId: node.targetId,
+					originalPath: '',
+					originalName: node.name,
+					targetKind: 'file'
+				},
+				createdAt: node.createdAt,
+				updatedAt: node.updatedAt
+			};
+	}
+}
+
+function inferFileType(
+	appId: string
+): 'text' | 'sticky' | 'recording' | 'app' | 'data' | 'unknown' {
+	if (!appId) return 'unknown';
+	if (appId === 'textedit') return 'text';
+	if (appId === 'stickies') return 'sticky';
+	if (appId === 'recorder') return 'recording';
+	return 'app';
 }
 
 // ---------------------------------------------------------------------------
-// Storage
+// Storage — reads/writes the TerminalFS manifest format
 // ---------------------------------------------------------------------------
+
+const STORAGE_KEY = 'terminalos.manifest';
+const OLD_STORAGE_KEY = 'terminal.fs';
 
 let _cache: Record<string, FSNode> | null = null;
+
+function seed(): Record<string, FSNode> {
+	const fs = TerminalFS.createCleanDisk();
+	const nodes = fs.getAllNodes();
+	const store: Record<string, FSNode> = {};
+	for (const node of nodes.values()) {
+		store[node.id] = toOldNode(node);
+	}
+	return store;
+}
 
 function load(): Record<string, FSNode> {
 	if (_cache) return { ..._cache };
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) {
-			_cache = seed();
-			return { ..._cache };
+		if (raw) {
+			const parsed = JSON.parse(raw);
+			// TerminalFS format: { volume, nodes: FsNode[] }
+			if (parsed && Array.isArray(parsed.nodes) && parsed.volume) {
+				const store: Record<string, FSNode> = {};
+				for (const node of parsed.nodes as FsNode[]) {
+					store[node.id] = toOldNode(node);
+				}
+				if (store[ROOT_ID]) {
+					_cache = store;
+					return { ..._cache };
+				}
+			}
 		}
-		const parsed = JSON.parse(raw) as Record<string, FSNode>;
-		if (!parsed[ROOT_ID]) {
-			_cache = seed();
-			return { ..._cache };
+
+		// Attempt migration from old key
+		const oldRaw = localStorage.getItem(OLD_STORAGE_KEY);
+		if (oldRaw) {
+			const oldParsed = JSON.parse(oldRaw) as Record<string, FSNode>;
+			if (oldParsed && oldParsed['root']) {
+				// Migrate old-format data: convert old IDs to new IDs
+				const migrated = migrateOldData(oldParsed);
+				_cache = migrated;
+				persistSync(migrated);
+				localStorage.removeItem(OLD_STORAGE_KEY);
+				return { ..._cache };
+			}
 		}
-		_cache = parsed;
+
+		// No existing data — create a fresh disk
+		_cache = seed();
+		persistSync(_cache);
 		return { ..._cache };
 	} catch {
 		_cache = seed();
+		persistSync(_cache);
 		return { ..._cache };
 	}
+}
+
+/** Map old well-known IDs to new ones. */
+const ID_MIGRATION_MAP: Record<string, string> = {
+	root: TFS_ROOT_ID,
+	system: TFS_SYSTEM_ID,
+	applications: TFS_APPS_ID,
+	documents: TFS_DOCS_ID,
+	recordings: TFS_RECORDINGS_ID,
+	trash: TFS_TRASH_ID,
+	desktop: TFS_DESKTOP_ID
+};
+
+function migrateOldData(old: Record<string, FSNode>): Record<string, FSNode> {
+	const migrated: Record<string, FSNode> = {};
+	for (const node of Object.values(old)) {
+		const newId = ID_MIGRATION_MAP[node.id] ?? node.id;
+		const newParentId =
+			node.parentId === null ? null : (ID_MIGRATION_MAP[node.parentId] ?? node.parentId);
+
+		if (node.type === 'alias') {
+			const alias = node as FSAlias;
+			const newTargetId = ID_MIGRATION_MAP[alias.targetId] ?? alias.targetId;
+			migrated[newId] = { ...alias, id: newId, parentId: newParentId!, targetId: newTargetId };
+		} else if (node.type === 'file') {
+			migrated[newId] = { ...node, id: newId, parentId: newParentId! };
+		} else {
+			migrated[newId] = { ...node, id: newId, parentId: newParentId };
+		}
+	}
+	return migrated;
 }
 
 let _changeListeners: (() => void)[] = [];
@@ -102,9 +279,16 @@ export function onFsChange(fn: () => void): () => void {
 	};
 }
 
+/** Write cache to localStorage in TerminalFS manifest format. */
+function persistSync(store: Record<string, FSNode>): void {
+	const nodes: FsNode[] = Object.values(store).map(toNewNode);
+	const manifest = { volume: COMPAT_VOLUME, nodes };
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(manifest));
+}
+
 function save(store: Record<string, FSNode>): void {
 	_cache = store;
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+	persistSync(store);
 	for (const fn of _changeListeners) fn();
 }
 
@@ -176,6 +360,13 @@ export function findByApp(appId: string, parentId?: string): FSFile[] {
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
+
+function uid(): string {
+	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+		return crypto.randomUUID();
+	}
+	return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export function createFolder(parentId: string, name: string): FSFolder {
 	const store = load();
@@ -370,7 +561,6 @@ export function deleteNode(id: string): void {
 	const store = load();
 	if (!store[id]) return;
 	const toDelete = [id];
-	// Collect descendants for folders
 	const queue = [id];
 	while (queue.length > 0) {
 		const current = queue.shift()!;
