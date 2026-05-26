@@ -509,7 +509,7 @@
 						{@const fileId = w.id.replace('textedit-', '')}
 						<TextEditWindow docId={fileId} fs={terminalFs} />
 					{:else if w.id === 'about'}
-						<AboutTerminal {os} />
+						<AboutTerminal {os} fs={terminalFs} />
 					{:else if w.id.startsWith('about-')}
 						{@const aboutAppId = w.id.replace('about-', '')}
 						{@const aboutApp = APPS[aboutAppId]}
@@ -517,7 +517,7 @@
 							<AboutAppWindow about={aboutApp.about} />
 						{/if}
 					{:else if w.id === 'software-shop'}
-						<SoftwareShopWindow {os} />
+						<SoftwareShopWindow {os} fs={terminalFs} />
 					{:else if w.id === 'stats'}
 						<StatsWindow
 							showCount={os.groups.filter((g) => g.active).length}

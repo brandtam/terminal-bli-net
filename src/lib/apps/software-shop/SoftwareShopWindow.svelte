@@ -1,14 +1,10 @@
 <script lang="ts">
-	import {
-		TerminalFS,
-		LocalStorageManifestStore,
-		getShopCatalog,
-		canUninstall
-	} from '$lib/terminalos';
+	import type { TerminalFS } from '$lib/terminalos';
+	import { getShopCatalog, canUninstall } from '$lib/terminalos';
 	import type { ShopItem } from '$lib/terminalos';
 	import type { OsApi } from '$lib/os/os-api';
 
-	let { os }: { os: OsApi } = $props();
+	let { os, fs }: { os: OsApi; fs: TerminalFS } = $props();
 
 	let catalog = $state<ShopItem[]>([]);
 	let loading = $state(true);
@@ -16,7 +12,6 @@
 
 	async function load() {
 		loading = true;
-		const fs = await TerminalFS.open(new LocalStorageManifestStore());
 		catalog = getShopCatalog(fs.getAllNodes());
 		loading = false;
 	}
@@ -25,11 +20,22 @@
 
 	async function install(appId: string) {
 		busy = appId;
-		const fs = await TerminalFS.open(new LocalStorageManifestStore());
-		const result = await fs.installApp(appId);
+		const PROGRESS_MS = 2000;
+
+		os.showAlert({
+			title: 'Installing',
+			body: 'Reading from floppy disk…',
+			progress: { durationMs: PROGRESS_MS }
+		});
+
+		const [result] = await Promise.all([
+			fs.installApp(appId),
+			new Promise((r) => setTimeout(r, PROGRESS_MS))
+		]);
+
 		if (result.ok) {
+			os.dismissAlert();
 			await load();
-			window.location.reload();
 		} else {
 			os.alert({
 				title: 'Install Failed',
@@ -51,11 +57,22 @@
 					primary: true,
 					action: async () => {
 						busy = appId;
-						const fs = await TerminalFS.open(new LocalStorageManifestStore());
-						const result = await fs.uninstallApp(appId);
+						const PROGRESS_MS = 2000;
+
+						os.showAlert({
+							title: 'Uninstalling',
+							body: `Removing ${appName}…`,
+							progress: { durationMs: PROGRESS_MS }
+						});
+
+						const [result] = await Promise.all([
+							fs.uninstallApp(appId),
+							new Promise((r) => setTimeout(r, PROGRESS_MS))
+						]);
+
 						if (result.ok) {
+							os.dismissAlert();
 							await load();
-							window.location.reload();
 						} else {
 							os.alert({
 								title: 'Uninstall Failed',
