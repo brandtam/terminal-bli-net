@@ -582,7 +582,7 @@ export class OsApiClass implements OsApi {
 						this.fs.reinstallOS().then(() => {
 							clearAllPreferences();
 							saveWindows([]);
-							window.location.reload();
+							window.location.replace(window.location.pathname);
 						});
 					}
 				}
