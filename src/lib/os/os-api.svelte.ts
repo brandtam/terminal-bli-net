@@ -5,6 +5,7 @@ import { APPS } from './app-registry';
 import { isShowOnAir, getSlotIndex } from '$lib/schedule';
 import {
 	loadWindows,
+	saveWindows,
 	loadTweaks,
 	saveTweaks,
 	loadTimezone,
@@ -580,6 +581,7 @@ export class OsApiClass implements OsApi {
 					action: () => {
 						this.fs.reinstallOS().then(() => {
 							clearAllPreferences();
+							saveWindows([]);
 							window.location.reload();
 						});
 					}
