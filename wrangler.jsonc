@@ -3,14 +3,10 @@
 	"compatibility_date": "2026-05-24",
 	"compatibility_flags": ["nodejs_compat"],
 	"pages_build_output_dir": ".svelte-kit/cloudflare",
-	// Replace with your own KV namespace ID from `wrangler kv namespace create KV`,
-	// or bind via the Pages dashboard. Local dev (miniflare) creates an in-memory KV.
-	"kv_namespaces": [
-		{
-			"binding": "KV",
-			"id": "PLACEHOLDER_KV_ID"
-		}
-	],
+	// KV binding "KV" must be configured in the Cloudflare Pages dashboard,
+	// or uncomment below with your own namespace ID from `wrangler kv namespace create KV`.
+	// Local dev (miniflare) creates an in-memory KV automatically.
+	// "kv_namespaces": [{ "binding": "KV", "id": "YOUR_KV_NAMESPACE_ID" }],
 	// ReminderAgent DO + send_email are a future feature.
 	// Cloudflare Pages (adapter-cloudflare) can't export DO classes from _worker.js,
 	// so these must be deployed as a separate Worker when ready.
