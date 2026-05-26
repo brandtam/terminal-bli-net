@@ -44,6 +44,8 @@ export default [
 				KVNamespace: 'readonly',
 				indexedDB: 'readonly',
 				IDBDatabase: 'readonly',
+				BroadcastChannel: 'readonly',
+				MessageEvent: 'readonly',
 				__APP_VERSION__: 'readonly'
 			}
 		},

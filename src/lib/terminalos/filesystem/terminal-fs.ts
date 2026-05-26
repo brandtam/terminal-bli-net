@@ -18,6 +18,8 @@ import type { ManifestStore, BodyStore } from './storage/storage-types';
 import { InMemoryManifestStore, InMemoryBodyStore } from './storage/storage-types';
 import { computeDiskUsage } from './usage';
 import type { DiskUsage } from './usage';
+import { WatcherRegistry } from './watchers';
+import type { FsChangeEvent, FsWatchCallback } from './watchers';
 
 // Well-known IDs
 export const ROOT_ID: NodeId = 'root_terminal_hd';
@@ -169,6 +171,8 @@ export class TerminalFS {
 	private lastUndo: UndoRecord | null = null;
 	private manifest: ManifestStore;
 	private bodies: BodyStore;
+	private watcherRegistry = new WatcherRegistry();
+	private broadcastChannel: BroadcastChannel | null = null;
 
 	private constructor(
 		volume: TerminalVolume,
@@ -180,11 +184,54 @@ export class TerminalFS {
 		this.nodes = nodes;
 		this.manifest = manifest;
 		this.bodies = bodies;
+
+		// Set up cross-tab notifications (browser only)
+		if (typeof BroadcastChannel !== 'undefined') {
+			this.broadcastChannel = new BroadcastChannel('terminalos-fs');
+			this.broadcastChannel.onmessage = (e: MessageEvent) => {
+				const event = e.data as FsChangeEvent;
+				if (event && event.operation) {
+					this.reloadFromManifest().then(() => {
+						this.watcherRegistry.notify({ ...event, remote: true });
+					});
+				}
+			};
+		}
 	}
 
 	private async persist(): Promise<FsResult<void>> {
 		const nodes = Array.from(this.nodes.values());
 		return this.manifest.save(this.volume, nodes);
+	}
+
+	private async reloadFromManifest(): Promise<void> {
+		const loaded = await this.manifest.load();
+		if (loaded) {
+			this.nodes.clear();
+			for (const node of loaded.nodes) {
+				this.nodes.set(node.id, node);
+			}
+		}
+	}
+
+	private notifyChange(
+		changedNodeIds: NodeId[],
+		changedFolderIds: NodeId[],
+		operation: string
+	): void {
+		const event: FsChangeEvent = {
+			changedNodeIds,
+			changedFolderIds,
+			operation,
+			remote: false
+		};
+		this.watcherRegistry.notify(event);
+
+		try {
+			this.broadcastChannel?.postMessage(event);
+		} catch {
+			// Channel may be closed
+		}
 	}
 
 	static async open(manifest?: ManifestStore, bodies?: BodyStore): Promise<TerminalFS> {
@@ -487,6 +534,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFolder>;
 
+		this.notifyChange([nodeId], [parentId], 'create_folder');
 		return ok(folder);
 	}
 
@@ -524,6 +572,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
 
+		this.notifyChange([nodeId], [parentId], 'create_file');
 		return ok(file);
 	}
 
@@ -543,6 +592,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
 
+		this.notifyChange([fileId], [node.parentId], 'write');
 		return ok(updated);
 	}
 
@@ -580,6 +630,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
 
+		this.notifyChange([nodeId], node.parentId ? [node.parentId] : [], 'rename');
 		return ok(updated);
 	}
 
@@ -631,6 +682,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
 
+		this.notifyChange([nodeId], [previousParentId, targetFolderId], 'move');
 		return ok(updated);
 	}
 
@@ -670,6 +722,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
 
+		this.notifyChange(newIds, [parentId], 'duplicate');
 		return ok(topNode);
 	}
 
@@ -706,6 +759,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
 
+		this.notifyChange([nodeId], [previousParentId, TRASH_ID], 'trash');
 		return ok(updated);
 	}
 
@@ -728,6 +782,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<{ deletedCount: number }>;
 
+		this.notifyChange(trashChildren, [TRASH_ID], 'empty_trash');
 		return ok({ deletedCount: trashChildren.length });
 	}
 
@@ -785,6 +840,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<FsAlias>;
 
+		this.notifyChange([aliasId], [parentId], 'create_alias');
 		return ok(alias);
 	}
 
@@ -802,6 +858,7 @@ export class TerminalFS {
 				// Apply the repair — update the alias in the node map
 				this.nodes.set(aliasId, result.alias);
 				await this.persist();
+				this.notifyChange([aliasId], [], 'repair_alias');
 				return ok(result.node);
 			}
 			case 'broken':
@@ -814,14 +871,23 @@ export class TerminalFS {
 		if (!undo) return fail('not_found', 'Nothing to undo');
 
 		const { undoData, label } = undo;
+		const affectedNodeIds: NodeId[] = [];
+		const affectedFolderIds: NodeId[] = [];
 
 		switch (undoData.type) {
-			case 'delete_node':
+			case 'delete_node': {
+				const node = this.nodes.get(undoData.nodeId);
+				if (node?.parentId) affectedFolderIds.push(node.parentId);
+				affectedNodeIds.push(undoData.nodeId);
 				this.nodes.delete(undoData.nodeId);
 				break;
+			}
 
 			case 'delete_nodes':
 				for (const id of undoData.nodeIds) {
+					const node = this.nodes.get(id);
+					if (node?.parentId) affectedFolderIds.push(node.parentId);
+					affectedNodeIds.push(id);
 					this.nodes.delete(id);
 				}
 				break;
@@ -829,6 +895,9 @@ export class TerminalFS {
 			case 'move_back': {
 				const node = this.nodes.get(undoData.nodeId);
 				if (node) {
+					if (node.parentId) affectedFolderIds.push(node.parentId);
+					affectedFolderIds.push(undoData.previousParentId);
+					affectedNodeIds.push(undoData.nodeId);
 					const restored: FsNode = {
 						...node,
 						parentId: undoData.previousParentId,
@@ -842,6 +911,8 @@ export class TerminalFS {
 			case 'rename_back': {
 				const node = this.nodes.get(undoData.nodeId);
 				if (node) {
+					affectedNodeIds.push(undoData.nodeId);
+					if (node.parentId) affectedFolderIds.push(node.parentId);
 					const restored: FsNode = {
 						...node,
 						name: undoData.previousName,
@@ -854,6 +925,8 @@ export class TerminalFS {
 
 			case 'restore_nodes':
 				for (const n of undoData.nodes) {
+					affectedNodeIds.push(n.id);
+					if (n.parentId) affectedFolderIds.push(n.parentId);
 					this.nodes.set(n.id, n);
 				}
 				break;
@@ -865,6 +938,7 @@ export class TerminalFS {
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<string>;
 
+		this.notifyChange(affectedNodeIds, affectedFolderIds, 'undo');
 		return ok(label);
 	}
 
@@ -899,5 +973,29 @@ export class TerminalFS {
 	async getDiskUsage(): Promise<FsResult<DiskUsage>> {
 		const blobBytes = await this.bodies.getUsedBytes();
 		return ok(computeDiskUsage(this.nodes, blobBytes));
+	}
+
+	// --- Watchers ---
+
+	/** Watch all filesystem changes. Returns unsubscribe function. */
+	watch(callback: FsWatchCallback): () => void {
+		return this.watcherRegistry.watch(callback);
+	}
+
+	/** Watch changes to a specific node. Returns unsubscribe function. */
+	watchNode(nodeId: NodeId, callback: FsWatchCallback): () => void {
+		return this.watcherRegistry.watchNode(nodeId, callback);
+	}
+
+	/** Watch changes to a folder's children. Returns unsubscribe function. */
+	watchFolder(folderId: NodeId, callback: FsWatchCallback): () => void {
+		return this.watcherRegistry.watchFolder(folderId, callback);
+	}
+
+	/** Clean up BroadcastChannel and all watchers. */
+	destroy(): void {
+		this.broadcastChannel?.close();
+		this.broadcastChannel = null;
+		this.watcherRegistry.clear();
 	}
 }
