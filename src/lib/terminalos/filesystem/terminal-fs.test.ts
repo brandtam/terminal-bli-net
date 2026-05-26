@@ -274,3 +274,127 @@ describe('hasSiblingConflict (case-insensitive duplicate detection)', () => {
 		expect(hasSiblingConflict('Notes.txt', siblings)).toBe(false);
 	});
 });
+
+describe('TerminalFS.createFile', () => {
+	it('creates a file with appId and fileType', async () => {
+		const fs = createDisk();
+		const result = await fs.createFile(DOCUMENTS_ID, 'test.sticky', {
+			appId: 'stickies',
+			fileType: 'sticky',
+			text: '{"title":"Test","body":"Hello","color":"#f9bd2b"}'
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.appId).toBe('stickies');
+			expect(result.value.fileType).toBe('sticky');
+			expect(result.value.bodyRef?.kind).toBe('inline-text');
+		}
+	});
+
+	it('defaults fileType to data when not specified', async () => {
+		const fs = createDisk();
+		const result = await fs.createFile(DOCUMENTS_ID, 'blob.bin', {});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.fileType).toBe('data');
+		}
+	});
+
+	it('rejects duplicate names', async () => {
+		const fs = createDisk();
+		await fs.createFile(DOCUMENTS_ID, 'dup.txt', { text: '' });
+		const result = await fs.createFile(DOCUMENTS_ID, 'dup.txt', { text: '' });
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('duplicate_name');
+		}
+	});
+});
+
+describe('TerminalFS.findByApp', () => {
+	it('finds files by appId', async () => {
+		const fs = createDisk();
+		const before = fs.findByApp('stickies').length;
+		await fs.createFile(DOCUMENTS_ID, 'note1', {
+			appId: 'stickies',
+			fileType: 'sticky',
+			text: '{}'
+		});
+		await fs.createFile(DOCUMENTS_ID, 'note2', {
+			appId: 'stickies',
+			fileType: 'sticky',
+			text: '{}'
+		});
+		await fs.createFile(DOCUMENTS_ID, 'doc1', { appId: 'textedit', fileType: 'text', text: '' });
+		const stickies = fs.findByApp('stickies');
+		expect(stickies.length).toBe(before + 2);
+	});
+
+	it('filters by parentId when provided', async () => {
+		const fs = createDisk();
+		await fs.createFile(DOCUMENTS_ID, 'note1', {
+			appId: 'stickies',
+			fileType: 'sticky',
+			text: '{}'
+		});
+		await fs.createFile(RECORDINGS_ID, 'note2', {
+			appId: 'stickies',
+			fileType: 'sticky',
+			text: '{}'
+		});
+		const docsOnly = fs.findByApp('stickies', DOCUMENTS_ID);
+		expect(docsOnly.length).toBe(1);
+	});
+});
+
+describe('TerminalFS.readText', () => {
+	it('reads inline text from a file', async () => {
+		const fs = createDisk();
+		const result = await fs.createFile(DOCUMENTS_ID, 'test.txt', { text: 'hello world' });
+		if (result.ok) {
+			expect(fs.readText(result.value.id)).toBe('hello world');
+		}
+	});
+
+	it('returns null for non-existent node', () => {
+		const fs = createDisk();
+		expect(fs.readText('nonexistent')).toBeNull();
+	});
+});
+
+describe('TerminalFS.deleteNode', () => {
+	it('permanently deletes a node', async () => {
+		const fs = createDisk();
+		const result = await fs.createFile(DOCUMENTS_ID, 'deleteme', { text: 'bye' });
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const nodeId = result.value.id;
+			const delResult = await fs.deleteNode(nodeId);
+			expect(delResult.ok).toBe(true);
+			const getResult = await fs.getNode(nodeId);
+			expect(getResult.ok).toBe(false);
+		}
+	});
+
+	it('refuses to delete protected nodes', async () => {
+		const fs = createDisk();
+		const result = await fs.deleteNode(DOCUMENTS_ID);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('protected_node');
+		}
+	});
+});
+
+describe('TerminalFS.exists', () => {
+	it('returns true when a file with that name exists', async () => {
+		const fs = createDisk();
+		await fs.createFile(DOCUMENTS_ID, 'check.txt', { text: '' });
+		expect(fs.exists(DOCUMENTS_ID, 'check.txt')).toBe(true);
+	});
+
+	it('returns false when no file with that name exists', () => {
+		const fs = createDisk();
+		expect(fs.exists(DOCUMENTS_ID, 'nope.txt')).toBe(false);
+	});
+});

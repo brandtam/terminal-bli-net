@@ -2,6 +2,7 @@ import type {
 	NodeId,
 	BodyId,
 	AppId,
+	FileType,
 	FsNode,
 	FsFolder,
 	FsFile,
@@ -562,6 +563,49 @@ export class TerminalFS {
 			fileType: 'text',
 			opensWith: 'textedit',
 			bodyRef: { kind: 'inline-text', text },
+			createdAt: now,
+			updatedAt: now
+		};
+		this.nodes.set(nodeId, file);
+
+		this.lastUndo = {
+			kind: 'create_file',
+			label: `Create file "${name}"`,
+			undoData: { type: 'delete_node', nodeId }
+		};
+
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+
+		this.notifyChange([nodeId], [parentId], 'create_file');
+		return ok(file);
+	}
+
+	async createFile(
+		parentId: NodeId,
+		name: string,
+		opts: { appId?: AppId; fileType?: FileType; text?: string }
+	): Promise<FsResult<FsFile>> {
+		const parent = this.nodes.get(parentId);
+		if (!parent) return fail('not_found', `Parent "${parentId}" not found`);
+		if (parent.kind !== 'folder') return fail('not_folder', `Parent "${parentId}" is not a folder`);
+
+		if (hasSiblingConflict(name, this.siblings(parentId))) {
+			return fail('duplicate_name', `A node named "${name}" already exists in this folder`);
+		}
+
+		const now = Date.now();
+		const nodeId = generateUniqueId();
+		const file: FsFile = {
+			id: nodeId,
+			volumeId: this.volume.id,
+			kind: 'file',
+			parentId,
+			name,
+			fileType: opts.fileType ?? 'data',
+			opensWith: opts.appId,
+			appId: opts.appId,
+			bodyRef: opts.text !== undefined ? { kind: 'inline-text', text: opts.text } : undefined,
 			createdAt: now,
 			updatedAt: now
 		};
@@ -1183,6 +1227,57 @@ export class TerminalFS {
 		this.notifyChange(allNodeIds, allNodeIds, 'reinstall');
 
 		return ok(undefined);
+	}
+
+	async deleteNode(nodeId: NodeId): Promise<FsResult<void>> {
+		const node = this.nodes.get(nodeId);
+		if (!node) return fail('not_found', `Node "${nodeId}" not found`);
+
+		if (this.isProtected(node)) {
+			return fail('protected_node', `Cannot delete protected node "${node.name}"`);
+		}
+
+		const toDelete = this.collectDescendants(nodeId);
+		const parentId = node.parentId;
+
+		for (const id of toDelete) {
+			this.nodes.delete(id);
+		}
+
+		this.lastUndo = {
+			kind: 'trash',
+			label: `Delete "${node.name}"`,
+			undoData: { type: 'delete_node', nodeId }
+		};
+
+		const persistResult = await this.persist();
+		if (!persistResult.ok) return persistResult as FsResult<void>;
+
+		this.notifyChange(toDelete, parentId ? [parentId] : [], 'delete');
+		return ok(undefined);
+	}
+
+	findByApp(appId: AppId, parentId?: NodeId): FsFile[] {
+		const results: FsFile[] = [];
+		for (const node of this.nodes.values()) {
+			if (node.kind === 'file' && node.appId === appId) {
+				if (parentId === undefined || node.parentId === parentId) {
+					results.push(node);
+				}
+			}
+		}
+		return results;
+	}
+
+	readText(fileId: NodeId): string | null {
+		const node = this.nodes.get(fileId);
+		if (!node || node.kind !== 'file') return null;
+		if (node.bodyRef?.kind === 'inline-text') return node.bodyRef.text;
+		return null;
+	}
+
+	exists(parentId: NodeId, name: string): boolean {
+		return hasSiblingConflict(name, this.siblings(parentId));
 	}
 
 	/** Clean up BroadcastChannel and all watchers. */
