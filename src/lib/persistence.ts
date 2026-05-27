@@ -113,6 +113,10 @@ export function saveConversation(botId: string, conversation: Conversation): voi
 	set(KEYS.conversations, all);
 }
 
+export function saveConversations(all: Record<string, Conversation>): void {
+	set(KEYS.conversations, all);
+}
+
 export function loadTimezone(): string | null {
 	return get<string | null>(KEYS.timezone, null);
 }

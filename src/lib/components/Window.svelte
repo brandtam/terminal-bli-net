@@ -41,9 +41,6 @@
 		children: Snippet;
 	} = $props();
 
-	const MIN_W = minW;
-	const MIN_H = minH;
-
 	let dragState: { startX: number; startY: number; origX: number; origY: number } | null = null;
 	let resizeSEState: { startX: number; startY: number; origW: number; origH: number } | null = null;
 	let resizeNEState: {
@@ -101,8 +98,8 @@
 
 	function onGrowSEMove(e: PointerEvent) {
 		if (!resizeSEState) return;
-		const newW = Math.max(MIN_W, resizeSEState.origW + e.clientX - resizeSEState.startX);
-		const newH = Math.max(MIN_H, resizeSEState.origH + e.clientY - resizeSEState.startY);
+		const newW = Math.max(minW, resizeSEState.origW + e.clientX - resizeSEState.startX);
+		const newH = Math.max(minH, resizeSEState.origH + e.clientY - resizeSEState.startY);
 		onresize?.(id, newW, newH);
 	}
 
@@ -135,9 +132,9 @@
 		if (!resizeNEState) return;
 		const dx = e.clientX - resizeNEState.startX;
 		const dy = e.clientY - resizeNEState.startY;
-		const newW = Math.max(MIN_W, resizeNEState.origW + dx);
+		const newW = Math.max(minW, resizeNEState.origW + dx);
 		const desiredH = resizeNEState.origH - dy;
-		const newH = Math.max(MIN_H, desiredH);
+		const newH = Math.max(minH, desiredH);
 		const effectiveDy = resizeNEState.origH - newH;
 		const newY = Math.max(28, resizeNEState.origY + effectiveDy);
 		onresize?.(id, newW, newH);

@@ -10,6 +10,8 @@ import {
 	saveTweaks,
 	loadTimezone,
 	saveTimezone,
+	loadConversations,
+	saveConversations,
 	isFirstVisit,
 	clearAllPreferences
 } from '$lib/persistence';
@@ -526,7 +528,14 @@ export class OsApiClass implements OsApi {
 
 		const wait = new Promise((r) => setTimeout(r, PROGRESS_MS));
 
-		Promise.all([this.fs.exportBackup(), wait]).then(([result]) => {
+		const preferences = {
+			tweaks: loadTweaks(),
+			conversations: loadConversations(),
+			timezone: loadTimezone(),
+			windows: loadWindows()
+		};
+
+		Promise.all([this.fs.exportBackup(preferences), wait]).then(([result]) => {
 			if (!result.ok) {
 				this.showAlert({
 					title: 'Backup Failed',
@@ -536,7 +545,7 @@ export class OsApiClass implements OsApi {
 				return;
 			}
 			const json = JSON.stringify(result.value, null, 2);
-			const blob = new Blob([json], { type: 'application/json' });
+			const blob = new Blob([json], { type: 'application/octet-stream' });
 			const filename = `terminal-hd-${new Date().toISOString().slice(0, 10)}.terminal-hd`;
 			this.showAlert({
 				title: 'Backup Complete',
@@ -547,12 +556,10 @@ export class OsApiClass implements OsApi {
 						label: 'Download',
 						primary: true,
 						action: () => {
-							const url = URL.createObjectURL(blob);
 							const a = document.createElement('a');
-							a.href = url;
+							a.href = URL.createObjectURL(blob);
 							a.download = filename;
 							a.click();
-							URL.revokeObjectURL(url);
 						}
 					}
 				]
@@ -563,7 +570,6 @@ export class OsApiClass implements OsApi {
 	restoreBackup(): void {
 		const input = document.createElement('input');
 		input.type = 'file';
-		input.accept = '.terminal-hd,.json';
 		input.onchange = () => {
 			const file = input.files?.[0];
 			if (!file) return;
@@ -589,9 +595,14 @@ export class OsApiClass implements OsApi {
 						return;
 					}
 					const p = preview.value;
+					const lines = [
+						`${p.diskName} — exported ${new Date(p.exportedAt).toLocaleDateString()}`,
+						`${p.fileCount} files, ${p.folderCount} folders, ${p.appCount} apps`
+					];
+					if (p.hasPreferences) lines.push('Includes preferences and chat history');
 					this.showAlert({
 						title: 'Restore Terminal HD?',
-						body: `This will replace your current disk with:\n${p.diskName} — exported ${new Date(p.exportedAt).toLocaleDateString()}\n${p.fileCount} files, ${p.folderCount} folders, ${p.appCount} apps`,
+						body: `This will replace your current disk with:\n${lines.join('\n')}`,
 						buttons: [
 							{ label: 'Cancel' },
 							{
@@ -599,13 +610,29 @@ export class OsApiClass implements OsApi {
 								primary: true,
 								action: () => {
 									this.fs.restoreBackup(data).then((r) => {
-										if (r.ok) window.location.reload();
-										else
+										if (r.ok) {
+											const prefs = r.value.preferences;
+											if (prefs) {
+												if (prefs.tweaks !== undefined) saveTweaks(prefs.tweaks);
+												if (prefs.timezone != null) saveTimezone(prefs.timezone);
+												if (prefs.conversations !== undefined)
+													saveConversations(prefs.conversations);
+												if (prefs.windows !== undefined) {
+													// Set reactive state so the $effect's next
+													// debounce-save writes the restored windows,
+													// not the current session's stale layout.
+													this.windows = prefs.windows;
+													saveWindows(prefs.windows);
+												}
+											}
+											window.location.reload();
+										} else {
 											this.showAlert({
 												title: 'Restore Failed',
 												body: r.error.message,
 												buttons: [{ label: 'OK', primary: true }]
 											});
+										}
 									});
 								}
 							}

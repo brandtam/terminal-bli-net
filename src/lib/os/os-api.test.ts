@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TerminalFS } from '$lib/terminalos';
+import { windowAppId } from './os-api';
 
 // Mock persistence so nothing touches localStorage
 vi.mock('$lib/persistence', () => ({
 	loadWindows: () => [],
+	saveWindows: vi.fn(),
 	loadTweaks: () => ({
 		wallpaper: 'teal',
 		accent: '#f54e00',
@@ -14,6 +16,8 @@ vi.mock('$lib/persistence', () => ({
 	saveTweaks: vi.fn(),
 	loadTimezone: () => null,
 	saveTimezone: vi.fn(),
+	loadConversations: () => ({}),
+	saveConversations: vi.fn(),
 	isFirstVisit: () => false,
 	clearAllPreferences: vi.fn()
 }));
@@ -252,6 +256,25 @@ describe('system actions', () => {
 		expect(spy).toHaveBeenCalledOnce();
 	});
 
+	it('exportBackup collects preferences and passes them to fs', async () => {
+		const { os, fs } = createOs();
+		const spy = vi.spyOn(fs, 'exportBackup');
+
+		vi.useFakeTimers();
+		os.exportBackup();
+		await vi.advanceTimersByTimeAsync(2000);
+		vi.useRealTimers();
+
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				tweaks: expect.objectContaining({ wallpaper: 'teal' }),
+				conversations: expect.any(Object),
+				timezone: null,
+				windows: expect.any(Array)
+			})
+		);
+	});
+
 	it('exportBackup shows a progress alert then a completion alert', async () => {
 		vi.useFakeTimers();
 		const { os, fs } = createOs();
@@ -261,7 +284,7 @@ describe('system actions', () => {
 			ok: true as const,
 			value: {
 				format: 'terminal-hd' as const,
-				version: 1 as const,
+				version: 2 as const,
 				exportedAt: new Date().toISOString(),
 				disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
 				nodes: [],
@@ -282,6 +305,36 @@ describe('system actions', () => {
 		expect(os.alertSpec?.buttons?.[1].label).toBe('Download');
 
 		vi.useRealTimers();
+	});
+
+	it('restoreBackup returns window layout in preferences', async () => {
+		const { fs } = createOs();
+
+		const windows = [
+			{ id: 'welcome', x: 50, y: 50, w: 460, h: 940, z: 1 },
+			{ id: 'vcr', x: 600, y: 50, w: 860, h: 833, z: 2 }
+		];
+		const exported = await fs.exportBackup({
+			tweaks: {
+				wallpaper: 'teal',
+				accent: '#f54e00',
+				tvGridLoop: 400,
+				marqueeLoop: 100,
+				tvPauseOnHover: false
+			},
+			windows
+		});
+		if (!exported.ok) throw new Error('export failed');
+
+		const freshFs = TerminalFS.createCleanDisk();
+		const result = await freshFs.restoreBackup(exported.value);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.preferences?.windows).toHaveLength(2);
+		expect(result.value.preferences?.windows?.[0].id).toBe('welcome');
+		expect(result.value.preferences?.windows?.[0].x).toBe(50);
+		expect(result.value.preferences?.windows?.[1].id).toBe('vcr');
 	});
 
 	it('reinstallOS shows a confirmation alert with Cancel and Reinstall', () => {
@@ -703,5 +756,35 @@ describe('timezone', () => {
 		os.setTimezone('America/New_York');
 		expect(os.timezone).toBe('America/New_York');
 		expect(saveTimezone).toHaveBeenCalledWith('America/New_York');
+	});
+});
+
+// ── Window app ID mapping ────────────────────────────────────────────────
+
+describe('windowAppId', () => {
+	it('maps store app window IDs to their app IDs', () => {
+		expect(windowAppId('tv-guide')).toBe('tvguide');
+		expect(windowAppId('recorder')).toBe('recorder');
+		expect(windowAppId('vcr')).toBe('vcr');
+		expect(windowAppId('stats')).toBe('stats');
+		expect(windowAppId('software-shop')).toBe('software-shop');
+		expect(windowAppId('computer-store')).toBe('computer-store');
+	});
+
+	it('maps prefix-based window IDs', () => {
+		expect(windowAppId('chat-seinfeld')).toBe('chatrbot');
+		expect(windowAppId('sticky-abc')).toBe('stickies');
+		expect(windowAppId('textedit-xyz')).toBe('textedit');
+		expect(windowAppId('recorder-123')).toBe('recorder');
+	});
+
+	it('maps about windows to their app', () => {
+		expect(windowAppId('about-vcr')).toBe('vcr');
+		expect(windowAppId('about-chatrbot')).toBe('chatrbot');
+		expect(windowAppId('about-tvguide')).toBe('tvguide');
+	});
+
+	it('falls back to finder for unknown IDs', () => {
+		expect(windowAppId('unknown-thing')).toBe('finder');
 	});
 });

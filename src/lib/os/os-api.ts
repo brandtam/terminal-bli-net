@@ -164,7 +164,9 @@ export const WINDOW_APP_MAP: Record<string, string> = {
 	'software-shop': 'software-shop',
 	'about-software-shop': 'software-shop',
 	'computer-store': 'computer-store',
-	'about-computer-store': 'computer-store'
+	'about-computer-store': 'computer-store',
+	vcr: 'vcr',
+	'about-vcr': 'vcr'
 };
 
 export function windowAppId(windowId: string): string {

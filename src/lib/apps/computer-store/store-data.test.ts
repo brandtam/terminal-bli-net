@@ -3,8 +3,8 @@ import { APPS, APP_BY_ID, CATEGORIES, CAT_COLORS, shelfLineup } from './store-da
 import { APP_LIBRARY } from '$lib/terminalos/apps/app-library';
 
 describe('store catalog', () => {
-	it('has 11 apps', () => {
-		expect(APPS).toHaveLength(11);
+	it('has 12 apps', () => {
+		expect(APPS).toHaveLength(12);
 	});
 
 	it('every app has required fields', () => {
