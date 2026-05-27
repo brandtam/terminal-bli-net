@@ -22,6 +22,7 @@
 		"test:unit:watch": "vitest",
 		"lint": "prettier --check . && eslint .",
 		"lint:bots": "node scripts/lint-bots.js",
+		"lint:backup": "node scripts/lint-backup-coverage.js",
 		"format": "prettier --write .",
 		"prepare": "husky",
 		"deploy-cloudflare": "pnpm build && wrangler pages deploy .svelte-kit/cloudflare",
