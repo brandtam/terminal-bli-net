@@ -266,10 +266,10 @@
 		// Initialize OsApi (fetches API data, restores windows, starts clock, keyboard shortcuts)
 		await os.init();
 
-		// Ensure minimum boot time for retro boot ceremony
+		// Ensure minimum boot time for retro boot ceremony (matches smiley rotation)
 		const elapsed = Date.now() - bootStart;
-		if (elapsed < 1000) {
-			await new Promise((resolve) => setTimeout(resolve, 1000 - elapsed));
+		if (elapsed < 2400) {
+			await new Promise((resolve) => setTimeout(resolve, 2400 - elapsed));
 		}
 
 		booted = true;
