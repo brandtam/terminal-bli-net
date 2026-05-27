@@ -30,7 +30,13 @@
 		const boxKey = CAT_TO_BOX[catId];
 		return boxKey ? (CAT_COLORS[boxKey]?.band ?? INK) : INK;
 	});
+
+	function onkeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') onclose();
+	}
 </script>
+
+<svelte:window {onkeydown} />
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->

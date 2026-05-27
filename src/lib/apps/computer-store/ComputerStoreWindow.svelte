@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TerminalFS } from '$lib/terminalos';
+	import { type TerminalFS, getAppDef } from '$lib/terminalos';
 	import type { OsApi } from '$lib/os/os-api';
 	import TopBar from './TopBar.svelte';
 	import AisleView from './AisleView.svelte';
@@ -23,7 +23,11 @@
 		counter: { scale: 1.0, tilt: 0, x: 380, y: 56 }
 	});
 
-	const owned = $derived(fs.getOwnedApps());
+	let ownedVersion = $state(0);
+	const owned = $derived.by(() => {
+		ownedVersion;
+		return fs.getOwnedApps();
+	});
 
 	const breadcrumb = $derived(
 		view === 'aisle'
@@ -45,16 +49,35 @@
 		if (cart.length === 0) return;
 		for (const id of cart) {
 			if (!fs.isAppOwned(id)) {
-				await fs.buyApp(id);
+				if (!getAppDef(id)) continue;
+				const result = await fs.buyApp(id);
+				if (!result.ok) {
+					os.alert({
+						title: 'Purchase Failed',
+						body: result.error.message,
+						buttons: [{ label: 'OK', primary: true }]
+					});
+					return;
+				}
 			}
 		}
+		ownedVersion++;
 		receipt = { items: [...cart] };
 		cart = [];
 		view = 'aisle';
 	}
 
 	async function returnToStore(id: string) {
-		await fs.returnApp(id);
+		const result = await fs.returnApp(id);
+		if (!result.ok) {
+			os.alert({
+				title: 'Return Failed',
+				body: result.error.message,
+				buttons: [{ label: 'OK', primary: true }]
+			});
+			return;
+		}
+		ownedVersion++;
 		pickedUp = null;
 	}
 </script>

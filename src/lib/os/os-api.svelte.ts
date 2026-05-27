@@ -390,6 +390,7 @@ export class OsApiClass implements OsApi {
 		if (appId === 'stickies') return this.openWindow('about-stickies');
 		if (appId === 'recorder') return this.openWindow('about-recorder');
 		if (appId === 'software-shop') return this.openWindow('about-software-shop');
+		if (appId === 'computer-store') return this.openWindow('about-computer-store');
 		this.openWindow('about');
 	}
 

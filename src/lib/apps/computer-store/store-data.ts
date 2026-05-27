@@ -142,7 +142,7 @@ export const APPS: StoreApp[] = [
 		reqs: 'Terminal OS 1.0 · TV Guide'
 	},
 	{
-		id: 'camera',
+		id: 'recorder',
 		cat: 'ENT',
 		title: 'CAMERA',
 		pub: 'POLAROID-ISH',
@@ -193,7 +193,7 @@ export const CATEGORIES: Record<string, StoreCategory> = {
 		label: 'ENTERTAINMENT',
 		color: '#c92127',
 		tagline: 'TV · Chat · Multimedia',
-		appIds: ['tvguide', 'chatrbot', 'camera', 'stats']
+		appIds: ['tvguide', 'chatrbot', 'recorder', 'stats']
 	}
 };
 
