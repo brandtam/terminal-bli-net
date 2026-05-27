@@ -74,6 +74,12 @@
 			type: 'action',
 			label: 'Computer Store',
 			action: (os) => os.openWindow('computer-store')
+		},
+		{ type: 'separator' },
+		{
+			type: 'action',
+			label: 'Reinstall Terminal OS…',
+			action: (os) => os.reinstallOS()
 		}
 	];
 

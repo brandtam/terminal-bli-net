@@ -24,7 +24,8 @@ export type {
 	FileType,
 	BodyRef,
 	AliasTarget,
-	NodeFlags
+	NodeFlags,
+	InstalledApp
 } from './filesystem/types';
 export { ok, fail, fsErr } from './filesystem/errors';
 export {
@@ -51,12 +52,7 @@ export {
 	getStoreApps
 } from './apps/app-library';
 export type { TerminalAppDefinition, AppCategory, AppVisibility } from './apps/app-types';
-export {
-	getAppWindowId,
-	getAppIconKind,
-	isAppInstalled,
-	isSpecialLaunchApp
-} from './apps/app-install';
+export { getAppWindowId, getAppIconKind, isSpecialLaunchApp } from './apps/app-install';
 export type { SpecialLaunchApp } from './apps/app-install';
 export {
 	getShopCatalog,

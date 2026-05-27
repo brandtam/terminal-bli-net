@@ -3,6 +3,13 @@ export type NodeId = string;
 export type BodyId = string;
 export type AppId = string;
 
+export type InstalledApp = {
+	id: AppId;
+	name: string;
+	icon: string;
+	windowId: string;
+};
+
 export type FsResult<T> = { ok: true; value: T } | { ok: false; error: FsError };
 
 export type FsErrorCode =

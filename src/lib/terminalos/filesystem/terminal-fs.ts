@@ -8,6 +8,7 @@ import type {
 	FsFile,
 	FsAlias,
 	FsResult,
+	InstalledApp,
 	TerminalVolume
 } from './types';
 import { ok, fail } from './errors';
@@ -15,6 +16,7 @@ import { generateUniqueId, hasSiblingConflict } from './names';
 import { derivePath } from './paths';
 import { resolveAlias as resolveAliasTarget, buildFingerprint } from './aliases';
 import { getDefaultInstalledApps, getDesktopAliasApps, getAppDef } from '../apps/app-library';
+import { getAppWindowId } from '../apps/app-install';
 import { findAppFile, isOwned as checkOwned, deriveOwnedApps } from '../apps/software-shop';
 import type { UndoRecord } from './operations';
 import { buildBackup, validateBackup, previewBackup, validateDiskForExport } from './backup';
@@ -42,6 +44,11 @@ const README_CONTENT = `README.TXT — Terminal v1.0
 Terminal is a desktop OS that lives in a browser tab. Apps run inside it.
 You drag windows. You open the menu bar. You change the timezone by clicking the clock.
 The whole thing is meant to feel like a computer from 1995 that someone restored for you.
+
+GETTING STARTED
+Open the Computer Store to browse software. Pick up boxes, read the back,
+and bring them to the counter. Purchased apps go to My Shelf, where you
+install and uninstall them. Installed apps appear on your desktop.
 
 NAVIGATION
 - Double-click a desktop icon to open it
@@ -1155,8 +1162,23 @@ export class TerminalFS {
 	}
 
 	async isAppInstalled(appId: AppId): Promise<FsResult<boolean>> {
-		const installed = findAppFile(appId, this.nodes) !== undefined;
-		return ok(installed);
+		return ok(this.isAppInstalledSync(appId));
+	}
+
+	isAppInstalledSync(appId: AppId): boolean {
+		return findAppFile(appId, this.nodes) !== undefined;
+	}
+
+	getInstalledApps(): InstalledApp[] {
+		const apps: InstalledApp[] = [];
+		for (const node of this.nodes.values()) {
+			if (node.kind !== 'file' || node.fileType !== 'app' || !node.appId) continue;
+			const def = getAppDef(node.appId);
+			const windowId = getAppWindowId(node.appId);
+			if (!def || !windowId) continue;
+			apps.push({ id: node.appId, name: def.name, icon: def.icon, windowId });
+		}
+		return apps;
 	}
 
 	// --- Ownership (buy/return) ---

@@ -101,12 +101,6 @@ export const APPS: Record<string, AppDef> = {
 						action: () => os.restoreBackup()
 					},
 					{ type: 'separator' },
-					{
-						type: 'action',
-						label: 'Reinstall Terminal OS…',
-						action: () => os.reinstallOS()
-					},
-					{ type: 'separator' },
 					{ type: 'action', label: 'Restart', action: () => os.openWindow('error') },
 					{ type: 'action', label: "Shut Down (don't)", action: () => os.openWindow('error') }
 				]

@@ -14,6 +14,7 @@ import {
 	clearAllPreferences
 } from '$lib/persistence';
 import { getAppWindowId } from '$lib/terminalos/apps/app-install';
+import { getAppDef } from '$lib/terminalos/apps/app-library';
 import type { TerminalFS } from '$lib/terminalos';
 
 export class OsApiClass implements OsApi {
@@ -103,8 +104,12 @@ export class OsApiClass implements OsApi {
 			// API failure is non-fatal — the OS runs without guide data
 		}
 
-		// Restore windows or show welcome
-		const saved = loadWindows();
+		// Restore windows or show welcome (filter out uninstalled store apps)
+		const saved = loadWindows().filter((w) => {
+			const wAppId = windowAppId(w.id);
+			const def = getAppDef(wAppId);
+			return !def || def.visibility !== 'store' || this.fs.isAppInstalledSync(wAppId);
+		});
 		if (saved.length > 0) {
 			this.windows = saved;
 			this.normalizeZOrder();
@@ -143,10 +148,7 @@ export class OsApiClass implements OsApi {
 		const handleKeydown = (e: KeyboardEvent) => {
 			if (!(e.metaKey || e.ctrlKey)) return;
 			const key = e.key.toLowerCase();
-			if (key === 'g') {
-				e.preventDefault();
-				this.openWindow('tv-guide');
-			} else if (key === 'w') {
+			if (key === 'w') {
 				e.preventDefault();
 				if (this.activeId) this.closeWindow(this.activeId);
 			} else if (key === 'n') {
@@ -156,7 +158,6 @@ export class OsApiClass implements OsApi {
 				const fileMenu = menus.find((m) => m.label === 'File');
 				const newItem = fileMenu?.items.find((it) => it.type === 'action' && it.shortcut === '⌘N');
 				if (newItem && newItem.type === 'action' && newItem.action) newItem.action(this);
-				else this.openWindow('tv-guide');
 			} else if (key === ',') {
 				e.preventDefault();
 				const appId = this.activeId ? windowAppId(this.activeId) : 'finder';
@@ -197,6 +198,41 @@ export class OsApiClass implements OsApi {
 		if (alias) {
 			alias();
 			return;
+		}
+
+		// Gate: store apps must be installed before any of their windows open
+		const appId = windowAppId(id);
+		const appDef = getAppDef(appId);
+		if (appDef?.visibility === 'store') {
+			const installed = this.fs.isAppInstalledSync(appId);
+			if (!installed) {
+				const name = appDef.name;
+				const owned = this.fs.isAppOwned(appId);
+				this.alert({
+					title: `${name} is not installed`,
+					body: owned
+						? `"${name}" is on your shelf but not installed. Open My Shelf to install it.`
+						: `"${name}" hasn't been purchased yet. Visit the Computer Store to pick it up.`,
+					buttons: owned
+						? [
+								{
+									label: 'Open My Shelf',
+									primary: true,
+									action: () => this.openWindow('software-shop')
+								},
+								{ label: 'OK' }
+							]
+						: [
+								{
+									label: 'Visit Store',
+									primary: true,
+									action: () => this.openWindow('computer-store')
+								},
+								{ label: 'OK' }
+							]
+				});
+				return;
+			}
 		}
 
 		if (this.isMobile) {
@@ -596,6 +632,10 @@ export class OsApiClass implements OsApi {
 	}
 
 	// ── Derived state ─────────────────────────────────────────────────────
+
+	isAppInstalled(appId: string): boolean {
+		return this.fs.isAppInstalledSync(appId);
+	}
 
 	get activeAppId(): string {
 		return this.activeId ? windowAppId(this.activeId) : 'finder';
