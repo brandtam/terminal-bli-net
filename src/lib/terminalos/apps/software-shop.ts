@@ -14,7 +14,10 @@ const HIDDEN_FROM_SHOP = new Set<AppId>([
 	'trash',
 	'system-prefs',
 	'about-terminal',
-	'computer-store'
+	'software-shop',
+	'computer-store',
+	'textedit',
+	'stickies'
 ]);
 
 /**
@@ -66,21 +69,20 @@ export function canUninstall(appId: AppId): boolean {
 
 /**
  * Check if an app is owned (on the user's shelf).
- * Free apps are always owned. Store apps check the ownedApps list.
+ * System apps are always owned. Store apps check the ownedApps list.
  */
 export function isOwned(appId: AppId, ownedApps: AppId[]): boolean {
 	const def = getAppDef(appId);
 	if (!def) return false;
-	if (def.visibility === 'free' || def.visibility === 'system') return true;
+	if (def.visibility === 'system') return true;
 	return ownedApps.includes(appId);
 }
 
 /**
- * Get all owned app IDs — free apps + explicitly owned store apps.
+ * Get all owned app IDs — store apps that have been purchased.
  */
 export function getOwnedAppIds(ownedApps: AppId[]): AppId[] {
-	const free = APP_LIBRARY.filter((a) => a.visibility === 'free').map((a) => a.id);
-	return Array.from(new Set([...free, ...ownedApps]));
+	return [...ownedApps];
 }
 
 /**

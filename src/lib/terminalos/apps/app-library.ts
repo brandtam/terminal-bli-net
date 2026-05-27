@@ -76,7 +76,7 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		visibility: 'system'
 	},
 
-	// --- Free apps (pre-owned + pre-installed) ---
+	// --- System apps bundled with OS (not in the Computer Store) ---
 	{
 		id: 'textedit',
 		name: 'TextEdit',
@@ -85,9 +85,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		description: 'Plain text editor',
 		icon: 'txt',
 		defaultInstalled: true,
-		removable: true,
+		removable: false,
 		desktopAliasByDefault: false,
-		visibility: 'free'
+		visibility: 'system'
 	},
 	{
 		id: 'stickies',
@@ -97,36 +97,12 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		description: 'Desktop sticky notes',
 		icon: '▤',
 		defaultInstalled: true,
-		removable: true,
+		removable: false,
 		desktopAliasByDefault: true,
-		visibility: 'free'
-	},
-	{
-		id: 'stats',
-		name: 'Stats',
-		fileName: 'Stats.app',
-		category: 'utilities',
-		description: 'System statistics',
-		icon: '≡',
-		defaultInstalled: true,
-		removable: true,
-		desktopAliasByDefault: true,
-		visibility: 'free'
-	},
-	{
-		id: 'error',
-		name: 'DO_NOT_OPEN',
-		fileName: 'DO_NOT_OPEN',
-		category: 'utilities',
-		description: 'Mystery app',
-		icon: '⚠',
-		defaultInstalled: true,
-		removable: true,
-		desktopAliasByDefault: true,
-		visibility: 'free'
+		visibility: 'system'
 	},
 
-	// --- Store apps (must be bought at Computer Store) ---
+	// --- Store apps (must be bought at the Computer Store) ---
 	{
 		id: 'tvguide',
 		name: 'TV Guide',
@@ -134,7 +110,7 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'entertainment',
 		description: 'Channel guide and schedule',
 		icon: 'TV',
-		defaultInstalled: true,
+		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: true,
 		visibility: 'store'
@@ -146,7 +122,7 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'entertainment',
 		description: 'Chat with TV characters',
 		icon: 'cb',
-		defaultInstalled: true,
+		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: false,
 		visibility: 'store'
@@ -158,13 +134,35 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'utilities',
 		description: 'Record short webcam clips',
 		icon: 'REC',
-		defaultInstalled: true,
+		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: true,
 		visibility: 'store'
 	},
-
-	// --- Store apps (not yet installable — decorative boxes in Computer Store) ---
+	{
+		id: 'stats',
+		name: 'Stats',
+		fileName: 'Stats.app',
+		category: 'utilities',
+		description: 'System statistics',
+		icon: '≡',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: true,
+		visibility: 'store'
+	},
+	{
+		id: 'error',
+		name: 'DO_NOT_OPEN',
+		fileName: 'DO_NOT_OPEN',
+		category: 'utilities',
+		description: 'Mystery app',
+		icon: '⚠',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: true,
+		visibility: 'store'
+	},
 	{
 		id: 'tetra',
 		name: 'Tetra',
@@ -251,14 +249,6 @@ export function getDesktopAliasApps(): TerminalAppDefinition[] {
 	return APP_LIBRARY.filter((a) => a.desktopAliasByDefault);
 }
 
-export function getFreeApps(): TerminalAppDefinition[] {
-	return APP_LIBRARY.filter((a) => a.visibility === 'free');
-}
-
 export function getStoreApps(): TerminalAppDefinition[] {
 	return APP_LIBRARY.filter((a) => a.visibility === 'store');
-}
-
-export function getFreeAppIds(): AppId[] {
-	return getFreeApps().map((a) => a.id);
 }

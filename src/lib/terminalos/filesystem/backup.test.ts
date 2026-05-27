@@ -207,8 +207,9 @@ describe('reinstallOS', () => {
 		expect(appsResult.ok).toBe(true);
 		if (appsResult.ok) {
 			const names = appsResult.value.map((n) => n.name);
-			expect(names).toContain('TV Guide.app');
 			expect(names).toContain('My Shelf.app');
+			expect(names).toContain('TextEdit.app');
+			expect(names).not.toContain('TV Guide.app');
 		}
 	});
 });

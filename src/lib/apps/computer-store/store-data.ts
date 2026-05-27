@@ -70,29 +70,6 @@ export const APPS: StoreApp[] = [
 
 	// ─── PRODUCTIVITY ───
 	{
-		id: 'textedit',
-		cat: 'PROD',
-		title: 'TEXTEDIT',
-		pub: 'PAPER ST.',
-		tagline: '.txt files only.',
-		icon: 'doc',
-		back: 'Opens .txt files. Edits them. Saves them. Does not do fonts, does not do tables, does not check spelling. The TXT format will outlive you. So will TextEdit.',
-		inside: ['Plain text engine', 'Word wrap toggle', 'Nothing else'],
-		reqs: 'Terminal OS 1.0'
-	},
-	{
-		id: 'stickies',
-		cat: 'PROD',
-		title: 'STICKIES',
-		pub: 'POSTIT INC.',
-		tagline: 'Yellow notes.',
-		icon: 'sticky',
-		sticker: 'SALE',
-		back: 'Sticks little yellow notes to your desktop. They stay there. They survive reboots. Useful for to-do lists, reminders, and the word "groceries".',
-		inside: ['Five paper colors', 'Drag-and-drop', 'Auto-rotate (off by default)'],
-		reqs: 'Terminal OS 1.0'
-	},
-	{
 		id: 'calc',
 		cat: 'PROD',
 		title: 'CALC.APP',
@@ -114,6 +91,18 @@ export const APPS: StoreApp[] = [
 		back: "A bitmap painting program. Click to make pixels. The pixels are square. The pixels are the point. Saves to .bmp because .png hadn't been invented.",
 		inside: ['256-color palette', 'Bucket fill', "One spray-paint tool that doesn't work right"],
 		reqs: 'Terminal OS 1.0 · 1MB RAM'
+	},
+
+	{
+		id: 'error',
+		cat: 'PROD',
+		title: 'DO_NOT_OPEN',
+		pub: '???',
+		tagline: "Don't.",
+		icon: 'bomb',
+		back: 'You were told not to open this. The name is right there. DO_NOT_OPEN. And yet here you are, reading the back of the box. There is no refund. There is no support. There is only whatever happens next.',
+		inside: ['One warning', 'One consequence', 'No undo'],
+		reqs: 'Terminal OS 1.0 · Hubris'
 	},
 
 	// ─── ENTERTAINMENT ───
@@ -186,7 +175,7 @@ export const CATEGORIES: Record<string, StoreCategory> = {
 		label: 'BUSINESS',
 		color: '#1e5fc8',
 		tagline: 'Productivity · Tools',
-		appIds: ['textedit', 'stickies', 'calc', 'paint']
+		appIds: ['calc', 'paint', 'error']
 	},
 	ent: {
 		id: 'ent',

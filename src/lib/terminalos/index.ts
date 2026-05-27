@@ -48,9 +48,7 @@ export {
 	getAppDef,
 	getDefaultInstalledApps,
 	getDesktopAliasApps,
-	getFreeApps,
-	getStoreApps,
-	getFreeAppIds
+	getStoreApps
 } from './apps/app-library';
 export type { TerminalAppDefinition, AppCategory, AppVisibility } from './apps/app-types';
 export {

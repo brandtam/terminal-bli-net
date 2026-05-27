@@ -2,7 +2,7 @@ import type { AppId } from '../filesystem/types';
 
 export type AppCategory = 'system' | 'entertainment' | 'productivity' | 'utilities';
 
-export type AppVisibility = 'free' | 'store' | 'system';
+export type AppVisibility = 'store' | 'system';
 
 export type TerminalAppDefinition = {
 	id: AppId;
