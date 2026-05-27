@@ -61,8 +61,7 @@
 		font-size: 40px;
 		color: var(--brand-color-orange, #f54e00);
 		margin-bottom: 24px;
-		animation: spin-steps 2s forwards;
-		animation-timing-function: steps(1, end);
+		animation: spin-steps 2s steps(1, end) forwards;
 	}
 
 	@keyframes spin-steps {
