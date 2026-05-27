@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TerminalFS } from '$lib/terminalos';
+import { windowAppId } from './os-api';
 
 // Mock persistence so nothing touches localStorage
 vi.mock('$lib/persistence', () => ({
@@ -304,6 +305,69 @@ describe('system actions', () => {
 		expect(os.alertSpec?.buttons?.[1].label).toBe('Download');
 
 		vi.useRealTimers();
+	});
+
+	it('restoreBackup applies window layout to reactive state', async () => {
+		const { os, fs } = createOs();
+
+		// Buy and install VCR so the backup has it
+		await fs.buyApp('vcr');
+		await fs.installApp('vcr');
+
+		// Export with window layout
+		const prefs = {
+			tweaks: {
+				wallpaper: 'teal',
+				accent: '#f54e00',
+				tvGridLoop: 400,
+				marqueeLoop: 100,
+				tvPauseOnHover: false
+			},
+			conversations: {},
+			timezone: null,
+			windows: [
+				{ id: 'welcome', x: 50, y: 50, w: 460, h: 940, z: 1 },
+				{ id: 'vcr', x: 600, y: 50, w: 860, h: 833, z: 2 }
+			]
+		};
+		const exported = await fs.exportBackup(prefs);
+		if (!exported.ok) throw new Error('export failed');
+
+		// Simulate a fresh OS that only has welcome open
+		const freshFs = TerminalFS.createCleanDisk();
+		const freshOs = new OsApiClass(freshFs);
+		freshOs.openWindow('welcome');
+		expect(freshOs.windows).toHaveLength(1);
+
+		// Stub reload to prevent actual navigation
+		const origReload = globalThis.window?.location?.reload;
+		let reloaded = false;
+		if (typeof globalThis.window !== 'undefined') {
+			Object.defineProperty(window, 'location', {
+				value: { ...window.location, reload: () => (reloaded = true) },
+				writable: true
+			});
+		}
+
+		// Call restoreBackup on the fresh FS and trigger the restore action
+		const restoreResult = await freshFs.restoreBackup(exported.value);
+		expect(restoreResult.ok).toBe(true);
+		if (restoreResult.ok && restoreResult.value.preferences?.windows) {
+			freshOs.windows = restoreResult.value.preferences.windows;
+		}
+
+		// Verify the reactive state now has both windows
+		expect(freshOs.windows).toHaveLength(2);
+		expect(freshOs.windows.find((w) => w.id === 'vcr')).toBeDefined();
+		expect(freshOs.windows.find((w) => w.id === 'welcome')?.x).toBe(50);
+
+		// Restore original
+		if (origReload && typeof globalThis.window !== 'undefined') {
+			Object.defineProperty(window, 'location', {
+				value: { ...window.location, reload: origReload },
+				writable: true
+			});
+		}
 	});
 
 	it('reinstallOS shows a confirmation alert with Cancel and Reinstall', () => {
@@ -725,5 +789,35 @@ describe('timezone', () => {
 		os.setTimezone('America/New_York');
 		expect(os.timezone).toBe('America/New_York');
 		expect(saveTimezone).toHaveBeenCalledWith('America/New_York');
+	});
+});
+
+// ── Window app ID mapping ────────────────────────────────────────────────
+
+describe('windowAppId', () => {
+	it('maps store app window IDs to their app IDs', () => {
+		expect(windowAppId('tv-guide')).toBe('tvguide');
+		expect(windowAppId('recorder')).toBe('recorder');
+		expect(windowAppId('vcr')).toBe('vcr');
+		expect(windowAppId('stats')).toBe('stats');
+		expect(windowAppId('software-shop')).toBe('software-shop');
+		expect(windowAppId('computer-store')).toBe('computer-store');
+	});
+
+	it('maps prefix-based window IDs', () => {
+		expect(windowAppId('chat-seinfeld')).toBe('chatrbot');
+		expect(windowAppId('sticky-abc')).toBe('stickies');
+		expect(windowAppId('textedit-xyz')).toBe('textedit');
+		expect(windowAppId('recorder-123')).toBe('recorder');
+	});
+
+	it('maps about windows to their app', () => {
+		expect(windowAppId('about-vcr')).toBe('vcr');
+		expect(windowAppId('about-chatrbot')).toBe('chatrbot');
+		expect(windowAppId('about-tvguide')).toBe('tvguide');
+	});
+
+	it('falls back to finder for unknown IDs', () => {
+		expect(windowAppId('unknown-thing')).toBe('finder');
 	});
 });

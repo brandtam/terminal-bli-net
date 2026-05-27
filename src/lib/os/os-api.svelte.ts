@@ -561,7 +561,7 @@ export class OsApiClass implements OsApi {
 							a.href = url;
 							a.download = filename;
 							a.click();
-							URL.revokeObjectURL(url);
+							setTimeout(() => URL.revokeObjectURL(url), 10000);
 						}
 					}
 				]
@@ -620,7 +620,13 @@ export class OsApiClass implements OsApi {
 												if (prefs.timezone != null) saveTimezone(prefs.timezone);
 												if (prefs.conversations !== undefined)
 													saveConversations(prefs.conversations);
-												if (prefs.windows !== undefined) saveWindows(prefs.windows);
+												if (prefs.windows !== undefined) {
+													// Set reactive state so the $effect's next
+													// debounce-save writes the restored windows,
+													// not the current session's stale layout.
+													this.windows = prefs.windows;
+													saveWindows(prefs.windows);
+												}
 											}
 											window.location.reload();
 										} else {
