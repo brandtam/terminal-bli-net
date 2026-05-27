@@ -67,8 +67,13 @@
 		{ type: 'separator' },
 		{
 			type: 'action',
-			label: 'Software Shop',
+			label: 'My Shelf',
 			action: (os) => os.openWindow('software-shop')
+		},
+		{
+			type: 'action',
+			label: 'Computer Store',
+			action: (os) => os.openWindow('computer-store')
 		}
 	];
 

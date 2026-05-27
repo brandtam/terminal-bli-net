@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { TerminalFS } from '$lib/terminalos';
-	import { getShopCatalog, canUninstall } from '$lib/terminalos';
+	import { getShopCatalog, canUninstall, isOwned } from '$lib/terminalos';
 	import type { ShopItem } from '$lib/terminalos';
 	import type { OsApi } from '$lib/os/os-api';
 
@@ -12,7 +12,9 @@
 
 	async function load() {
 		loading = true;
-		catalog = getShopCatalog(fs.getAllNodes());
+		const fullCatalog = getShopCatalog(fs.getAllNodes());
+		const ownedAppIds = fs.getOwnedApps();
+		catalog = fullCatalog.filter((item) => isOwned(item.app.id, ownedAppIds));
 		loading = false;
 	}
 
@@ -49,7 +51,7 @@
 	async function uninstall(appId: string, appName: string) {
 		os.alert({
 			title: `Uninstall ${appName}?`,
-			body: `"${appName}" will be removed. Your documents will not be deleted. You can reinstall it from Software Shop any time.`,
+			body: `"${appName}" will be removed. Your documents will not be deleted. You can reinstall it from My Shelf any time.`,
 			buttons: [
 				{ label: 'Cancel' },
 				{
@@ -90,8 +92,11 @@
 
 <div class="shop">
 	<div class="shop-header">
-		<div class="shop-title">Software Shop</div>
-		<div class="shop-subtitle">Install from Floppy or uninstall apps from your Terminal.</div>
+		<div class="shop-title">My Shelf</div>
+		<div class="shop-subtitle">Your owned apps. Install or uninstall from your desktop.</div>
+		<button class="btn visit-store" onclick={() => os.openWindow('computer-store')}>
+			▸ Visit the Computer Store
+		</button>
 	</div>
 
 	{#if loading}
@@ -125,7 +130,7 @@
 								disabled={busy === item.app.id}
 								onclick={() => install(item.app.id)}
 							>
-								{busy === item.app.id ? 'Installing…' : 'Install from Floppy'}
+								{busy === item.app.id ? 'Installing…' : 'Install'}
 							</button>
 						{/if}
 					</div>
@@ -161,6 +166,19 @@
 		font-size: 17px;
 		color: var(--ink, #0a0a0a);
 		opacity: 0.7;
+	}
+
+	.visit-store {
+		margin-top: 8px;
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
+		font-size: 9px;
+		letter-spacing: 0.04em;
+		background: #f54e00;
+		color: #ffffff;
+		border: 2px solid #0a0a0a;
+		box-shadow: 2px 2px 0 #0a0a0a;
+		padding: 6px 12px;
+		cursor: pointer;
 	}
 
 	.shop-loading {

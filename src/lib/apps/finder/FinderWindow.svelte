@@ -137,10 +137,10 @@
 				if (!isInstalled(appId, nodes)) {
 					os.alert({
 						title: `${appDef.name} is not installed`,
-						body: `The ${appDef.name} application has been uninstalled. You can reinstall it from the Software Shop.`,
+						body: `The ${appDef.name} application has been uninstalled. You can reinstall it from My Shelf.`,
 						buttons: [
 							{
-								label: 'Open Software Shop',
+								label: 'Open My Shelf',
 								action: () => os.openWindow('software-shop')
 							},
 							{ label: 'OK', primary: true }

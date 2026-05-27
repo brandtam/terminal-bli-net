@@ -398,3 +398,70 @@ describe('TerminalFS.exists', () => {
 		expect(fs.exists(DOCUMENTS_ID, 'nope.txt')).toBe(false);
 	});
 });
+
+describe('ownership (buyApp / returnApp)', () => {
+	it('buyApp adds app to ownedApps', async () => {
+		const fs = createDisk();
+		// Clean disk has tvguide pre-owned AND installed.
+		// Uninstall first, then return, then buy again.
+		await fs.uninstallApp('tvguide');
+		await fs.returnApp('tvguide');
+		expect(fs.isAppOwned('tvguide')).toBe(false);
+
+		const result = await fs.buyApp('tvguide');
+		expect(result.ok).toBe(true);
+		expect(fs.isAppOwned('tvguide')).toBe(true);
+	});
+
+	it('buyApp rejects already-owned app', async () => {
+		const fs = createDisk();
+		const result = await fs.buyApp('tvguide'); // already owned on clean disk
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('duplicate_name');
+	});
+
+	it('returnApp removes app from ownedApps', async () => {
+		const fs = createDisk();
+		await fs.uninstallApp('tvguide');
+		const result = await fs.returnApp('tvguide');
+		expect(result.ok).toBe(true);
+		expect(fs.isAppOwned('tvguide')).toBe(false);
+	});
+
+	it('returnApp rejects if app is still installed', async () => {
+		const fs = createDisk();
+		const result = await fs.returnApp('tvguide');
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('protected_node');
+	});
+
+	it('returnApp rejects if app is not owned', async () => {
+		const fs = createDisk();
+		await fs.uninstallApp('tvguide');
+		await fs.returnApp('tvguide');
+		const result = await fs.returnApp('tvguide');
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('not_found');
+	});
+
+	it('free apps are always owned', () => {
+		const fs = createDisk();
+		expect(fs.isAppOwned('textedit')).toBe(true);
+		expect(fs.isAppOwned('stickies')).toBe(true);
+	});
+
+	it('getOwnedApps returns pre-owned store apps on clean disk', () => {
+		const fs = createDisk();
+		const owned = fs.getOwnedApps();
+		expect(owned).toContain('tvguide');
+		expect(owned).toContain('chatrbot');
+		expect(owned).toContain('recorder');
+	});
+
+	it('clean disk has ownedApps set on the volume', () => {
+		const fs = createDisk();
+		const vol = fs.getVolume();
+		expect(vol.ownedApps).toBeDefined();
+		expect(Array.isArray(vol.ownedApps)).toBe(true);
+	});
+});

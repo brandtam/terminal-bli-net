@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { TerminalFS, APPLICATIONS_ID, DESKTOP_ID } from '../filesystem/terminal-fs';
-import { getShopCatalog, isInstalled, canUninstall } from './software-shop';
+import {
+	getShopCatalog,
+	isInstalled,
+	canUninstall,
+	isOwned,
+	getOwnedAppIds,
+	deriveOwnedApps
+} from './software-shop';
 
 describe('getShopCatalog', () => {
 	it('returns catalog items', () => {
@@ -168,5 +175,83 @@ describe('isAppInstalled', () => {
 		const result = await fs.isAppInstalled('tvguide');
 		expect(result.ok).toBe(true);
 		if (result.ok) expect(result.value).toBe(false);
+	});
+});
+
+describe('isOwned', () => {
+	it('returns true for free apps regardless of ownedApps list', () => {
+		// textedit, stickies, stats, error are free — always owned
+		expect(isOwned('textedit', [])).toBe(true);
+		expect(isOwned('stickies', [])).toBe(true);
+		expect(isOwned('stats', [])).toBe(true);
+		expect(isOwned('error', [])).toBe(true);
+	});
+
+	it('returns true for system apps', () => {
+		expect(isOwned('finder', [])).toBe(true);
+		expect(isOwned('software-shop', [])).toBe(true);
+	});
+
+	it('returns false for store apps not in ownedApps', () => {
+		expect(isOwned('tvguide', [])).toBe(false);
+		expect(isOwned('chatrbot', [])).toBe(false);
+		expect(isOwned('recorder', [])).toBe(false);
+	});
+
+	it('returns true for store apps in ownedApps', () => {
+		expect(isOwned('tvguide', ['tvguide'])).toBe(true);
+		expect(isOwned('chatrbot', ['chatrbot', 'tvguide'])).toBe(true);
+	});
+
+	it('returns false for unknown apps', () => {
+		expect(isOwned('nonexistent' as string, ['nonexistent' as string])).toBe(false);
+	});
+});
+
+describe('getOwnedAppIds', () => {
+	it('includes free apps even with empty ownedApps', () => {
+		const owned = getOwnedAppIds([]);
+		expect(owned).toContain('textedit');
+		expect(owned).toContain('stickies');
+		expect(owned).toContain('stats');
+		expect(owned).toContain('error');
+	});
+
+	it('includes store apps from ownedApps list', () => {
+		const owned = getOwnedAppIds(['tvguide', 'chatrbot']);
+		expect(owned).toContain('tvguide');
+		expect(owned).toContain('chatrbot');
+		expect(owned).toContain('textedit'); // still has free apps
+	});
+
+	it('deduplicates if free app somehow appears in ownedApps', () => {
+		const owned = getOwnedAppIds(['textedit']);
+		const textEditCount = owned.filter((id) => id === 'textedit').length;
+		expect(textEditCount).toBe(1);
+	});
+});
+
+describe('deriveOwnedApps', () => {
+	it('derives store apps from installed nodes', () => {
+		const fs = TerminalFS.createCleanDisk();
+		const derived = deriveOwnedApps(fs.getAllNodes());
+		// Default installed store apps: tvguide, chatrbot, recorder
+		expect(derived).toContain('tvguide');
+		expect(derived).toContain('chatrbot');
+		expect(derived).toContain('recorder');
+	});
+
+	it('does not include free apps in derived list', () => {
+		const fs = TerminalFS.createCleanDisk();
+		const derived = deriveOwnedApps(fs.getAllNodes());
+		expect(derived).not.toContain('textedit');
+		expect(derived).not.toContain('stickies');
+	});
+
+	it('does not include uninstalled store apps', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.uninstallApp('tvguide');
+		const derived = deriveOwnedApps(fs.getAllNodes());
+		expect(derived).not.toContain('tvguide');
 	});
 });

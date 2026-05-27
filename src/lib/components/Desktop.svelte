@@ -42,6 +42,7 @@
 	import ChatrbotPrefs from './ChatrbotPrefs.svelte';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import SoftwareShopWindow from '$lib/apps/software-shop/SoftwareShopWindow.svelte';
+	import ComputerStoreWindow from '$lib/apps/computer-store/ComputerStoreWindow.svelte';
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
@@ -521,6 +522,8 @@
 						{/if}
 					{:else if w.id === 'software-shop'}
 						<SoftwareShopWindow {os} fs={terminalFs} />
+					{:else if w.id === 'computer-store'}
+						<ComputerStoreWindow {os} fs={terminalFs} />
 					{:else if w.id === 'stats'}
 						<StatsWindow
 							showCount={os.groups.filter((g) => g.active).length}
