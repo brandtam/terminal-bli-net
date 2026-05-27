@@ -67,8 +67,13 @@
 		{ type: 'separator' },
 		{
 			type: 'action',
-			label: 'Software Shop',
+			label: 'My Shelf',
 			action: (os) => os.openWindow('software-shop')
+		},
+		{
+			type: 'action',
+			label: 'Computer Store',
+			action: (os) => os.openWindow('computer-store')
 		}
 	];
 
@@ -159,7 +164,8 @@
 		<button
 			class="apple menu-item"
 			class:open={openMenu === '__os'}
-			onclick={() => (openMenu = openMenu === '__os' ? null : '__os')}>●</button
+			onclick={() => (openMenu = openMenu === '__os' ? null : '__os')}
+			><img src="/favicon-16x16.png" alt="" class="os-icon" /></button
 		>
 		{#if openMenu === '__os'}
 			<div class="dropdown">
@@ -310,8 +316,14 @@
 		color: var(--chrome-menubar-fg, var(--ink));
 	}
 	.apple {
-		font-size: 18px;
 		line-height: 1;
+		display: inline-flex;
+		align-items: center;
+	}
+	.os-icon {
+		width: 16px;
+		height: 16px;
+		image-rendering: pixelated;
 	}
 	.menu-item {
 		cursor: pointer;

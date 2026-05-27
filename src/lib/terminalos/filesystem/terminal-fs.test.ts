@@ -67,14 +67,17 @@ describe('TerminalFS.createCleanDisk', () => {
 		if (!result.ok) return;
 
 		const names = result.value.map((n) => n.name);
-		expect(names).toContain('TV Guide.app');
-		expect(names).toContain('chatrbot.app');
+		// System apps that ship with the OS
+		expect(names).toContain('My Shelf.app');
+		expect(names).toContain('Computer Store.app');
 		expect(names).toContain('TextEdit.app');
 		expect(names).toContain('Stickies');
-		expect(names).toContain('Camera.app');
-		expect(names).toContain('Stats.app');
-		expect(names).toContain('DO_NOT_OPEN');
-		expect(names).toContain('Software Shop.app');
+		// Store apps should NOT be installed by default
+		expect(names).not.toContain('TV Guide.app');
+		expect(names).not.toContain('chatrbot.app');
+		expect(names).not.toContain('Camera.app');
+		expect(names).not.toContain('Stats.app');
+		expect(names).not.toContain('DO_NOT_OPEN');
 	});
 
 	it('system-prefs and about-terminal are in /System', async () => {
@@ -110,30 +113,18 @@ describe('TerminalFS.createCleanDisk', () => {
 		const aliases = result.value.filter((n): n is FsAlias => n.kind === 'alias');
 		const aliasNames = aliases.map((a) => a.name);
 
-		// These apps have desktopAliasByDefault: true
-		expect(aliasNames).toContain('TV Guide.app');
-		expect(aliasNames).toContain('Software Shop.app');
+		// Only system apps with desktopAliasByDefault get aliases on clean disk
+		expect(aliasNames).toContain('My Shelf.app');
 		expect(aliasNames).toContain('Stickies');
-		expect(aliasNames).toContain('Camera.app');
-		expect(aliasNames).toContain('Stats.app');
-		expect(aliasNames).toContain('DO_NOT_OPEN');
+		// Store apps should NOT have desktop aliases (they're not installed)
+		expect(aliasNames).not.toContain('TV Guide.app');
+		expect(aliasNames).not.toContain('Camera.app');
 
 		// Each alias should point to an existing app file with targetKind 'app'
 		for (const alias of aliases) {
 			expect(alias.target.targetKind).toBe('app');
 			expect(fs.getAllNodes().has(alias.target.nodeId)).toBe(true);
 		}
-	});
-
-	it('chatrbot has no desktop alias', async () => {
-		const fs = createDisk();
-		const result = await fs.listFolder(DESKTOP_ID);
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
-
-		const aliases = result.value.filter((n): n is FsAlias => n.kind === 'alias');
-		const aliasNames = aliases.map((a) => a.name);
-		expect(aliasNames).not.toContain('chatrbot.app');
 	});
 
 	it('default documents exist in /Documents', async () => {
@@ -396,5 +387,67 @@ describe('TerminalFS.exists', () => {
 	it('returns false when no file with that name exists', () => {
 		const fs = createDisk();
 		expect(fs.exists(DOCUMENTS_ID, 'nope.txt')).toBe(false);
+	});
+});
+
+describe('ownership (buyApp / returnApp)', () => {
+	it('buyApp adds app to ownedApps', async () => {
+		const fs = createDisk();
+		expect(fs.isAppOwned('tvguide')).toBe(false);
+
+		const result = await fs.buyApp('tvguide');
+		expect(result.ok).toBe(true);
+		expect(fs.isAppOwned('tvguide')).toBe(true);
+	});
+
+	it('buyApp rejects already-owned app', async () => {
+		const fs = createDisk();
+		await fs.buyApp('tvguide');
+		const result = await fs.buyApp('tvguide');
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('duplicate_name');
+	});
+
+	it('returnApp removes app from ownedApps', async () => {
+		const fs = createDisk();
+		await fs.buyApp('tvguide');
+		const result = await fs.returnApp('tvguide');
+		expect(result.ok).toBe(true);
+		expect(fs.isAppOwned('tvguide')).toBe(false);
+	});
+
+	it('returnApp rejects if app is still installed', async () => {
+		const fs = createDisk();
+		await fs.buyApp('tvguide');
+		await fs.installApp('tvguide');
+		const result = await fs.returnApp('tvguide');
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('protected_node');
+	});
+
+	it('returnApp rejects if app is not owned', async () => {
+		const fs = createDisk();
+		const result = await fs.returnApp('tvguide');
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('not_found');
+	});
+
+	it('system apps are always owned', () => {
+		const fs = createDisk();
+		expect(fs.isAppOwned('textedit')).toBe(true);
+		expect(fs.isAppOwned('stickies')).toBe(true);
+	});
+
+	it('getOwnedApps returns empty on clean disk', () => {
+		const fs = createDisk();
+		const owned = fs.getOwnedApps();
+		expect(owned).toHaveLength(0);
+	});
+
+	it('clean disk has ownedApps set on the volume', () => {
+		const fs = createDisk();
+		const vol = fs.getVolume();
+		expect(vol.ownedApps).toBeDefined();
+		expect(Array.isArray(vol.ownedApps)).toBe(true);
 	});
 });

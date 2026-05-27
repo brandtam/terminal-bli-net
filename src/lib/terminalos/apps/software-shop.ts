@@ -9,7 +9,16 @@ export type ShopItem = {
 };
 
 /** Apps that don't appear in the shop — they're the shell/system, not installable. */
-const HIDDEN_FROM_SHOP = new Set<AppId>(['finder', 'trash', 'system-prefs', 'about-terminal']);
+const HIDDEN_FROM_SHOP = new Set<AppId>([
+	'finder',
+	'trash',
+	'system-prefs',
+	'about-terminal',
+	'software-shop',
+	'computer-store',
+	'textedit',
+	'stickies'
+]);
 
 /**
  * Get the Software Shop catalog — all apps that should appear in the shop.
@@ -56,4 +65,37 @@ export function canUninstall(appId: AppId): boolean {
 	const def = getAppDef(appId);
 	if (!def) return false;
 	return def.removable;
+}
+
+/**
+ * Check if an app is owned (on the user's shelf).
+ * System apps are always owned. Store apps check the ownedApps list.
+ */
+export function isOwned(appId: AppId, ownedApps: AppId[]): boolean {
+	const def = getAppDef(appId);
+	if (!def) return false;
+	if (def.visibility === 'system') return true;
+	return ownedApps.includes(appId);
+}
+
+/**
+ * Get all owned app IDs — store apps that have been purchased.
+ */
+export function getOwnedAppIds(ownedApps: AppId[]): AppId[] {
+	return [...ownedApps];
+}
+
+/**
+ * Derive ownedApps from currently installed apps for migration.
+ * Called once when loading a disk that lacks ownedApps (pre-ownership model).
+ * Any installed store app gets added to ownedApps; free apps are always owned.
+ */
+export function deriveOwnedApps(nodes: Map<NodeId, FsNode>): AppId[] {
+	const owned: AppId[] = [];
+	for (const app of APP_LIBRARY) {
+		if (app.visibility === 'store' && isInstalled(app.id, nodes)) {
+			owned.push(app.id);
+		}
+	}
+	return owned;
 }

@@ -47,9 +47,10 @@ export {
 	APP_LIBRARY,
 	getAppDef,
 	getDefaultInstalledApps,
-	getDesktopAliasApps
+	getDesktopAliasApps,
+	getStoreApps
 } from './apps/app-library';
-export type { TerminalAppDefinition, AppCategory } from './apps/app-types';
+export type { TerminalAppDefinition, AppCategory, AppVisibility } from './apps/app-types';
 export {
 	getAppWindowId,
 	getAppIconKind,
@@ -57,7 +58,15 @@ export {
 	isSpecialLaunchApp
 } from './apps/app-install';
 export type { SpecialLaunchApp } from './apps/app-install';
-export { getShopCatalog, isInstalled, canUninstall, findAppFile } from './apps/software-shop';
+export {
+	getShopCatalog,
+	isInstalled,
+	canUninstall,
+	findAppFile,
+	isOwned,
+	getOwnedAppIds,
+	deriveOwnedApps
+} from './apps/software-shop';
 export type { ShopItem } from './apps/software-shop';
 export { createFolderView } from './svelte/folder-view.svelte';
 export { createNodeView } from './svelte/node-view.svelte';

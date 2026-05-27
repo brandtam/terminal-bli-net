@@ -29,6 +29,7 @@ export type TerminalVolume = {
 	name: string;
 	kind: 'local';
 	rootNodeId: NodeId;
+	ownedApps?: AppId[];
 };
 
 export type NodeFlags = {

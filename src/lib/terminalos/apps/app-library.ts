@@ -12,7 +12,8 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: ':)',
 		defaultInstalled: false,
 		removable: false,
-		desktopAliasByDefault: false
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 	{
 		id: 'system-prefs',
@@ -23,7 +24,8 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: '⚙',
 		defaultInstalled: false,
 		removable: false,
-		desktopAliasByDefault: false
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 	{
 		id: 'about-terminal',
@@ -34,18 +36,32 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: ':)',
 		defaultInstalled: false,
 		removable: false,
-		desktopAliasByDefault: false
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 	{
 		id: 'software-shop',
-		name: 'Software Shop',
-		fileName: 'Software Shop.app',
+		name: 'My Shelf',
+		fileName: 'My Shelf.app',
 		category: 'system',
-		description: 'Install and remove apps',
+		description: 'Your owned apps',
 		icon: '💾',
 		defaultInstalled: true,
 		removable: false,
-		desktopAliasByDefault: true
+		desktopAliasByDefault: true,
+		visibility: 'system'
+	},
+	{
+		id: 'computer-store',
+		name: 'Computer Store',
+		fileName: 'Computer Store.app',
+		category: 'system',
+		description: 'Browse and buy software',
+		icon: '🏪',
+		defaultInstalled: true,
+		removable: false,
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 	{
 		id: 'trash',
@@ -56,32 +72,11 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: '🗑',
 		defaultInstalled: false,
 		removable: false,
-		desktopAliasByDefault: false
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 
-	// --- Default-installed removable apps ---
-	{
-		id: 'tvguide',
-		name: 'TV Guide',
-		fileName: 'TV Guide.app',
-		category: 'entertainment',
-		description: 'Channel guide and schedule',
-		icon: 'TV',
-		defaultInstalled: true,
-		removable: true,
-		desktopAliasByDefault: true
-	},
-	{
-		id: 'chatrbot',
-		name: 'chatrbot',
-		fileName: 'chatrbot.app',
-		category: 'entertainment',
-		description: 'Chat with TV characters',
-		icon: 'cb',
-		defaultInstalled: true,
-		removable: true,
-		desktopAliasByDefault: false
-	},
+	// --- System apps bundled with OS (not in the Computer Store) ---
 	{
 		id: 'textedit',
 		name: 'TextEdit',
@@ -90,8 +85,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		description: 'Plain text editor',
 		icon: 'txt',
 		defaultInstalled: true,
-		removable: true,
-		desktopAliasByDefault: false
+		removable: false,
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 	{
 		id: 'stickies',
@@ -101,8 +97,35 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		description: 'Desktop sticky notes',
 		icon: '▤',
 		defaultInstalled: true,
+		removable: false,
+		desktopAliasByDefault: true,
+		visibility: 'system'
+	},
+
+	// --- Store apps (must be bought at the Computer Store) ---
+	{
+		id: 'tvguide',
+		name: 'TV Guide',
+		fileName: 'TV Guide.app',
+		category: 'entertainment',
+		description: 'Channel guide and schedule',
+		icon: 'TV',
+		defaultInstalled: false,
 		removable: true,
-		desktopAliasByDefault: true
+		desktopAliasByDefault: true,
+		visibility: 'store'
+	},
+	{
+		id: 'chatrbot',
+		name: 'chatrbot',
+		fileName: 'chatrbot.app',
+		category: 'entertainment',
+		description: 'Chat with TV characters',
+		icon: 'cb',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
 	},
 	{
 		id: 'recorder',
@@ -111,9 +134,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'utilities',
 		description: 'Record short webcam clips',
 		icon: 'REC',
-		defaultInstalled: true,
+		defaultInstalled: false,
 		removable: true,
-		desktopAliasByDefault: true
+		desktopAliasByDefault: true,
+		visibility: 'store'
 	},
 	{
 		id: 'stats',
@@ -122,9 +146,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'utilities',
 		description: 'System statistics',
 		icon: '≡',
-		defaultInstalled: true,
+		defaultInstalled: false,
 		removable: true,
-		desktopAliasByDefault: true
+		desktopAliasByDefault: true,
+		visibility: 'store'
 	},
 	{
 		id: 'error',
@@ -133,9 +158,82 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'utilities',
 		description: 'Mystery app',
 		icon: '⚠',
-		defaultInstalled: true,
+		defaultInstalled: false,
 		removable: true,
-		desktopAliasByDefault: true
+		desktopAliasByDefault: true,
+		visibility: 'store'
+	},
+	{
+		id: 'tetra',
+		name: 'Tetra',
+		fileName: 'Tetra.app',
+		category: 'entertainment',
+		description: 'Falling block puzzle',
+		icon: '▦',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'solitaire',
+		name: 'Solitaire',
+		fileName: 'Solitaire.app',
+		category: 'entertainment',
+		description: 'Card game',
+		icon: '♠',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'minesweep',
+		name: 'Minesweep',
+		fileName: 'Minesweep.app',
+		category: 'entertainment',
+		description: 'Grid puzzle with bombs',
+		icon: '💣',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'zorquest',
+		name: 'ZorQuest',
+		fileName: 'ZorQuest.app',
+		category: 'entertainment',
+		description: 'Text adventure',
+		icon: '📜',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'calc',
+		name: 'Calc.app',
+		fileName: 'Calc.app',
+		category: 'productivity',
+		description: 'Calculator',
+		icon: '🧮',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'paint',
+		name: 'Pixel Paint',
+		fileName: 'Pixel Paint.app',
+		category: 'productivity',
+		description: 'Bitmap painting',
+		icon: '🖌',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
 	}
 ];
 
@@ -149,4 +247,8 @@ export function getDefaultInstalledApps(): TerminalAppDefinition[] {
 
 export function getDesktopAliasApps(): TerminalAppDefinition[] {
 	return APP_LIBRARY.filter((a) => a.desktopAliasByDefault);
+}
+
+export function getStoreApps(): TerminalAppDefinition[] {
+	return APP_LIBRARY.filter((a) => a.visibility === 'store');
 }

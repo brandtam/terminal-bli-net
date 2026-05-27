@@ -61,6 +61,37 @@
 		font-size: 40px;
 		color: var(--brand-color-orange, #f54e00);
 		margin-bottom: 24px;
+		animation: spin-steps 2s steps(1, end) forwards;
+	}
+
+	@keyframes spin-steps {
+		0% {
+			transform: rotate(0deg);
+		}
+		12.5% {
+			transform: rotate(45deg);
+		}
+		25% {
+			transform: rotate(90deg);
+		}
+		37.5% {
+			transform: rotate(135deg);
+		}
+		50% {
+			transform: rotate(180deg);
+		}
+		62.5% {
+			transform: rotate(225deg);
+		}
+		75% {
+			transform: rotate(270deg);
+		}
+		87.5% {
+			transform: rotate(315deg);
+		}
+		100% {
+			transform: rotate(360deg);
+		}
 	}
 
 	.boot-label {
