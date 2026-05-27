@@ -61,14 +61,36 @@
 		font-size: 40px;
 		color: var(--brand-color-orange, #f54e00);
 		margin-bottom: 24px;
-		animation: spin-steps 2s steps(8) forwards;
+		animation: spin-steps 2s forwards;
+		animation-timing-function: steps(1, end);
 	}
 
 	@keyframes spin-steps {
-		from {
+		0% {
 			transform: rotate(0deg);
 		}
-		to {
+		12.5% {
+			transform: rotate(45deg);
+		}
+		25% {
+			transform: rotate(90deg);
+		}
+		37.5% {
+			transform: rotate(135deg);
+		}
+		50% {
+			transform: rotate(180deg);
+		}
+		62.5% {
+			transform: rotate(225deg);
+		}
+		75% {
+			transform: rotate(270deg);
+		}
+		87.5% {
+			transform: rotate(315deg);
+		}
+		100% {
 			transform: rotate(360deg);
 		}
 	}
