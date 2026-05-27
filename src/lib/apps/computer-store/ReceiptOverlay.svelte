@@ -52,8 +52,8 @@
 		</div>
 
 		<div class="btn-row">
-			<button class="browse-btn" onclick={onclose}>◂ KEEP BROWSING</button>
-			<button class="leave-btn" onclick={onleave}>▸ LEAVE THE STORE</button>
+			<button class="btn" onclick={onclose}>◂ KEEP BROWSING</button>
+			<button class="btn primary" onclick={onleave}>▸ LEAVE THE STORE</button>
 		</div>
 	</div>
 </div>
@@ -135,27 +135,15 @@
 
 	.btn-row {
 		display: flex;
-		border-top: 2px solid #0a0a0a;
+		gap: 8px;
+		padding: 12px 18px;
+		border-top: 2px solid var(--ink, #0a0a0a);
 	}
-	.browse-btn {
+	.btn-row :global(.btn) {
 		flex: 1;
-		background: #ffffff;
-		color: #0a0a0a;
-		border: none;
-		border-right: 2px solid #0a0a0a;
-		padding: 10px 0;
-		font-family: 'Press Start 2P', monospace;
+		text-align: center;
 		font-size: 9px;
-		cursor: pointer;
-	}
-	.leave-btn {
-		flex: 1;
-		background: #f54e00;
-		color: #ffffff;
-		border: none;
-		padding: 10px 0;
 		font-family: 'Press Start 2P', monospace;
-		font-size: 9px;
-		cursor: pointer;
+		padding: 10px 8px;
 	}
 </style>
