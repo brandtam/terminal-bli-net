@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TerminalFS } from '$lib/terminalos';
+	import { getOwnedAppIds } from '$lib/terminalos';
 	import type { OsApi } from '$lib/os/os-api';
 	import TopBar from './TopBar.svelte';
 	import AisleView from './AisleView.svelte';
@@ -26,7 +27,7 @@
 	let ownedVersion = $state(0);
 	const owned = $derived.by(() => {
 		ownedVersion;
-		return fs.getOwnedApps();
+		return getOwnedAppIds(fs.getOwnedApps());
 	});
 
 	const breadcrumb = $derived(
