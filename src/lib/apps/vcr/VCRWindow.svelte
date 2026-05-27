@@ -82,7 +82,7 @@
 	<defs>
 		<clipPath id="crt-barrel" clipPathUnits="objectBoundingBox">
 			<path
-				d="M 0.04,0.055 Q 0.5,-0.01 0.96,0.055 Q 1,0.5 0.96,0.945 Q 0.5,1.01 0.04,0.945 Q 0,0.5 0.04,0.055 Z"
+				d="M 0.04,0.045 Q 0.5,-0.01 0.96,0.045 Q 1,0.5 0.96,0.955 Q 0.5,1.01 0.04,0.955 Q 0,0.5 0.04,0.045 Z"
 			/>
 		</clipPath>
 	</defs>
@@ -245,6 +245,7 @@
 		position: relative;
 		overflow: hidden;
 		margin: 3% 2.5%;
+		padding: 2%;
 		clip-path: url(#crt-barrel);
 	}
 
@@ -275,7 +276,7 @@
 		height: 100%;
 		display: flex;
 		flex-direction: column;
-		padding: 10px;
+		padding: 20px;
 		overflow: hidden;
 	}
 
