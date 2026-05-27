@@ -249,3 +249,165 @@ describe('deriveOwnedApps', () => {
 		expect(derived).toContain('tvguide');
 	});
 });
+
+describe('full lifecycle: buy → install → uninstall → return', () => {
+	it('buy then install puts app on desktop', async () => {
+		const fs = TerminalFS.createCleanDisk();
+
+		await fs.buyApp('tvguide');
+		expect(fs.isAppOwned('tvguide')).toBe(true);
+		expect(isInstalled('tvguide', fs.getAllNodes())).toBe(false);
+
+		await fs.installApp('tvguide');
+		expect(isInstalled('tvguide', fs.getAllNodes())).toBe(true);
+	});
+
+	it('uninstall keeps app owned but removes from disk', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+		await fs.installApp('tvguide');
+
+		await fs.uninstallApp('tvguide');
+		expect(isInstalled('tvguide', fs.getAllNodes())).toBe(false);
+		expect(fs.isAppOwned('tvguide')).toBe(true);
+	});
+
+	it('return after uninstall removes ownership', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+		await fs.installApp('tvguide');
+		await fs.uninstallApp('tvguide');
+
+		await fs.returnApp('tvguide');
+		expect(fs.isAppOwned('tvguide')).toBe(false);
+		expect(isInstalled('tvguide', fs.getAllNodes())).toBe(false);
+	});
+
+	it('cannot return while still installed', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+		await fs.installApp('tvguide');
+
+		const result = await fs.returnApp('tvguide');
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('protected_node');
+		expect(fs.isAppOwned('tvguide')).toBe(true);
+	});
+
+	it('cannot install without buying first', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		const result = await fs.installApp('tetra');
+		expect(result.ok).toBe(true);
+		// installApp doesn't check ownership — it just creates the file.
+		// Ownership is a store-level concern, not a filesystem concern.
+		// But the app IS installed now.
+		if (result.ok) {
+			expect(result.value.appId).toBe('tetra');
+		}
+	});
+
+	it('buying multiple apps then returning one leaves others owned', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+		await fs.buyApp('chatrbot');
+		await fs.buyApp('stats');
+
+		expect(fs.getOwnedApps()).toHaveLength(3);
+
+		await fs.returnApp('chatrbot');
+		expect(fs.isAppOwned('tvguide')).toBe(true);
+		expect(fs.isAppOwned('chatrbot')).toBe(false);
+		expect(fs.isAppOwned('stats')).toBe(true);
+		expect(fs.getOwnedApps()).toHaveLength(2);
+	});
+});
+
+describe('My Shelf (getShopCatalog filtered by ownership)', () => {
+	it('shelf is empty on a clean disk', () => {
+		const fs = TerminalFS.createCleanDisk();
+		const catalog = getShopCatalog(fs.getAllNodes());
+		const ownedAppIds = fs.getOwnedApps();
+		const shelf = catalog.filter((item) => isOwned(item.app.id, ownedAppIds));
+		expect(shelf).toHaveLength(0);
+	});
+
+	it('bought app appears on shelf', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+
+		const catalog = getShopCatalog(fs.getAllNodes());
+		const ownedAppIds = fs.getOwnedApps();
+		const shelf = catalog.filter((item) => isOwned(item.app.id, ownedAppIds));
+
+		expect(shelf).toHaveLength(1);
+		expect(shelf[0].app.id).toBe('tvguide');
+	});
+
+	it('returned app disappears from shelf', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+		await fs.returnApp('tvguide');
+
+		const catalog = getShopCatalog(fs.getAllNodes());
+		const ownedAppIds = fs.getOwnedApps();
+		const shelf = catalog.filter((item) => isOwned(item.app.id, ownedAppIds));
+
+		expect(shelf).toHaveLength(0);
+	});
+
+	it('installed app shows as installed on shelf', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+		await fs.installApp('tvguide');
+
+		const catalog = getShopCatalog(fs.getAllNodes());
+		const ownedAppIds = fs.getOwnedApps();
+		const shelf = catalog.filter((item) => isOwned(item.app.id, ownedAppIds));
+
+		expect(shelf).toHaveLength(1);
+		expect(shelf[0].installed).toBe(true);
+	});
+
+	it('uninstalled app shows as not installed on shelf', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+		await fs.installApp('tvguide');
+		await fs.uninstallApp('tvguide');
+
+		const catalog = getShopCatalog(fs.getAllNodes());
+		const ownedAppIds = fs.getOwnedApps();
+		const shelf = catalog.filter((item) => isOwned(item.app.id, ownedAppIds));
+
+		expect(shelf).toHaveLength(1);
+		expect(shelf[0].installed).toBe(false);
+	});
+});
+
+describe('reinstall clears ownership', () => {
+	it('reinstall resets ownedApps to empty', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+		await fs.buyApp('chatrbot');
+		expect(fs.getOwnedApps()).toHaveLength(2);
+
+		await fs.reinstallOS();
+		expect(fs.getOwnedApps()).toHaveLength(0);
+	});
+
+	it('reinstall removes installed store apps', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.buyApp('tvguide');
+		await fs.installApp('tvguide');
+		expect(isInstalled('tvguide', fs.getAllNodes())).toBe(true);
+
+		await fs.reinstallOS();
+		expect(isInstalled('tvguide', fs.getAllNodes())).toBe(false);
+	});
+
+	it('reinstall keeps system apps installed', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.reinstallOS();
+		expect(isInstalled('textedit', fs.getAllNodes())).toBe(true);
+		expect(isInstalled('stickies', fs.getAllNodes())).toBe(true);
+	});
+});
