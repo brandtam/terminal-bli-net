@@ -307,15 +307,14 @@ describe('system actions', () => {
 		vi.useRealTimers();
 	});
 
-	it('restoreBackup applies window layout to reactive state', async () => {
-		const { os, fs } = createOs();
+	it('restoreBackup returns window layout in preferences', async () => {
+		const { fs } = createOs();
 
-		// Buy and install VCR so the backup has it
-		await fs.buyApp('vcr');
-		await fs.installApp('vcr');
-
-		// Export with window layout
-		const prefs = {
+		const windows = [
+			{ id: 'welcome', x: 50, y: 50, w: 460, h: 940, z: 1 },
+			{ id: 'vcr', x: 600, y: 50, w: 860, h: 833, z: 2 }
+		];
+		const exported = await fs.exportBackup({
 			tweaks: {
 				wallpaper: 'teal',
 				accent: '#f54e00',
@@ -323,51 +322,19 @@ describe('system actions', () => {
 				marqueeLoop: 100,
 				tvPauseOnHover: false
 			},
-			conversations: {},
-			timezone: null,
-			windows: [
-				{ id: 'welcome', x: 50, y: 50, w: 460, h: 940, z: 1 },
-				{ id: 'vcr', x: 600, y: 50, w: 860, h: 833, z: 2 }
-			]
-		};
-		const exported = await fs.exportBackup(prefs);
+			windows
+		});
 		if (!exported.ok) throw new Error('export failed');
 
-		// Simulate a fresh OS that only has welcome open
 		const freshFs = TerminalFS.createCleanDisk();
-		const freshOs = new OsApiClass(freshFs);
-		freshOs.openWindow('welcome');
-		expect(freshOs.windows).toHaveLength(1);
+		const result = await freshFs.restoreBackup(exported.value);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
 
-		// Stub reload to prevent actual navigation
-		const origReload = globalThis.window?.location?.reload;
-		let reloaded = false;
-		if (typeof globalThis.window !== 'undefined') {
-			Object.defineProperty(window, 'location', {
-				value: { ...window.location, reload: () => (reloaded = true) },
-				writable: true
-			});
-		}
-
-		// Call restoreBackup on the fresh FS and trigger the restore action
-		const restoreResult = await freshFs.restoreBackup(exported.value);
-		expect(restoreResult.ok).toBe(true);
-		if (restoreResult.ok && restoreResult.value.preferences?.windows) {
-			freshOs.windows = restoreResult.value.preferences.windows;
-		}
-
-		// Verify the reactive state now has both windows
-		expect(freshOs.windows).toHaveLength(2);
-		expect(freshOs.windows.find((w) => w.id === 'vcr')).toBeDefined();
-		expect(freshOs.windows.find((w) => w.id === 'welcome')?.x).toBe(50);
-
-		// Restore original
-		if (origReload && typeof globalThis.window !== 'undefined') {
-			Object.defineProperty(window, 'location', {
-				value: { ...window.location, reload: origReload },
-				writable: true
-			});
-		}
+		expect(result.value.preferences?.windows).toHaveLength(2);
+		expect(result.value.preferences?.windows?.[0].id).toBe('welcome');
+		expect(result.value.preferences?.windows?.[0].x).toBe(50);
+		expect(result.value.preferences?.windows?.[1].id).toBe('vcr');
 	});
 
 	it('reinstallOS shows a confirmation alert with Cancel and Reinstall', () => {

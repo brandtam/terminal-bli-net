@@ -556,12 +556,10 @@ export class OsApiClass implements OsApi {
 						label: 'Download',
 						primary: true,
 						action: () => {
-							const url = URL.createObjectURL(blob);
 							const a = document.createElement('a');
-							a.href = url;
+							a.href = URL.createObjectURL(blob);
 							a.download = filename;
 							a.click();
-							setTimeout(() => URL.revokeObjectURL(url), 10000);
 						}
 					}
 				]
@@ -572,7 +570,6 @@ export class OsApiClass implements OsApi {
 	restoreBackup(): void {
 		const input = document.createElement('input');
 		input.type = 'file';
-		input.accept = '.terminal-hd,.json,*/*';
 		input.onchange = () => {
 			const file = input.files?.[0];
 			if (!file) return;
