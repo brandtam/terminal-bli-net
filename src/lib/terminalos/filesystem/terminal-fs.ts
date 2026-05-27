@@ -20,7 +20,7 @@ import { getAppWindowId } from '../apps/app-install';
 import { findAppFile, isOwned as checkOwned, deriveOwnedApps } from '../apps/software-shop';
 import type { UndoRecord } from './operations';
 import { buildBackup, validateBackup, previewBackup, validateDiskForExport } from './backup';
-import type { BackupFile, BackupPreview } from './backup';
+import type { BackupFileV2, BackupPreferences, BackupRestoreResult } from './backup';
 import type { ManifestStore, BodyStore } from './storage/storage-types';
 import { InMemoryManifestStore, InMemoryBodyStore } from './storage/storage-types';
 import { computeDiskUsage } from './usage';
@@ -1276,25 +1276,25 @@ export class TerminalFS {
 
 	// --- Backup / Restore ---
 
-	async exportBackup(): Promise<FsResult<BackupFile>> {
+	async exportBackup(preferences?: BackupPreferences): Promise<FsResult<BackupFileV2>> {
 		const validation = validateDiskForExport(this.volume, this.nodes);
-		if (!validation.ok) return validation as FsResult<BackupFile>;
+		if (!validation.ok) return validation as FsResult<BackupFileV2>;
 
-		const backup = buildBackup(this.volume, this.nodes);
+		const backup = buildBackup(this.volume, this.nodes, preferences);
 		return ok(backup);
 	}
 
-	async validateBackup(data: unknown): Promise<FsResult<BackupPreview>> {
+	async validateBackup(data: unknown): Promise<FsResult<BackupRestoreResult>> {
 		const validated = validateBackup(data);
-		if (!validated.ok) return validated as FsResult<BackupPreview>;
+		if (!validated.ok) return validated as FsResult<BackupRestoreResult>;
 
 		const preview = previewBackup(validated.value);
 		return ok(preview);
 	}
 
-	async restoreBackup(data: unknown): Promise<FsResult<BackupPreview>> {
+	async restoreBackup(data: unknown): Promise<FsResult<BackupRestoreResult>> {
 		const validated = validateBackup(data);
-		if (!validated.ok) return validated as FsResult<BackupPreview>;
+		if (!validated.ok) return validated as FsResult<BackupRestoreResult>;
 
 		const backup = validated.value;
 		const preview = previewBackup(backup);
@@ -1305,9 +1305,14 @@ export class TerminalFS {
 			this.nodes.set(node.id, node as FsNode);
 		}
 
+		// Restore ownedApps from v2 backups (always set — even if empty/undefined)
+		if (backup.version === 2) {
+			this.volume = { ...this.volume, ownedApps: backup.disk.ownedApps ?? [] };
+		}
+
 		// Persist the restored state
 		const persistResult = await this.persist();
-		if (!persistResult.ok) return persistResult as FsResult<BackupPreview>;
+		if (!persistResult.ok) return persistResult as FsResult<BackupRestoreResult>;
 
 		// Clear undo — restore is a full disk replacement
 		this.lastUndo = null;
@@ -1316,7 +1321,11 @@ export class TerminalFS {
 		const allNodeIds = Array.from(this.nodes.keys());
 		this.notifyChange(allNodeIds, allNodeIds, 'restore');
 
-		return ok(preview);
+		const result: BackupRestoreResult = {
+			...preview,
+			preferences: backup.version === 2 ? backup.preferences : undefined
+		};
+		return ok(result);
 	}
 
 	// --- Reinstall ---

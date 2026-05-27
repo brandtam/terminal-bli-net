@@ -34,7 +34,14 @@ export {
 	previewBackup,
 	validateDiskForExport
 } from './filesystem/backup';
-export type { BackupFile, BackupPreview } from './filesystem/backup';
+export type {
+	BackupFile,
+	BackupFileV1,
+	BackupFileV2,
+	BackupPreview,
+	BackupPreferences,
+	BackupRestoreResult
+} from './filesystem/backup';
 export type { AliasResolution } from './filesystem/aliases';
 export type { OperationKind, UndoRecord } from './filesystem/operations';
 export type { DiskUsage } from './filesystem/usage';
