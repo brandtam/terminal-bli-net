@@ -15,7 +15,7 @@ import { generateUniqueId, hasSiblingConflict } from './names';
 import { derivePath } from './paths';
 import { resolveAlias as resolveAliasTarget, buildFingerprint } from './aliases';
 import { getDefaultInstalledApps, getDesktopAliasApps, getAppDef } from '../apps/app-library';
-import { findAppFile } from '../apps/software-shop';
+import { findAppFile, isOwned as checkOwned, deriveOwnedApps } from '../apps/software-shop';
 import type { UndoRecord } from './operations';
 import { buildBackup, validateBackup, previewBackup, validateDiskForExport } from './backup';
 import type { BackupFile, BackupPreview } from './backup';
@@ -283,6 +283,12 @@ export class TerminalFS {
 			for (const node of loaded.nodes) {
 				nodes.set(node.id, node);
 			}
+
+			// Migration: derive ownedApps from installed apps if missing
+			if (loaded.volume.ownedApps === undefined) {
+				loaded.volume.ownedApps = deriveOwnedApps(nodes);
+			}
+
 			return new TerminalFS(loaded.volume, nodes, manifestStore, bodyStore);
 		}
 
@@ -298,12 +304,16 @@ export class TerminalFS {
 		const now = Date.now();
 		const nodes = new Map<NodeId, FsNode>();
 
-		// 1. Volume
+		// 1. Volume — pre-own all defaultInstalled store apps
+		const preOwnedStoreApps = getDefaultInstalledApps()
+			.filter((a) => a.visibility === 'store')
+			.map((a) => a.id);
 		const volume: TerminalVolume = {
 			id: VOLUME_ID,
 			name: 'Terminal HD',
 			kind: 'local',
-			rootNodeId: ROOT_ID
+			rootNodeId: ROOT_ID,
+			ownedApps: preOwnedStoreApps
 		};
 
 		// 2. Root folder
@@ -1147,6 +1157,58 @@ export class TerminalFS {
 	async isAppInstalled(appId: AppId): Promise<FsResult<boolean>> {
 		const installed = findAppFile(appId, this.nodes) !== undefined;
 		return ok(installed);
+	}
+
+	// --- Ownership (buy/return) ---
+
+	isAppOwned(appId: AppId): boolean {
+		return checkOwned(appId, this.volume.ownedApps ?? []);
+	}
+
+	getOwnedApps(): AppId[] {
+		return this.volume.ownedApps ?? [];
+	}
+
+	async buyApp(appId: AppId): Promise<FsResult<void>> {
+		const appDef = getAppDef(appId);
+		if (!appDef) return fail('missing_app', `App "${appId}" not found in AppLibrary`);
+
+		if (this.isAppOwned(appId)) {
+			return fail('duplicate_name', `App "${appDef.name}" is already owned`);
+		}
+
+		const owned = this.volume.ownedApps ?? [];
+		this.volume = { ...this.volume, ownedApps: [...owned, appId] };
+
+		const persistResult = await this.debouncedPersist();
+		if (!persistResult.ok) return persistResult;
+
+		this.notifyChange([], [], 'buy_app');
+		return ok(undefined);
+	}
+
+	async returnApp(appId: AppId): Promise<FsResult<void>> {
+		const appDef = getAppDef(appId);
+		if (!appDef) return fail('missing_app', `App "${appId}" not found in AppLibrary`);
+
+		if (!this.isAppOwned(appId)) {
+			return fail('not_found', `App "${appDef.name}" is not owned`);
+		}
+
+		// Cannot return an app that is currently installed
+		const installed = findAppFile(appId, this.nodes) !== undefined;
+		if (installed) {
+			return fail('protected_node', `Uninstall "${appDef.name}" before returning it`);
+		}
+
+		const owned = this.volume.ownedApps ?? [];
+		this.volume = { ...this.volume, ownedApps: owned.filter((id) => id !== appId) };
+
+		const persistResult = await this.debouncedPersist();
+		if (!persistResult.ok) return persistResult;
+
+		this.notifyChange([], [], 'return_app');
+		return ok(undefined);
 	}
 
 	// --- Body storage ---

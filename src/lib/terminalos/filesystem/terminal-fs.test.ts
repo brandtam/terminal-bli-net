@@ -74,7 +74,7 @@ describe('TerminalFS.createCleanDisk', () => {
 		expect(names).toContain('Camera.app');
 		expect(names).toContain('Stats.app');
 		expect(names).toContain('DO_NOT_OPEN');
-		expect(names).toContain('Software Shop.app');
+		expect(names).toContain('My Shelf.app');
 	});
 
 	it('system-prefs and about-terminal are in /System', async () => {
@@ -112,7 +112,7 @@ describe('TerminalFS.createCleanDisk', () => {
 
 		// These apps have desktopAliasByDefault: true
 		expect(aliasNames).toContain('TV Guide.app');
-		expect(aliasNames).toContain('Software Shop.app');
+		expect(aliasNames).toContain('My Shelf.app');
 		expect(aliasNames).toContain('Stickies');
 		expect(aliasNames).toContain('Camera.app');
 		expect(aliasNames).toContain('Stats.app');

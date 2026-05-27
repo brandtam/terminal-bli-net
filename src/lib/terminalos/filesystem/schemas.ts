@@ -91,7 +91,8 @@ export const terminalVolumeSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	kind: z.literal('local'),
-	rootNodeId: z.string()
+	rootNodeId: z.string(),
+	ownedApps: z.array(z.string()).optional()
 });
 
 // --- Validation helpers ---

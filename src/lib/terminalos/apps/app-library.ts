@@ -12,7 +12,8 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: ':)',
 		defaultInstalled: false,
 		removable: false,
-		desktopAliasByDefault: false
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 	{
 		id: 'system-prefs',
@@ -23,7 +24,8 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: '⚙',
 		defaultInstalled: false,
 		removable: false,
-		desktopAliasByDefault: false
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 	{
 		id: 'about-terminal',
@@ -34,18 +36,20 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: ':)',
 		defaultInstalled: false,
 		removable: false,
-		desktopAliasByDefault: false
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 	{
 		id: 'software-shop',
-		name: 'Software Shop',
-		fileName: 'Software Shop.app',
+		name: 'My Shelf',
+		fileName: 'My Shelf.app',
 		category: 'system',
-		description: 'Install and remove apps',
+		description: 'Your owned apps',
 		icon: '💾',
 		defaultInstalled: true,
 		removable: false,
-		desktopAliasByDefault: true
+		desktopAliasByDefault: true,
+		visibility: 'system'
 	},
 	{
 		id: 'trash',
@@ -56,32 +60,11 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: '🗑',
 		defaultInstalled: false,
 		removable: false,
-		desktopAliasByDefault: false
+		desktopAliasByDefault: false,
+		visibility: 'system'
 	},
 
-	// --- Default-installed removable apps ---
-	{
-		id: 'tvguide',
-		name: 'TV Guide',
-		fileName: 'TV Guide.app',
-		category: 'entertainment',
-		description: 'Channel guide and schedule',
-		icon: 'TV',
-		defaultInstalled: true,
-		removable: true,
-		desktopAliasByDefault: true
-	},
-	{
-		id: 'chatrbot',
-		name: 'chatrbot',
-		fileName: 'chatrbot.app',
-		category: 'entertainment',
-		description: 'Chat with TV characters',
-		icon: 'cb',
-		defaultInstalled: true,
-		removable: true,
-		desktopAliasByDefault: false
-	},
+	// --- Free apps (pre-owned + pre-installed) ---
 	{
 		id: 'textedit',
 		name: 'TextEdit',
@@ -91,7 +74,8 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: 'txt',
 		defaultInstalled: true,
 		removable: true,
-		desktopAliasByDefault: false
+		desktopAliasByDefault: false,
+		visibility: 'free'
 	},
 	{
 		id: 'stickies',
@@ -102,18 +86,8 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: '▤',
 		defaultInstalled: true,
 		removable: true,
-		desktopAliasByDefault: true
-	},
-	{
-		id: 'recorder',
-		name: 'Camera',
-		fileName: 'Camera.app',
-		category: 'utilities',
-		description: 'Record short webcam clips',
-		icon: 'REC',
-		defaultInstalled: true,
-		removable: true,
-		desktopAliasByDefault: true
+		desktopAliasByDefault: true,
+		visibility: 'free'
 	},
 	{
 		id: 'stats',
@@ -124,7 +98,8 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: '≡',
 		defaultInstalled: true,
 		removable: true,
-		desktopAliasByDefault: true
+		desktopAliasByDefault: true,
+		visibility: 'free'
 	},
 	{
 		id: 'error',
@@ -135,7 +110,46 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		icon: '⚠',
 		defaultInstalled: true,
 		removable: true,
-		desktopAliasByDefault: true
+		desktopAliasByDefault: true,
+		visibility: 'free'
+	},
+
+	// --- Store apps (must be bought at Computer Store) ---
+	{
+		id: 'tvguide',
+		name: 'TV Guide',
+		fileName: 'TV Guide.app',
+		category: 'entertainment',
+		description: 'Channel guide and schedule',
+		icon: 'TV',
+		defaultInstalled: true,
+		removable: true,
+		desktopAliasByDefault: true,
+		visibility: 'store'
+	},
+	{
+		id: 'chatrbot',
+		name: 'chatrbot',
+		fileName: 'chatrbot.app',
+		category: 'entertainment',
+		description: 'Chat with TV characters',
+		icon: 'cb',
+		defaultInstalled: true,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'recorder',
+		name: 'Camera',
+		fileName: 'Camera.app',
+		category: 'utilities',
+		description: 'Record short webcam clips',
+		icon: 'REC',
+		defaultInstalled: true,
+		removable: true,
+		desktopAliasByDefault: true,
+		visibility: 'store'
 	}
 ];
 
@@ -149,4 +163,16 @@ export function getDefaultInstalledApps(): TerminalAppDefinition[] {
 
 export function getDesktopAliasApps(): TerminalAppDefinition[] {
 	return APP_LIBRARY.filter((a) => a.desktopAliasByDefault);
+}
+
+export function getFreeApps(): TerminalAppDefinition[] {
+	return APP_LIBRARY.filter((a) => a.visibility === 'free');
+}
+
+export function getStoreApps(): TerminalAppDefinition[] {
+	return APP_LIBRARY.filter((a) => a.visibility === 'store');
+}
+
+export function getFreeAppIds(): AppId[] {
+	return getFreeApps().map((a) => a.id);
 }
