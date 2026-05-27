@@ -4,6 +4,7 @@ import { TerminalFS } from '$lib/terminalos';
 // Mock persistence so nothing touches localStorage
 vi.mock('$lib/persistence', () => ({
 	loadWindows: () => [],
+	saveWindows: vi.fn(),
 	loadTweaks: () => ({
 		wallpaper: 'teal',
 		accent: '#f54e00',
@@ -14,6 +15,8 @@ vi.mock('$lib/persistence', () => ({
 	saveTweaks: vi.fn(),
 	loadTimezone: () => null,
 	saveTimezone: vi.fn(),
+	loadConversations: () => ({}),
+	saveConversations: vi.fn(),
 	isFirstVisit: () => false,
 	clearAllPreferences: vi.fn()
 }));
@@ -252,6 +255,25 @@ describe('system actions', () => {
 		expect(spy).toHaveBeenCalledOnce();
 	});
 
+	it('exportBackup collects preferences and passes them to fs', async () => {
+		const { os, fs } = createOs();
+		const spy = vi.spyOn(fs, 'exportBackup');
+
+		vi.useFakeTimers();
+		os.exportBackup();
+		await vi.advanceTimersByTimeAsync(2000);
+		vi.useRealTimers();
+
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				tweaks: expect.objectContaining({ wallpaper: 'teal' }),
+				conversations: expect.any(Object),
+				timezone: null,
+				windows: expect.any(Array)
+			})
+		);
+	});
+
 	it('exportBackup shows a progress alert then a completion alert', async () => {
 		vi.useFakeTimers();
 		const { os, fs } = createOs();
@@ -261,7 +283,7 @@ describe('system actions', () => {
 			ok: true as const,
 			value: {
 				format: 'terminal-hd' as const,
-				version: 1 as const,
+				version: 2 as const,
 				exportedAt: new Date().toISOString(),
 				disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
 				nodes: [],

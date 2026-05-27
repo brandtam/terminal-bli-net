@@ -10,6 +10,8 @@ import {
 	saveTweaks,
 	loadTimezone,
 	saveTimezone,
+	loadConversations,
+	saveConversations,
 	isFirstVisit,
 	clearAllPreferences
 } from '$lib/persistence';
@@ -526,7 +528,14 @@ export class OsApiClass implements OsApi {
 
 		const wait = new Promise((r) => setTimeout(r, PROGRESS_MS));
 
-		Promise.all([this.fs.exportBackup(), wait]).then(([result]) => {
+		const preferences = {
+			tweaks: loadTweaks(),
+			conversations: loadConversations(),
+			timezone: loadTimezone(),
+			windows: loadWindows()
+		};
+
+		Promise.all([this.fs.exportBackup(preferences), wait]).then(([result]) => {
 			if (!result.ok) {
 				this.showAlert({
 					title: 'Backup Failed',
@@ -589,9 +598,10 @@ export class OsApiClass implements OsApi {
 						return;
 					}
 					const p = preview.value;
+					const prefsNote = p.hasPreferences ? '\nIncludes preferences and chat history' : '';
 					this.showAlert({
 						title: 'Restore Terminal HD?',
-						body: `This will replace your current disk with:\n${p.diskName} — exported ${new Date(p.exportedAt).toLocaleDateString()}\n${p.fileCount} files, ${p.folderCount} folders, ${p.appCount} apps`,
+						body: `This will replace your current disk with:\n${p.diskName} — exported ${new Date(p.exportedAt).toLocaleDateString()}\n${p.fileCount} files, ${p.folderCount} folders, ${p.appCount} apps${prefsNote}`,
 						buttons: [
 							{ label: 'Cancel' },
 							{
@@ -599,8 +609,16 @@ export class OsApiClass implements OsApi {
 								primary: true,
 								action: () => {
 									this.fs.restoreBackup(data).then((r) => {
-										if (r.ok) window.location.reload();
-										else
+										if (r.ok) {
+											const prefs = r.value.preferences;
+											if (prefs) {
+												if (prefs.tweaks) saveTweaks(prefs.tweaks);
+												if (prefs.timezone) saveTimezone(prefs.timezone);
+												if (prefs.conversations) saveConversations(prefs.conversations);
+												if (prefs.windows) saveWindows(prefs.windows);
+											}
+											window.location.reload();
+										} else
 											this.showAlert({
 												title: 'Restore Failed',
 												body: r.error.message,
