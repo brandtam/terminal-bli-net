@@ -2,14 +2,20 @@
 	import { APP_BY_ID } from './store-data';
 
 	let {
-		items,
+		purchases = [],
+		returns = [],
 		onclose,
 		onleave
 	}: {
-		items: string[];
+		purchases?: string[];
+		returns?: string[];
 		onclose: () => void;
 		onleave: () => void;
 	} = $props();
+
+	const isReturn = $derived(returns.length > 0 && purchases.length === 0);
+	const hasReturns = $derived(returns.length > 0);
+	const hasPurchases = $derived(purchases.length > 0);
 
 	function onkeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onclose();
@@ -24,7 +30,7 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="receipt" onclick={(e) => e.stopPropagation()}>
-		<div class="receipt-header">★ THANK YOU ★</div>
+		<div class="receipt-header">{isReturn ? '★ RETURN ★' : '★ THANK YOU ★'}</div>
 
 		<div class="receipt-body">
 			<div class="shop-name">
@@ -32,12 +38,22 @@
 				<div class="separator">─── ─── ─── ─── ───</div>
 			</div>
 
-			{#each items as id (id)}
-				<div class="line-item">
-					<span>{APP_BY_ID[id]?.title ?? id}</span>
-					<span>$0.00</span>
-				</div>
-			{/each}
+			{#if hasReturns}
+				{#each returns as id (id)}
+					<div class="line-item return">
+						<span>RETURN {APP_BY_ID[id]?.title ?? id}</span>
+						<span>-$0.00</span>
+					</div>
+				{/each}
+			{/if}
+			{#if hasPurchases}
+				{#each purchases as id (id)}
+					<div class="line-item">
+						<span>{APP_BY_ID[id]?.title ?? id}</span>
+						<span>$0.00</span>
+					</div>
+				{/each}
+			{/if}
 
 			<div class="total-row">
 				<span>TOTAL</span>
@@ -45,9 +61,14 @@
 			</div>
 
 			<div class="footer-text">
-				{items.length} item{items.length === 1 ? '' : 's'} on your shelf now.<br />
-				looks like you're developing quite a little software library.<br />
-				have fun.
+				{#if isReturn}
+					item returned to the shelf.<br />
+					no hard feelings.
+				{:else}
+					{purchases.length} item{purchases.length === 1 ? '' : 's'} on your shelf now.<br />
+					looks like you're developing quite a little software library.<br />
+					have fun.
+				{/if}
 			</div>
 		</div>
 
@@ -115,6 +136,10 @@
 	.line-item {
 		display: flex;
 		justify-content: space-between;
+	}
+	.line-item.return {
+		opacity: 0.65;
+		text-decoration: line-through;
 	}
 
 	.total-row {

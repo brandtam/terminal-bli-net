@@ -15,7 +15,7 @@
 	let view = $state<string>('aisle');
 	let cart = $state<string[]>([]);
 	let pickedUp = $state<StoreApp | null>(null);
-	let receipt = $state<{ items: string[] } | null>(null);
+	let receipt = $state<{ purchases: string[]; returns: string[] } | null>(null);
 	let tweaksOpen = $state(false);
 	let shelfT = $state({
 		games: { scale: 1.0, tilt: 20, x: 12, y: 110 },
@@ -62,7 +62,7 @@
 			}
 		}
 		ownedVersion++;
-		receipt = { items: [...cart] };
+		receipt = { purchases: [...cart], returns: [] };
 		cart = [];
 		view = 'aisle';
 	}
@@ -79,6 +79,8 @@
 		}
 		ownedVersion++;
 		pickedUp = null;
+		view = 'counter';
+		receipt = { purchases: [], returns: [id] };
 	}
 </script>
 
@@ -150,7 +152,8 @@
 		{/if}
 		{#if receipt}
 			<ReceiptOverlay
-				items={receipt.items}
+				purchases={receipt.purchases}
+				returns={receipt.returns}
 				onclose={() => {
 					receipt = null;
 				}}
