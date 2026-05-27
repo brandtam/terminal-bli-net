@@ -545,7 +545,7 @@ export class OsApiClass implements OsApi {
 				return;
 			}
 			const json = JSON.stringify(result.value, null, 2);
-			const blob = new Blob([json], { type: 'application/json' });
+			const blob = new Blob([json], { type: 'application/octet-stream' });
 			const filename = `terminal-hd-${new Date().toISOString().slice(0, 10)}.terminal-hd`;
 			this.showAlert({
 				title: 'Backup Complete',
