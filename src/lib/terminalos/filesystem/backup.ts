@@ -30,47 +30,45 @@ export type BackupPreferences = {
 	windows?: WindowState[];
 };
 
-const backupPreferencesSchema = z
-	.object({
-		tweaks: z
-			.object({
-				wallpaper: z.string(),
-				accent: z.string(),
-				tvGridLoop: z.number(),
-				marqueeLoop: z.number(),
-				tvPauseOnHover: z.boolean()
+const backupPreferencesSchema = z.object({
+	tweaks: z
+		.object({
+			wallpaper: z.string(),
+			accent: z.string(),
+			tvGridLoop: z.number(),
+			marqueeLoop: z.number(),
+			tvPauseOnHover: z.boolean()
+		})
+		.optional(),
+	conversations: z
+		.record(
+			z.object({
+				botId: z.string(),
+				group: z.string(),
+				messages: z.array(
+					z.object({
+						role: z.enum(['user', 'assistant']),
+						content: z.string()
+					})
+				),
+				updatedAt: z.number()
 			})
-			.optional(),
-		conversations: z
-			.record(
-				z.object({
-					botId: z.string(),
-					group: z.string(),
-					messages: z.array(
-						z.object({
-							role: z.enum(['user', 'assistant']),
-							content: z.string()
-						})
-					),
-					updatedAt: z.number()
-				})
-			)
-			.optional(),
-		timezone: z.string().nullable().optional(),
-		windows: z
-			.array(
-				z.object({
-					id: z.string(),
-					x: z.number(),
-					y: z.number(),
-					w: z.number(),
-					h: z.number(),
-					z: z.number()
-				})
-			)
-			.optional()
-	})
-	.optional();
+		)
+		.optional(),
+	timezone: z.string().nullable().optional(),
+	windows: z
+		.array(
+			z.object({
+				id: z.string(),
+				x: z.number(),
+				y: z.number(),
+				w: z.number(),
+				h: z.number(),
+				z: z.number()
+			})
+		)
+		.optional()
+});
 
 // --- Backup format ---
 
@@ -142,7 +140,7 @@ const backupSchemaV2 = z.object({
 	}),
 	nodes: z.array(fsNodeSchema),
 	bodies: z.record(z.string()),
-	preferences: backupPreferencesSchema
+	preferences: backupPreferencesSchema.optional()
 });
 
 const backupSchema = z.discriminatedUnion('version', [backupSchemaV1, backupSchemaV2]);
@@ -214,7 +212,7 @@ export function previewBackup(backup: BackupFile): BackupPreview {
 	const hasPreferences =
 		backup.version === 2 &&
 		backup.preferences != null &&
-		Object.keys(backup.preferences).length > 0;
+		Object.values(backup.preferences).some((v) => v != null);
 
 	return {
 		diskName: backup.disk.name,
