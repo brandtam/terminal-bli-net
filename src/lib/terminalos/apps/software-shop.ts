@@ -9,7 +9,13 @@ export type ShopItem = {
 };
 
 /** Apps that don't appear in the shop — they're the shell/system, not installable. */
-const HIDDEN_FROM_SHOP = new Set<AppId>(['finder', 'trash', 'system-prefs', 'about-terminal']);
+const HIDDEN_FROM_SHOP = new Set<AppId>([
+	'finder',
+	'trash',
+	'system-prefs',
+	'about-terminal',
+	'computer-store'
+]);
 
 /**
  * Get the Software Shop catalog — all apps that should appear in the shop.

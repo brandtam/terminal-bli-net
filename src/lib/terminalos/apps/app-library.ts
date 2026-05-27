@@ -52,6 +52,18 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		visibility: 'system'
 	},
 	{
+		id: 'computer-store',
+		name: 'Computer Store',
+		fileName: 'Computer Store.app',
+		category: 'system',
+		description: 'Browse and buy software',
+		icon: '🏪',
+		defaultInstalled: true,
+		removable: false,
+		desktopAliasByDefault: false,
+		visibility: 'system'
+	},
+	{
 		id: 'trash',
 		name: 'Trash',
 		fileName: 'Trash',

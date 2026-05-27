@@ -473,23 +473,23 @@ export const APPS: Record<string, AppDef> = {
 
 	'software-shop': {
 		id: 'software-shop',
-		name: 'Software Shop',
-		filename: 'Software Shop.app',
+		name: 'My Shelf',
+		filename: 'My Shelf.app',
 		about: {
-			title: 'Software Shop',
+			title: 'My Shelf',
 			version: 'v1.0',
-			tagline: 'install and remove apps from your Terminal',
-			glyph: '💾',
+			tagline: 'your owned apps',
+			glyph: '📚',
 			glyphBg: 'var(--accent)',
 			glyphFg: 'var(--paper)',
 			sections: [
 				{
 					h: 'WHAT IT IS',
-					body: "The place to install and remove apps on your Terminal desktop. Core OS tools are protected — you can't strand yourself. Everything else is removable and restorable."
+					body: 'Your library of owned software. Apps you buy at the Computer Store appear here. Install or uninstall them to your desktop from this shelf.'
 				},
 				{
 					h: 'HOW IT WORKS',
-					body: 'Click "Install from Floppy" to add an app. Click "Uninstall" to remove one. Uninstalling an app never deletes your documents — just the app itself. You can always reinstall from here.'
+					body: 'Click "Install" to put an app on your desktop. Click "Uninstall" to remove it (it stays on your shelf). Visit the Computer Store to find new software.'
 				}
 			]
 		},
@@ -504,8 +504,50 @@ export const APPS: Record<string, AppDef> = {
 				items: [
 					{
 						type: 'action',
-						label: 'About Software Shop',
+						label: 'About My Shelf',
 						action: () => os.openAbout('software-shop')
+					}
+				]
+			}
+		],
+		statusExtra: () => null
+	},
+
+	'computer-store': {
+		id: 'computer-store',
+		name: 'Computer Store',
+		filename: 'Computer Store.app',
+		about: {
+			title: 'Computer Store',
+			version: 'v1.0',
+			tagline: 'the 8-bit shopping experience',
+			glyph: '🏪',
+			glyphBg: '#f5b34f',
+			glyphFg: '#0a0a0a',
+			sections: [
+				{
+					h: 'WHAT IT IS',
+					body: 'A software store. Walk in, browse the aisles, pick up a box, read the back, drop it in your cart, and check out at the counter. Everything costs $0.00. The store metaphor is the whole point.'
+				},
+				{
+					h: 'HOW IT WORKS',
+					body: 'Click an aisle to step closer. Click a software box to pick it up. Add it to your cart. Head to the counter and ring up. Purchased apps appear on My Shelf, ready to install.'
+				}
+			]
+		},
+		preferences: null,
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }]
+			},
+			{
+				label: 'Help',
+				items: [
+					{
+						type: 'action',
+						label: 'About Computer Store',
+						action: () => os.openAbout('computer-store')
 					}
 				]
 			}

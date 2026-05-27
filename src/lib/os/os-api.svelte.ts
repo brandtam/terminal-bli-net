@@ -69,7 +69,9 @@ export class OsApiClass implements OsApi {
 		'trash',
 		'recorder',
 		'finder',
-		'software-shop'
+		'software-shop',
+		'computer-store',
+		'about-computer-store'
 	]);
 
 	constructor(fs: TerminalFS) {
@@ -271,8 +273,10 @@ export class OsApiClass implements OsApi {
 			trash: { title: 'Trash', w: 380, h: 320 },
 			recorder: { title: 'Camera.app', w: 360, h: 480 },
 			'about-recorder': { title: 'About Recorder', w: 420, h: 360 },
-			'software-shop': { title: 'Software Shop', w: 420, h: 520 },
-			'about-software-shop': { title: 'About Software Shop', w: 420, h: 380 },
+			'software-shop': { title: 'My Shelf', w: 420, h: 520 },
+			'about-software-shop': { title: 'About My Shelf', w: 420, h: 380 },
+			'computer-store': { title: 'Computer Store', w: 740, h: 620 },
+			'about-computer-store': { title: 'About Computer Store', w: 420, h: 380 },
 			finder: { title: 'Terminal HD', w: 480, h: 420 }
 		};
 
