@@ -154,6 +154,10 @@
 				onclose={() => {
 					receipt = null;
 				}}
+				onleave={() => {
+					receipt = null;
+					os.closeWindow('computer-store');
+				}}
 			/>
 		{/if}
 	</div>

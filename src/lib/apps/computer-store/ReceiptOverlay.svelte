@@ -3,10 +3,12 @@
 
 	let {
 		items,
-		onclose
+		onclose,
+		onleave
 	}: {
 		items: string[];
 		onclose: () => void;
+		onleave: () => void;
 	} = $props();
 
 	function onkeydown(e: KeyboardEvent) {
@@ -49,7 +51,10 @@
 			</div>
 		</div>
 
-		<button class="leave-btn" onclick={onclose}>▸ LEAVE THE STORE</button>
+		<div class="btn-row">
+			<button class="browse-btn" onclick={onclose}>◂ KEEP BROWSING</button>
+			<button class="leave-btn" onclick={onleave}>▸ LEAVE THE STORE</button>
+		</div>
 	</div>
 </div>
 
@@ -128,15 +133,29 @@
 		opacity: 0.75;
 	}
 
+	.btn-row {
+		display: flex;
+		border-top: 2px solid #0a0a0a;
+	}
+	.browse-btn {
+		flex: 1;
+		background: #ffffff;
+		color: #0a0a0a;
+		border: none;
+		border-right: 2px solid #0a0a0a;
+		padding: 10px 0;
+		font-family: 'Press Start 2P', monospace;
+		font-size: 9px;
+		cursor: pointer;
+	}
 	.leave-btn {
-		width: 100%;
+		flex: 1;
 		background: #f54e00;
 		color: #ffffff;
 		border: none;
-		border-top: 2px solid #0a0a0a;
 		padding: 10px 0;
 		font-family: 'Press Start 2P', monospace;
-		font-size: 10px;
+		font-size: 9px;
 		cursor: pointer;
 	}
 </style>
