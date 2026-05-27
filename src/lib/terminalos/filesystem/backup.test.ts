@@ -157,6 +157,21 @@ describe('validateBackup', () => {
 		expect(result.ok).toBe(true);
 	});
 
+	it('rejects v2 backup with malformed preferences', () => {
+		const result = validateBackup({
+			format: 'terminal-hd',
+			version: 2,
+			exportedAt: '2025-01-01T00:00:00.000Z',
+			disk: { id: 'v', name: 'V' },
+			nodes: [],
+			bodies: {},
+			preferences: {
+				tweaks: { wallpaper: 123 }
+			}
+		});
+		expect(result.ok).toBe(false);
+	});
+
 	it('rejects version 3 (future)', () => {
 		const result = validateBackup({
 			format: 'terminal-hd',
@@ -363,6 +378,24 @@ describe('restoreBackup', () => {
 		if (result.ok) {
 			expect(result.value.preferences).toBeUndefined();
 		}
+	});
+
+	it('restoring v1 backup does not clear existing ownedApps', async () => {
+		const target = TerminalFS.createCleanDisk();
+		await target.buyApp('tvguide');
+
+		const source = TerminalFS.createCleanDisk();
+		const v1Backup = {
+			format: 'terminal-hd' as const,
+			version: 1 as const,
+			exportedAt: new Date().toISOString(),
+			disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
+			nodes: Array.from(source.getAllNodes().values()).filter((n) => !n.flags?.hidden),
+			bodies: {} as Record<string, string>
+		};
+
+		await target.restoreBackup(v1Backup);
+		expect(target.getVolume().ownedApps).toContain('tvguide');
 	});
 
 	it('restoring v2 backup with missing preferences uses undefined', async () => {
