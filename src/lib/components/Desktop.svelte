@@ -43,6 +43,7 @@
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import SoftwareShopWindow from '$lib/apps/software-shop/SoftwareShopWindow.svelte';
 	import ComputerStoreWindow from '$lib/apps/computer-store/ComputerStoreWindow.svelte';
+	import VCRWindow from '$lib/apps/vcr/VCRWindow.svelte';
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
@@ -463,6 +464,8 @@
 					z={w.z}
 					active={os.activeId === w.id}
 					chromeless={w.id.startsWith('sticky-')}
+					minW={def.minW}
+					minH={def.minH}
 					onfocus={(id) => os.focusWindow(id)}
 					onclose={(id) => os.closeWindow(id)}
 					onmove={(id, x, y) => os.moveWindow(id, x, y)}
@@ -534,6 +537,8 @@
 						<ErrorDialog onclose={() => os.closeWindow('error')} />
 					{:else if w.id === 'trash'}
 						<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
+					{:else if w.id === 'vcr'}
+						<VCRWindow />
 					{:else if w.id === 'recorder'}
 						<RecorderWindow bind:recording={cameraRecording} fs={terminalFs} />
 					{:else if w.id.startsWith('recorder-')}

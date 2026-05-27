@@ -151,6 +151,18 @@ export const APPS: StoreApp[] = [
 		back: 'Shows numbers about your Terminal usage. None of the numbers are real. The bar chart is for vibes. "Messages sent today: 14,209." No there weren\'t.',
 		inside: ['Three charts', 'One leaderboard', 'Honesty (none)'],
 		reqs: 'Terminal OS 1.0'
+	},
+	{
+		id: 'vcr',
+		cat: 'ENT',
+		title: 'VCR',
+		pub: 'ARCHIVE LABS',
+		tagline: 'Be kind, rewind.',
+		icon: 'vcr',
+		sticker: 'NEW',
+		back: 'A video cassette recorder for your desktop. Loads tapes from the Internet Archive — full episodes of The Computer Chronicles, BBS: The Documentary, and other relics of early computing. Hit play. Watch Stewart Cheifet explain the World Wide Web in 1996.',
+		inside: ['Four show collections', 'Internet Archive streaming', 'CRT display mode'],
+		reqs: 'Terminal OS 1.0 · Internet'
 	}
 ];
 
@@ -182,7 +194,7 @@ export const CATEGORIES: Record<string, StoreCategory> = {
 		label: 'ENTERTAINMENT',
 		color: '#c92127',
 		tagline: 'TV · Chat · Multimedia',
-		appIds: ['tvguide', 'chatrbot', 'recorder', 'stats']
+		appIds: ['tvguide', 'chatrbot', 'recorder', 'stats', 'vcr']
 	}
 };
 

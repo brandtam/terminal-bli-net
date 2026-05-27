@@ -549,6 +549,58 @@ export const APPS: Record<string, AppDef> = {
 		statusExtra: () => null
 	},
 
+	vcr: {
+		id: 'vcr',
+		name: 'VCR',
+		filename: 'VCR.app',
+		about: {
+			title: 'VCR',
+			version: 'v1.0',
+			tagline: 'be kind, rewind',
+			glyph: '📼',
+			glyphBg: '#1a1a1a',
+			glyphFg: '#3f3',
+			sections: [
+				{
+					h: 'WHAT IT IS',
+					body: 'A video cassette recorder for your desktop. Loads tapes from the Internet Archive — full episodes of retro computing shows, streamed directly to your CRT.'
+				},
+				{
+					h: 'THE LIBRARY',
+					body: 'The Computer Chronicles (1983–2002), BBS: The Documentary, The Computer Programme, the 1972 ARPANET documentary, and Net Cafe. More tapes being added.'
+				},
+				{
+					h: 'HOW IT WORKS',
+					body: 'Pick a show from the tape library. Pick an episode. Hit play. The video streams from archive.org. No account needed, no ads, no fees.'
+				},
+				{
+					h: 'CREDITS',
+					body: 'The Internet Archive, for preserving everything. Stewart Cheifet, for 20 years of Computer Chronicles. Jason Scott, for the BBS Documentary. The BBC, for The Computer Programme.'
+				}
+			]
+		},
+		preferences: null,
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [
+					{
+						type: 'action',
+						label: 'New VCR Window',
+						shortcut: '⌘N',
+						action: () => os.openWindow('vcr')
+					},
+					{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }
+				]
+			},
+			{
+				label: 'Help',
+				items: [{ type: 'action', label: 'About VCR', action: () => os.openAbout('vcr') }]
+			}
+		],
+		statusExtra: () => null
+	},
+
 	textedit: {
 		id: 'textedit',
 		name: 'TextEdit',

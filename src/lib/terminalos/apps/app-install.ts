@@ -17,7 +17,8 @@ export function getAppWindowId(appId: AppId): string | undefined {
 		'about-terminal': 'about',
 		'software-shop': 'software-shop',
 		'computer-store': 'computer-store',
-		finder: 'finder'
+		finder: 'finder',
+		vcr: 'vcr'
 	};
 	return map[appId];
 }
@@ -38,7 +39,8 @@ export function getAppIconKind(appId: AppId): string {
 		chatrbot: 'doc',
 		'software-shop': 'floppy',
 		'computer-store': 'floppy',
-		finder: 'hd'
+		finder: 'hd',
+		vcr: 'tv'
 	};
 	return map[appId] ?? 'doc';
 }

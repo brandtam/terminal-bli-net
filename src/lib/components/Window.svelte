@@ -13,6 +13,8 @@
 		resizable = true,
 		chromeless = false,
 		className = '',
+		minW = 260,
+		minH = 140,
 		onfocus,
 		onclose,
 		onmove,
@@ -30,6 +32,8 @@
 		resizable?: boolean;
 		chromeless?: boolean;
 		className?: string;
+		minW?: number;
+		minH?: number;
 		onfocus: (id: string) => void;
 		onclose: (id: string) => void;
 		onmove: (id: string, x: number, y: number) => void;
@@ -37,8 +41,8 @@
 		children: Snippet;
 	} = $props();
 
-	const MIN_W = 260;
-	const MIN_H = 140;
+	const MIN_W = minW;
+	const MIN_H = minH;
 
 	let dragState: { startX: number; startY: number; origX: number; origY: number } | null = null;
 	let resizeSEState: { startX: number; startY: number; origW: number; origH: number } | null = null;
@@ -179,7 +183,9 @@
 					aria-label="close"
 				></button>
 			</div>
-			<div class="title">{title}</div>
+			<div class="title">
+				{title} <span class="dims">{Math.round(width)}×{Math.round(height)}</span>
+			</div>
 			<div class="btns right">
 				{#if resizable}
 					<div
@@ -311,6 +317,12 @@
 		white-space: nowrap;
 		line-height: 1;
 		color: var(--chrome-titlebar-fg, var(--ink));
+	}
+
+	.dims {
+		font-size: 10px;
+		font-weight: 400;
+		opacity: 0.6;
 	}
 
 	.window-btn {
