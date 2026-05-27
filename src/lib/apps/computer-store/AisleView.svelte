@@ -3,23 +3,34 @@
 	import BackWallHTML from './BackWallHTML.svelte';
 	import CounterScene from './CounterScene.svelte';
 	import Hotspot from './Hotspot.svelte';
+	import ShelfTweaksPanel from './ShelfTweaksPanel.svelte';
 	import { CATEGORIES, shelfLineup } from './store-data';
 
-	let { onenter }: { onenter: (view: string) => void } = $props();
+	let {
+		onenter,
+		shelfT,
+		tweaksOpen = false,
+		onopentweaks,
+		onclosetweaks,
+		onupdatetweaks
+	}: {
+		onenter: (view: string) => void;
+		shelfT: Record<string, { scale: number; tilt: number; x: number; y: number }>;
+		tweaksOpen?: boolean;
+		onopentweaks?: () => void;
+		onclosetweaks?: () => void;
+		onupdatetweaks?: (
+			id: string,
+			patch: Partial<{ scale: number; tilt: number; x: number; y: number }>
+		) => void;
+	} = $props();
 
 	let hot = $state<string | null>(null);
 
-	const shelfT = {
-		games: { scale: 1.0, tilt: 20, x: 12, y: 110 },
-		ent: { scale: 1.0, tilt: -22, x: 0, y: 80 },
-		business: { scale: 1.0, tilt: 0, x: 186, y: 97 },
-		counter: { scale: 1.0, tilt: 0, x: 380, y: 56 }
-	};
-
-	const G = shelfT.games;
-	const E = shelfT.ent;
-	const B = shelfT.business;
-	const C = shelfT.counter;
+	const G = $derived(shelfT.games);
+	const E = $derived(shelfT.ent);
+	const B = $derived(shelfT.business);
+	const C = $derived(shelfT.counter);
 
 	const ceilPerspXs = [40, 120, 200, 280, 360, 440, 520, 600, 680];
 	const floorPerspXs = [40, 120, 200, 280, 360, 440, 520, 600, 680];
@@ -493,6 +504,16 @@
 
 	<!-- Idle hint -->
 	<div class="idle-hint">click an aisle · step closer</div>
+
+	{#if onopentweaks && onclosetweaks && onupdatetweaks}
+		<ShelfTweaksPanel
+			open={tweaksOpen}
+			onopen={onopentweaks}
+			onclose={onclosetweaks}
+			tweaks={shelfT}
+			onupdate={onupdatetweaks}
+		/>
+	{/if}
 </div>
 
 <style>
