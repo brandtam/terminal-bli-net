@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type TerminalFS, getAppDef } from '$lib/terminalos';
+	import type { TerminalFS } from '$lib/terminalos';
 	import type { OsApi } from '$lib/os/os-api';
 	import TopBar from './TopBar.svelte';
 	import AisleView from './AisleView.svelte';
@@ -49,7 +49,6 @@
 		if (cart.length === 0) return;
 		for (const id of cart) {
 			if (!fs.isAppOwned(id)) {
-				if (!getAppDef(id)) continue;
 				const result = await fs.buyApp(id);
 				if (!result.ok) {
 					os.alert({

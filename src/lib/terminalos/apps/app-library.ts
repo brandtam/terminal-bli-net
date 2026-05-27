@@ -162,6 +162,80 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		removable: true,
 		desktopAliasByDefault: true,
 		visibility: 'store'
+	},
+
+	// --- Store apps (not yet installable — decorative boxes in Computer Store) ---
+	{
+		id: 'tetra',
+		name: 'Tetra',
+		fileName: 'Tetra.app',
+		category: 'entertainment',
+		description: 'Falling block puzzle',
+		icon: '▦',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'solitaire',
+		name: 'Solitaire',
+		fileName: 'Solitaire.app',
+		category: 'entertainment',
+		description: 'Card game',
+		icon: '♠',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'minesweep',
+		name: 'Minesweep',
+		fileName: 'Minesweep.app',
+		category: 'entertainment',
+		description: 'Grid puzzle with bombs',
+		icon: '💣',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'zorquest',
+		name: 'ZorQuest',
+		fileName: 'ZorQuest.app',
+		category: 'entertainment',
+		description: 'Text adventure',
+		icon: '📜',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'calc',
+		name: 'Calc.app',
+		fileName: 'Calc.app',
+		category: 'productivity',
+		description: 'Calculator',
+		icon: '🧮',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
+	},
+	{
+		id: 'paint',
+		name: 'Pixel Paint',
+		fileName: 'Pixel Paint.app',
+		category: 'productivity',
+		description: 'Bitmap painting',
+		icon: '🖌',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: false,
+		visibility: 'store'
 	}
 ];
 

@@ -20,6 +20,12 @@
 
 	load();
 
+	let unwatch: (() => void) | undefined;
+	$effect(() => {
+		unwatch = fs.watch(() => load());
+		return () => unwatch?.();
+	});
+
 	async function install(appId: string) {
 		busy = appId;
 		const PROGRESS_MS = 2000;
