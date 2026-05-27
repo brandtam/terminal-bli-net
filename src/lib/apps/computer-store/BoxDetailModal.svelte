@@ -46,8 +46,10 @@
 	<div class="modal" onclick={(e) => e.stopPropagation()}>
 		<!-- header -->
 		<div class="header">
-			<span>◂ YOU PICKED IT UP</span>
-			<button class="close-btn" onclick={onclose}>× PUT BACK</button>
+			<span>{owned || inCart ? '◂ DETAILS' : '◂ YOU PICKED IT UP'}</span>
+			<button class="close-btn" onclick={onclose}
+				>{owned || inCart ? '× CLOSE' : '× PUT BACK'}</button
+			>
 		</div>
 
 		<!-- body -->
@@ -80,11 +82,11 @@
 			{#if owned}
 				<div class="chip chip-owned">● ALREADY OWNED</div>
 				<button class="btn btn-warn" onclick={onreturn}>RETURN TO STORE</button>
-				<button class="btn btn-plain ml-auto" onclick={onclose}>◂ PUT BACK</button>
+				<button class="btn btn-plain ml-auto" onclick={onclose}>× CLOSE</button>
 			{:else if inCart}
 				<div class="chip chip-cart">● IN YOUR CART</div>
 				<button class="btn btn-warn" onclick={onremovefromcart}>TAKE OUT OF CART</button>
-				<button class="btn btn-plain ml-auto" onclick={onclose}>◂ PUT BACK</button>
+				<button class="btn btn-plain ml-auto" onclick={onclose}>× CLOSE</button>
 			{:else}
 				<button class="btn btn-primary" onclick={onaddtocart}>▸ ADD TO CART</button>
 				<button class="btn btn-plain ml-auto" onclick={onclose}>◂ PUT BACK ON SHELF</button>

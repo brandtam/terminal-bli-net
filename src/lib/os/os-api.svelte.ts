@@ -72,7 +72,9 @@ export class OsApiClass implements OsApi {
 		'finder',
 		'software-shop',
 		'computer-store',
-		'about-computer-store'
+		'about-computer-store',
+		'vcr',
+		'about-vcr'
 	]);
 
 	constructor(fs: TerminalFS) {
@@ -291,8 +293,11 @@ export class OsApiClass implements OsApi {
 
 	// ── Window definition lookup ──────────────────────────────────────────
 
-	getWindowDef(id: string): { title: string; w: number; h: number } {
-		const defs: Record<string, { title: string; w: number; h: number }> = {
+	getWindowDef(id: string): { title: string; w: number; h: number; minW?: number; minH?: number } {
+		const defs: Record<
+			string,
+			{ title: string; w: number; h: number; minW?: number; minH?: number }
+		> = {
 			welcome: { title: 'Welcome.app', w: 460, h: 540 },
 			'tv-guide': { title: 'TV Guide.app', w: 660, h: 700 },
 			'terminal-prefs': { title: 'System Preferences', w: 380, h: 360 },
@@ -313,7 +318,9 @@ export class OsApiClass implements OsApi {
 			'about-software-shop': { title: 'About My Shelf', w: 420, h: 380 },
 			'computer-store': { title: 'Computer Store', w: 740, h: 620 },
 			'about-computer-store': { title: 'About Computer Store', w: 420, h: 380 },
-			finder: { title: 'Terminal HD', w: 480, h: 420 }
+			finder: { title: 'Terminal HD', w: 480, h: 420 },
+			vcr: { title: 'VCR.app', w: 560, h: 523, minW: 480, minH: 470 },
+			'about-vcr': { title: 'About VCR', w: 420, h: 460 }
 		};
 
 		if (id.startsWith('chat-')) {

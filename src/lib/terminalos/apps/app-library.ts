@@ -234,6 +234,18 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		removable: true,
 		desktopAliasByDefault: false,
 		visibility: 'store'
+	},
+	{
+		id: 'vcr',
+		name: 'VCR',
+		fileName: 'VCR.app',
+		category: 'entertainment',
+		description: 'Retro video player',
+		icon: '📼',
+		defaultInstalled: false,
+		removable: true,
+		desktopAliasByDefault: true,
+		visibility: 'store'
 	}
 ];
 

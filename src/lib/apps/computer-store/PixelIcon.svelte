@@ -138,6 +138,22 @@
 			<rect x="3" y="7" width="2" height="2" fill="#f54e00" stroke="#0a0a0a" />
 			<rect x="6" y="3" width="1" height="2" fill="#0a0a0a" />
 		</svg>
+	{:else if name === 'vcr'}
+		<svg viewBox="0 0 16 16" shape-rendering="crispEdges">
+			<!-- VCR cassette body -->
+			<rect x="2" y="4" width="12" height="9" fill="#1a1a1a" stroke="#0a0a0a" />
+			<!-- label -->
+			<rect x="3" y="5" width="10" height="3" fill="#f0d8a0" stroke="#0a0a0a" />
+			<rect x="4" y="6" width="6" height="1" fill="#5a3820" />
+			<!-- tape reels -->
+			<rect x="4" y="9" width="3" height="3" rx="1" fill="#333" stroke="#555" />
+			<rect x="9" y="9" width="3" height="3" rx="1" fill="#333" stroke="#555" />
+			<!-- reel centers -->
+			<rect x="5" y="10" width="1" height="1" fill="#fff" />
+			<rect x="10" y="10" width="1" height="1" fill="#fff" />
+			<!-- tape between reels -->
+			<rect x="7" y="11" width="2" height="1" fill="#5a2a0a" />
+		</svg>
 	{:else if name === 'chart'}
 		<svg viewBox="0 0 16 16" shape-rendering="crispEdges">
 			<rect x="2" y="3" width="1" height="11" fill="#0a0a0a" />
