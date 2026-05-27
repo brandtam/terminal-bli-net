@@ -572,7 +572,7 @@ export class OsApiClass implements OsApi {
 	restoreBackup(): void {
 		const input = document.createElement('input');
 		input.type = 'file';
-		input.accept = '.terminal-hd,.json';
+		input.accept = '.terminal-hd,.json,*/*';
 		input.onchange = () => {
 			const file = input.files?.[0];
 			if (!file) return;
