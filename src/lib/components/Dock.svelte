@@ -1,8 +1,12 @@
 <script lang="ts">
+	import type { InstalledApp } from '$lib/terminalos';
+
 	let {
+		installedApps = [],
 		onopen,
 		openIds = []
 	}: {
+		installedApps: InstalledApp[];
 		onopen: (id: string) => void;
 		openIds: string[];
 	} = $props();
@@ -11,16 +15,16 @@
 	let pos = $state<{ x: number; y: number } | null>(null);
 	let dragRef: { offX: number; offY: number } | null = null;
 
-	const items = [
+	const systemItems = [
 		{ id: 'welcome', icon: '★', tip: 'Welcome' },
-		{ id: 'tv-guide', icon: '▦', tip: 'TV Guide' },
-		{ id: 'chat', icon: '✎', tip: 'New Chat' },
-		{ id: 'pricing', icon: '$', tip: 'Pricing' },
-		{ id: 'stats', icon: '≡', tip: 'Stats' },
-		{ id: 'readme', icon: '?', tip: 'README' },
 		{ id: 'about', icon: 'i', tip: 'About' },
 		{ id: 'trash', icon: 'T', tip: 'Trash' }
 	];
+
+	const items = $derived([
+		...systemItems,
+		...installedApps.map((app) => ({ id: app.windowId, icon: app.icon, tip: app.name }))
+	]);
 
 	function onPointerDown(e: PointerEvent) {
 		if (

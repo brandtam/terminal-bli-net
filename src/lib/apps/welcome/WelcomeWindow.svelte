@@ -9,18 +9,19 @@
 		A retro desktop you visit in a browser. Drag windows. Open apps. Tweak things until they feel right.
 	</div>
 	<p class="tagline">
-		Terminal is a tiny operating system that runs in a tab. It's what the inside of a computer
-		looked like before screens got slick. Floppy icons, striped title bars, chunky borders, a clock
-		you can change.
+		Terminal is a tiny operating system that runs in a tab. Floppy icons, striped title bars, chunky
+		borders, a clock you can change. It's what computers looked like before screens got slick.
 	</p>
 	<p class="tagline">
-		Open <b>TV Guide.app</b> to see what's broadcasting. Open <b>README.txt</b> for the manual. Drag the
-		windows around. Resize them. Stack them. Lose one behind another and find it again in the dock. The
-		desktop is yours.
+		Start at the <b>Computer Store</b> — browse the aisles, pick up software boxes, and bring them
+		to the counter. Purchased apps land on <b>My Shelf</b>, where you install and uninstall them.
+	</p>
+	<p class="tagline">
+		Once you've got apps installed, the desktop is yours. Drag windows around, stack them, lose one
+		behind another and fish it out of the dock.
 	</p>
 	<div class="btn-row">
-		<button class="btn primary" onclick={() => onopen('tv-guide')}>OPEN TV GUIDE</button>
-		<button class="btn yellow" onclick={() => onopen('readme')}>READ THE MANUAL</button>
+		<button class="btn primary" onclick={() => onopen('computer-store')}>VISIT THE STORE</button>
 	</div>
 	<div class="logo-marquee">
 		<div class="logo-marquee-track">

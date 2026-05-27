@@ -26,6 +26,13 @@ function createOs() {
 	return { os, fs };
 }
 
+async function createOsWithApp(appId: string) {
+	const { os, fs } = createOs();
+	await fs.buyApp(appId);
+	await fs.installApp(appId);
+	return { os, fs };
+}
+
 // ── Window management ─────────────────────────────────────────────────────
 
 describe('window management', () => {
@@ -52,7 +59,7 @@ describe('window management', () => {
 	it('openWindow on existing window focuses it instead of duplicating', () => {
 		const { os } = createOs();
 		os.openWindow('finder');
-		os.openWindow('tv-guide');
+		os.openWindow('welcome');
 		os.openWindow('finder');
 
 		expect(os.windows).toHaveLength(2);
@@ -62,11 +69,11 @@ describe('window management', () => {
 	it('closeWindow removes the window', () => {
 		const { os } = createOs();
 		os.openWindow('finder');
-		os.openWindow('tv-guide');
+		os.openWindow('welcome');
 		os.closeWindow('finder');
 
 		expect(os.windows).toHaveLength(1);
-		expect(os.windows[0].id).toBe('tv-guide');
+		expect(os.windows[0].id).toBe('welcome');
 	});
 
 	it('closeWindow clears activeId when closing the active window', () => {
@@ -79,15 +86,15 @@ describe('window management', () => {
 	it('closeWindow does not clear activeId when closing a non-active window', () => {
 		const { os } = createOs();
 		os.openWindow('finder');
-		os.openWindow('tv-guide');
+		os.openWindow('welcome');
 		os.closeWindow('finder');
-		expect(os.activeId).toBe('tv-guide');
+		expect(os.activeId).toBe('welcome');
 	});
 
 	it('focusWindow sets activeId and increments z-order', () => {
 		const { os } = createOs();
 		os.openWindow('finder');
-		os.openWindow('tv-guide');
+		os.openWindow('welcome');
 		const zBefore = os.windows.find((w) => w.id === 'finder')!.z;
 		os.focusWindow('finder');
 		const zAfter = os.windows.find((w) => w.id === 'finder')!.z;
@@ -119,11 +126,11 @@ describe('window management', () => {
 	it('z-order normalizes when counter exceeds 1000', () => {
 		const { os } = createOs();
 		os.openWindow('finder');
-		os.openWindow('tv-guide');
+		os.openWindow('welcome');
 
 		// Focus many times to push the counter past 1000
 		for (let i = 0; i < 1001; i++) {
-			os.focusWindow(i % 2 === 0 ? 'finder' : 'tv-guide');
+			os.focusWindow(i % 2 === 0 ? 'finder' : 'welcome');
 		}
 
 		// After normalization triggers, z values reset to small numbers
@@ -217,14 +224,14 @@ describe('launch routing', () => {
 		expect(handler).toHaveBeenCalledWith({ file: 'test.txt' });
 	});
 
-	it('launchApp tvguide opens tv-guide window', () => {
-		const { os } = createOs();
+	it('launchApp tvguide opens tv-guide window when installed', async () => {
+		const { os } = await createOsWithApp('tvguide');
 		os.launchApp('tvguide');
 		expect(os.windows.some((w) => w.id === 'tv-guide')).toBe(true);
 	});
 
-	it('launchApp recorder opens recorder window', () => {
-		const { os } = createOs();
+	it('launchApp recorder opens recorder window when installed', async () => {
+		const { os } = await createOsWithApp('recorder');
 		os.launchApp('recorder');
 		expect(os.windows.some((w) => w.id === 'recorder')).toBe(true);
 	});
@@ -420,8 +427,8 @@ describe('isKnownWindowId', () => {
 // ── Navigation routing ────────────────────────────────────────────────────
 
 describe('navigation routing', () => {
-	it('openAbout chatrbot opens about-chatrbot window', () => {
-		const { os } = createOs();
+	it('openAbout chatrbot opens about-chatrbot window', async () => {
+		const { os } = await createOsWithApp('chatrbot');
 		os.openAbout('chatrbot');
 		expect(os.windows.some((w) => w.id === 'about-chatrbot')).toBe(true);
 	});
@@ -432,8 +439,8 @@ describe('navigation routing', () => {
 		expect(os.windows.some((w) => w.id === 'about')).toBe(true);
 	});
 
-	it('openAbout tvguide opens about-tvguide', () => {
-		const { os } = createOs();
+	it('openAbout tvguide opens about-tvguide', async () => {
+		const { os } = await createOsWithApp('tvguide');
 		os.openAbout('tvguide');
 		expect(os.windows.some((w) => w.id === 'about-tvguide')).toBe(true);
 	});
@@ -444,8 +451,8 @@ describe('navigation routing', () => {
 		expect(os.windows.some((w) => w.id === 'about-textedit')).toBe(true);
 	});
 
-	it('openAbout stats opens about-stats', () => {
-		const { os } = createOs();
+	it('openAbout stats opens about-stats', async () => {
+		const { os } = await createOsWithApp('stats');
 		os.openAbout('stats');
 		expect(os.windows.some((w) => w.id === 'about-stats')).toBe(true);
 	});
@@ -456,8 +463,8 @@ describe('navigation routing', () => {
 		expect(os.windows.some((w) => w.id === 'about-stickies')).toBe(true);
 	});
 
-	it('openAbout recorder opens about-recorder', () => {
-		const { os } = createOs();
+	it('openAbout recorder opens about-recorder', async () => {
+		const { os } = await createOsWithApp('recorder');
 		os.openAbout('recorder');
 		expect(os.windows.some((w) => w.id === 'about-recorder')).toBe(true);
 	});
@@ -490,8 +497,8 @@ describe('navigation routing', () => {
 		expect(os.windows).toHaveLength(1);
 	});
 
-	it('startNewConversation opens tv-guide', () => {
-		const { os } = createOs();
+	it('startNewConversation opens tv-guide when installed', async () => {
+		const { os } = await createOsWithApp('tvguide');
 		os.startNewConversation();
 		expect(os.windows.some((w) => w.id === 'tv-guide')).toBe(true);
 	});
@@ -499,11 +506,11 @@ describe('navigation routing', () => {
 	it('listWindows returns the current windows', () => {
 		const { os } = createOs();
 		os.openWindow('finder');
-		os.openWindow('tv-guide');
+		os.openWindow('welcome');
 		const list = os.listWindows();
 		expect(list).toHaveLength(2);
 		expect(list.map((w) => w.id)).toContain('finder');
-		expect(list.map((w) => w.id)).toContain('tv-guide');
+		expect(list.map((w) => w.id)).toContain('welcome');
 	});
 });
 
@@ -562,14 +569,14 @@ describe('derived state', () => {
 		expect(os.activeAppId).toBe('finder');
 	});
 
-	it('activeAppId returns chatrbot for chat- windows', () => {
-		const { os } = createOs();
+	it('activeAppId returns chatrbot for chat- windows', async () => {
+		const { os } = await createOsWithApp('chatrbot');
 		os.openWindow('chat-seinfeld');
 		expect(os.activeAppId).toBe('chatrbot');
 	});
 
-	it('activeAppId returns tvguide for tv-guide window', () => {
-		const { os } = createOs();
+	it('activeAppId returns tvguide for tv-guide window', async () => {
+		const { os } = await createOsWithApp('tvguide');
 		os.openWindow('tv-guide');
 		expect(os.activeAppId).toBe('tvguide');
 	});
@@ -580,8 +587,8 @@ describe('derived state', () => {
 		expect(os.activeChatGroupSlug).toBeNull();
 	});
 
-	it('activeChatGroupSlug returns slug for active chat window', () => {
-		const { os } = createOs();
+	it('activeChatGroupSlug returns slug for active chat window', async () => {
+		const { os } = await createOsWithApp('chatrbot');
 		os.openWindow('chat-seinfeld');
 		expect(os.activeChatGroupSlug).toBe('seinfeld');
 	});
@@ -590,8 +597,8 @@ describe('derived state', () => {
 // ── Dock aliases ──────────────────────────────────────────────────────────
 
 describe('dock aliases', () => {
-	it('openWindow with dock alias chat routes to tv-guide', () => {
-		const { os } = createOs();
+	it('openWindow with dock alias chat routes to tv-guide when installed', async () => {
+		const { os } = await createOsWithApp('tvguide');
 		os.initDockAliases(() => {});
 		os.openWindow('chat');
 		expect(os.windows.some((w) => w.id === 'tv-guide')).toBe(true);
@@ -603,6 +610,87 @@ describe('dock aliases', () => {
 		os.initDockAliases(openFile);
 		os.openWindow('pricing');
 		expect(openFile).toHaveBeenCalledWith('Pricing.txt');
+	});
+});
+
+// ── Store app install gate ────────────────────────────────────────────────
+
+describe('store app install gate', () => {
+	it('blocks unowned store app and shows purchase alert', () => {
+		const { os } = createOs();
+		os.openWindow('tv-guide');
+
+		expect(os.windows).toHaveLength(0);
+		expect(os.alertSpec?.title).toBe('TV Guide is not installed');
+		expect(os.alertSpec?.body).toContain('Computer Store');
+		expect(os.alertSpec?.buttons?.[0].label).toBe('Visit Store');
+	});
+
+	it('blocks owned-but-not-installed store app and shows shelf alert', async () => {
+		const { os, fs } = createOs();
+		await fs.buyApp('tvguide');
+		os.openWindow('tv-guide');
+
+		expect(os.windows).toHaveLength(0);
+		expect(os.alertSpec?.title).toBe('TV Guide is not installed');
+		expect(os.alertSpec?.body).toContain('My Shelf');
+		expect(os.alertSpec?.buttons?.[0].label).toBe('Open My Shelf');
+	});
+
+	it('allows installed store app to open', async () => {
+		const { os } = await createOsWithApp('tvguide');
+		os.openWindow('tv-guide');
+
+		expect(os.windows).toHaveLength(1);
+		expect(os.windows[0].id).toBe('tv-guide');
+		expect(os.alertSpec).toBeNull();
+	});
+
+	it('does not gate system apps', () => {
+		const { os } = createOs();
+		os.openWindow('finder');
+
+		expect(os.windows).toHaveLength(1);
+		expect(os.alertSpec).toBeNull();
+	});
+
+	it('blocks chat windows when chatrbot is not installed', () => {
+		const { os } = createOs();
+		os.openWindow('chat-seinfeld');
+
+		expect(os.windows).toHaveLength(0);
+		expect(os.alertSpec?.title).toBe('chatrbot is not installed');
+	});
+
+	it('blocks about windows for uninstalled store apps', () => {
+		const { os } = createOs();
+		os.openAbout('tvguide');
+
+		expect(os.windows).toHaveLength(0);
+		expect(os.alertSpec?.title).toBe('TV Guide is not installed');
+	});
+
+	it('purchase alert Visit Store button opens computer-store', () => {
+		const { os } = createOs();
+		os.openWindow('tv-guide');
+
+		const visitBtn = os.alertSpec?.buttons?.[0];
+		expect(visitBtn?.label).toBe('Visit Store');
+		visitBtn?.action?.();
+
+		expect(os.windows.some((w) => w.id === 'computer-store')).toBe(true);
+	});
+
+	it('shelf alert Open My Shelf button opens software-shop', async () => {
+		const { os, fs } = createOs();
+		await fs.buyApp('recorder');
+		os.openWindow('recorder');
+
+		const shelfBtn = os.alertSpec?.buttons?.[0];
+		expect(shelfBtn?.label).toBe('Open My Shelf');
+		shelfBtn?.action?.();
+
+		expect(os.windows.some((w) => w.id === 'software-shop')).toBe(true);
 	});
 });
 

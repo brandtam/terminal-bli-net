@@ -365,9 +365,10 @@
 				: ''}
 			role="toolbar"
 			tabindex="-1"
-			onclick={() => {
+			onclick={(e) => {
 				selectedIconId = null;
 				closeDeskCtx();
+				if (e.target === e.currentTarget) os.activeId = null;
 			}}
 			onkeydown={(e) => {
 				if (e.key === 'Escape') {
@@ -572,7 +573,11 @@
 				</Window>
 			{/each}
 
-			<Dock onopen={(id) => os.openWindow(id)} openIds={dockOpenIds} />
+			<Dock
+				installedApps={terminalFs.getInstalledApps()}
+				onopen={(id) => os.openWindow(id)}
+				openIds={dockOpenIds}
+			/>
 
 			{#if os.alertSpec}
 				<div class="system-alert-backdrop" role="presentation" onclick={(e) => e.stopPropagation()}>

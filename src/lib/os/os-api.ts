@@ -127,6 +127,7 @@ export interface OsApi {
 
 	openChat: (group: GroupMeta) => void;
 	setTimezone: (tz: string) => void;
+	isAppInstalled: (appId: string) => boolean;
 }
 
 export interface AlertButton {

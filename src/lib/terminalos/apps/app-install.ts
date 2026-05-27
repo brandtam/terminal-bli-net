@@ -44,16 +44,6 @@ export function getAppIconKind(appId: AppId): string {
 }
 
 /**
- * Returns true if the given appId is installed (has a filesystem node).
- * For v1 this checks the AppLibrary catalog.
- */
-export function isAppInstalled(appId: AppId): boolean {
-	const def = getAppDef(appId);
-	if (!def) return false;
-	return def.defaultInstalled;
-}
-
-/**
  * Apps that require special launch handling (not just "open window X").
  * - 'stickies' creates a new note
  * - 'chatrbot' needs a show context from TV Guide
