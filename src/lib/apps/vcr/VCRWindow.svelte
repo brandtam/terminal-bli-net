@@ -56,7 +56,11 @@
 	}
 
 	let embedUrl = $derived(
-		currentEpisode ? `https://archive.org/embed/${currentEpisode.archiveId}` : ''
+		currentEpisode
+			? currentEpisode.archiveFile
+				? `https://archive.org/embed/${currentEpisode.archiveId}/${encodeURIComponent(currentEpisode.archiveFile)}`
+				: `https://archive.org/embed/${currentEpisode.archiveId}`
+			: ''
 	);
 
 	let showVideo = $derived(transport === 'play' || transport === 'pause');

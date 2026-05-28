@@ -11,6 +11,8 @@ export type VCREpisode = {
 	title: string;
 	year: number;
 	archiveId: string;
+	/** Path to a specific file within a multi-file archive item, e.g. "Alf/Season 01/ALF - S01E01 - A.L.F SDTV.mp4". Omitted when the archive item is a single video. */
+	archiveFile?: string;
 	description: string;
 };
 
@@ -301,7 +303,211 @@ export const SHOWS: VCRShow[] = [
 				description: "The culture, the drama, and the stories that didn't fit anywhere else."
 			}
 		]
+	},
+	{
+		id: 'monkees',
+		name: 'Monkees',
+		years: '????',
+		description: 'The Complete Monkees series + Head',
+		episodes: [
+			{
+				id: 'show-the-monkees-complete',
+				title: 'Monkees',
+				year: 0,
+				archiveId: 'The-Monkees-Complete',
+				description: 'The Complete Monkees series + Head'
+			}
+		]
+	},
+	{
+		id: 'v-the-series',
+		name: 'V The Series',
+		years: '1984–1986',
+		description: 'Continues from where V The Final Battle part 3 left off.',
+		episodes: [
+			{
+				id: 'v-the-series-s01e01',
+				title: 'V The Series (1984-85) s01e01 Liberation Day',
+				year: 1984,
+				archiveId: 'v-the-series-1984-85-s-01e-01-liberation-day',
+				description: 'Continues from where V The Final Battle part 3 left off.'
+			},
+			{
+				id: 'v-the-series-s01e02',
+				title: 'V The Series (1984-85) s01e02 Dreadnaught',
+				year: 1984,
+				archiveId: 'v-the-series-1984-85-s-01e-02-dreadnaught',
+				description:
+					'Diana activates her unstoppable Triax superweapon to reduce Bates and the city of Los Angeles to rubble.'
+			},
+			{
+				id: 'v-the-series-s01e03',
+				title: 'V The Series (1984-85) s01e03 Breakout',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-03-breakout',
+				description:
+					'Donovan and Ham are imprisoned in a Visitor work camp guarded by a hideous alien monster; Nathan Bates mounts a desperate search to find the "star-child" to ex…'
+			},
+			{
+				id: 'v-the-series-s01e04',
+				title: 'V The Series (1984-85) s01e04 The Deception',
+				year: 1984,
+				archiveId: 'v-the-series-1984-85-s-01e-04-the-deception',
+				description:
+					"While the Resistance seeks to help Elizabeth escape from Los Angeles, Diana captures Mike Donovan in an elaborate scheme to learn Elizabeth's whereabouts."
+			},
+			{
+				id: 'v-the-series-s01e05',
+				title: 'V The Series (1984-85) s01e05 The Sanction',
+				year: 1984,
+				archiveId: 'v-the-series-1984-85-s-01e-05-the-sanction',
+				description:
+					'Seeking to free his son Sean from the Visitors, Donovan grapples with an insidious, powerful alien named Klaus.'
+			},
+			{
+				id: 'v-the-series-s01e06',
+				title: "V The Series (1984-85) s01e06 Visitor's Choice",
+				year: 1984,
+				archiveId: 'v-the-series-1984-85-s-01e-06-visitors-choice',
+				description:
+					'The Resistance, led by Donovan, Julie, and Ham, stage a daring sabotage at a convention of Visitor commanders in a seaside estate where Diana intends to show o…'
+			},
+			{
+				id: 'v-the-series-s01e07',
+				title: 'V The Series (1984-85) S01e07 The Overlord',
+				year: 1984,
+				archiveId: 'v-the-series-1984-85-s-01e-07-the-overlord',
+				description:
+					'Led by Donovan, Ham, and Elias, the Resistance seek to rid a mining community from alien-backed thugs.'
+			},
+			{
+				id: 'v-the-series-s01e08',
+				title: 'V The Series (1984-85) s01e08 The Dissident',
+				year: 1984,
+				archiveId: 'v-the-series-1984-85-s-01e-08-the-dissident',
+				description:
+					'When Diana seals off the Open City with an impenetrable force field which destroys humans on contact, Donovan and Ham must kidnap the alien genius responsible …'
+			},
+			{
+				id: 'v-the-series-s01e09',
+				title: 'V The Series (1984-85) s01e09 Reflections In Terror',
+				year: 1984,
+				archiveId: 'v-the-series-1984-85-s-01e-09-reflections-in-terror',
+				description:
+					'With a blood sample from the "star-child," Diana creates an uncontrollable and deadly clone which seeks out Elizabeth; Bates tests Julie\'s loyalty when he susp…'
+			},
+			{
+				id: 'v-the-series-s01e10',
+				title: 'V The Series (1984-85) s01e10 The Conversion',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-10-the-conversion',
+				description:
+					'Warning : This episode contains flashing lights which can trigger seizures in some people.'
+			},
+			{
+				id: 'v-the-series-s01e11',
+				title: 'V The Series (1984-85) s01e11 The Hero',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s01e11-the-hero_202210',
+				description:
+					"A small group of resistance sympathizers (Robin included) are arrested by Bates' police, and a prisoner will be handed over to the Visitors to be executed ever…"
+			},
+			{
+				id: 'v-the-series-s01e11-2',
+				title: 'V The Series (1984-85) s01e11 The Hero',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-11-the-hero',
+				description:
+					"A small group of resistance sympathizers (Robin included) are arrested by Bates' police, and a prisoner will be handed over to the Visitors to be executed ever…"
+			},
+			{
+				id: 'v-the-series-s01e12',
+				title: 'V The Series (1984-85) s01e12 The Betrayal',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s01e-12-the-betrayal',
+				description: 'While Bates remains in a coma Charles plots to overthrow him.'
+			},
+			{
+				id: 'v-the-series-s01e12-2',
+				title: 'V The Series (1984-85) s01e12 The Betrayal',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-12-the-betrayal',
+				description: 'While Bates remains in a coma Charles plots to overthrow him.'
+			},
+			{
+				id: 'v-the-series-s01e13',
+				title: 'V The Series (1984-85) s01e13 The Rescue',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-13-the-rescue_202210',
+				description:
+					"Feeling Diana's presence threatens his power, Charles forces her to marry him, after which Alien law requires she return home"
+			},
+			{
+				id: 'v-the-series-s01e14',
+				title: 'V The Series (1984-85) s01e14 The Champion',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-14-the-champion_202210',
+				description:
+					'Newly arrived Inspector General Philip allows Lydia to choose a trial by combat in a laser duel to the death with Diana.'
+			},
+			{
+				id: 'v-the-series-s01e15',
+				title: 'V The Series (1984-85) s01e15 The Wildcats',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-15-the-wildcats',
+				description:
+					'Needing medicine to treat a deadly diphtheria epidemic, Julie and Kyle recruit a youth gang, one of whom may be a Visitor spy, to help steal the serum.'
+			},
+			{
+				id: 'v-the-series-s01e15-2',
+				title: 'V The Series (1984-85) s01e15 The Wildcats',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s01e-15-the-wildcats',
+				description:
+					'Needing medicine to treat a deadly diphtheria epidemic, Julie and Kyle recruit a youth gang, one of whom may be a Visitor spy, to help steal the serum.'
+			},
+			{
+				id: 'v-the-series-s01e16',
+				title: 'V The Series (1984-85) S01e16 The Littlest Dragon',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-16-the-littlest-dragon_202210',
+				description:
+					'Anxious to settle a personal vendetta, Philip trails a Fifth Columnist, hoping he will lead him to the Resistance and Donovan.'
+			},
+			{
+				id: 'v-the-series-s01e17',
+				title: 'V The Series (1984-85) S01e17 War of Illusions',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-17-war-of-illusions_202210',
+				description:
+					"When Philip and Diana install a high tech computer capable of launching a final victory over Earth, the Resistance's only hope at retaliation is a teenaged com…"
+			},
+			{
+				id: 'v-the-series-s01e18',
+				title: 'V The Series (1984-85) S01e18 Secret Underground',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-18-secret-underground',
+				description:
+					'Julie and Donovan sneak aboard the Mother Ship to look for a hidden list naming all the Resistance leaders.'
+			},
+			{
+				id: 'v-the-series-s01e19',
+				title: 'V - The Series (1984-1985) s01e19 The Return',
+				year: 1986,
+				archiveId: 'v-the-series-1984-85-s-01e-19-the-return_202206',
+				description: 'Could peace be on the horizon..or is it a ploy?'
+			},
+			{
+				id: 'v-the-series-s01e19-2',
+				title: 'V The Series (1984-85) S01e19 The Return',
+				year: 1985,
+				archiveId: 'v-the-series-1984-85-s-01e-19-the-return_202210',
+				description:
+					'The Leader stuns the Visitors by ordering a truce and traveling to Earth to negotiate peace; Diana plots to disrupt the peace.'
+			}
+		]
 	}
+	// >>> /dev/library inserts new shows above this line <<<
 ];
 
 export const SHOW_BY_ID: Record<string, VCRShow> = SHOWS.reduce(
