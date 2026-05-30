@@ -2,6 +2,7 @@ import type {
 	NodeId,
 	BodyId,
 	AppId,
+	PersistedAppId,
 	FileType,
 	FsNode,
 	FsFolder,
@@ -1050,7 +1051,11 @@ export class TerminalFS {
 
 	// --- App install/uninstall ---
 
-	async installApp(appId: AppId): Promise<FsResult<FsFile>> {
+	// The install/ownership methods below take PersistedAppId: the UI passes ids
+	// straight from disk (My Shelf, the Store, restored windows), and each method
+	// re-validates against the catalog (getAppDef) or the node graph and fails
+	// gracefully on an unknown id. That is the disk→catalog boundary in action.
+	async installApp(appId: PersistedAppId): Promise<FsResult<FsFile>> {
 		const appDef = getAppDef(appId);
 		if (!appDef) return fail('missing_app', `App "${appId}" not found in AppLibrary`);
 
@@ -1112,7 +1117,7 @@ export class TerminalFS {
 		return ok(file);
 	}
 
-	async uninstallApp(appId: AppId): Promise<FsResult<{ removedFiles: number }>> {
+	async uninstallApp(appId: PersistedAppId): Promise<FsResult<{ removedFiles: number }>> {
 		const appDef = getAppDef(appId);
 		if (!appDef) return fail('missing_app', `App "${appId}" not found in AppLibrary`);
 
@@ -1158,11 +1163,11 @@ export class TerminalFS {
 		return ok({ removedFiles: 1 + removedAliasIds.length });
 	}
 
-	async isAppInstalled(appId: AppId): Promise<FsResult<boolean>> {
+	async isAppInstalled(appId: PersistedAppId): Promise<FsResult<boolean>> {
 		return ok(this.isAppInstalledSync(appId));
 	}
 
-	isAppInstalledSync(appId: AppId): boolean {
+	isAppInstalledSync(appId: PersistedAppId): boolean {
 		return findAppFile(appId, this.nodes) !== undefined;
 	}
 
@@ -1180,15 +1185,15 @@ export class TerminalFS {
 
 	// --- Ownership (buy/return) ---
 
-	isAppOwned(appId: AppId): boolean {
+	isAppOwned(appId: PersistedAppId): boolean {
 		return checkOwned(appId, this.volume.ownedApps ?? []);
 	}
 
-	getOwnedApps(): AppId[] {
+	getOwnedApps(): PersistedAppId[] {
 		return this.volume.ownedApps ?? [];
 	}
 
-	async buyApp(appId: AppId): Promise<FsResult<void>> {
+	async buyApp(appId: PersistedAppId): Promise<FsResult<void>> {
 		const appDef = getAppDef(appId);
 		if (!appDef) return fail('missing_app', `App "${appId}" not found in AppLibrary`);
 
@@ -1206,7 +1211,7 @@ export class TerminalFS {
 		return ok(undefined);
 	}
 
-	async returnApp(appId: AppId): Promise<FsResult<void>> {
+	async returnApp(appId: PersistedAppId): Promise<FsResult<void>> {
 		const appDef = getAppDef(appId);
 		if (!appDef) return fail('missing_app', `App "${appId}" not found in AppLibrary`);
 
@@ -1386,7 +1391,9 @@ export class TerminalFS {
 		return ok(undefined);
 	}
 
-	findByApp(appId: AppId, parentId?: NodeId): FsFile[] {
+	// Matches nodes whose stored appId fingerprint equals the argument — a
+	// persisted-string comparison, so it takes PersistedAppId.
+	findByApp(appId: PersistedAppId, parentId?: NodeId): FsFile[] {
 		const results: FsFile[] = [];
 		for (const node of this.nodes.values()) {
 			if (node.kind === 'file' && node.appId === appId) {

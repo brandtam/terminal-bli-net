@@ -1,4 +1,4 @@
-import type { AppId, FsFile, FsNode, NodeId } from '../filesystem/types';
+import type { PersistedAppId, FsFile, FsNode, NodeId } from '../filesystem/types';
 import { getAppDef } from './app-library';
 import { APP_LIBRARY } from './app-library';
 import type { TerminalAppDefinition } from './app-types';
@@ -24,7 +24,7 @@ export function getShopCatalog(nodes: Map<NodeId, FsNode>): ShopItem[] {
  * Check if an app is currently installed (has an app file node in the filesystem).
  * Only matches fileType: 'app' — not user documents created by the app.
  */
-export function isInstalled(appId: AppId, nodes: Map<NodeId, FsNode>): boolean {
+export function isInstalled(appId: PersistedAppId, nodes: Map<NodeId, FsNode>): boolean {
 	for (const node of nodes.values()) {
 		if (node.kind === 'file' && node.fileType === 'app' && node.appId === appId) {
 			return true;
@@ -37,7 +37,7 @@ export function isInstalled(appId: AppId, nodes: Map<NodeId, FsNode>): boolean {
  * Find the app file node for a given appId.
  * Only matches fileType: 'app' — not user documents created by the app.
  */
-export function findAppFile(appId: AppId, nodes: Map<NodeId, FsNode>): FsFile | undefined {
+export function findAppFile(appId: PersistedAppId, nodes: Map<NodeId, FsNode>): FsFile | undefined {
 	for (const node of nodes.values()) {
 		if (node.kind === 'file' && node.fileType === 'app' && node.appId === appId) {
 			return node;
@@ -49,7 +49,7 @@ export function findAppFile(appId: AppId, nodes: Map<NodeId, FsNode>): FsFile | 
 /**
  * Check whether an app can be uninstalled.
  */
-export function canUninstall(appId: AppId): boolean {
+export function canUninstall(appId: PersistedAppId): boolean {
 	const def = getAppDef(appId);
 	if (!def) return false;
 	return def.removable;
@@ -59,7 +59,7 @@ export function canUninstall(appId: AppId): boolean {
  * Check if an app is owned (on the user's shelf).
  * System apps are always owned. Store apps check the ownedApps list.
  */
-export function isOwned(appId: AppId, ownedApps: AppId[]): boolean {
+export function isOwned(appId: PersistedAppId, ownedApps: PersistedAppId[]): boolean {
 	const def = getAppDef(appId);
 	if (!def) return false;
 	if (def.isSystem) return true;
@@ -69,7 +69,7 @@ export function isOwned(appId: AppId, ownedApps: AppId[]): boolean {
 /**
  * Get all owned app IDs — store apps that have been purchased.
  */
-export function getOwnedAppIds(ownedApps: AppId[]): AppId[] {
+export function getOwnedAppIds(ownedApps: PersistedAppId[]): PersistedAppId[] {
 	return [...ownedApps];
 }
 
@@ -78,8 +78,8 @@ export function getOwnedAppIds(ownedApps: AppId[]): AppId[] {
  * Called once when loading a disk that lacks ownedApps (pre-ownership model).
  * Any installed store app gets added to ownedApps; free apps are always owned.
  */
-export function deriveOwnedApps(nodes: Map<NodeId, FsNode>): AppId[] {
-	const owned: AppId[] = [];
+export function deriveOwnedApps(nodes: Map<NodeId, FsNode>): PersistedAppId[] {
+	const owned: PersistedAppId[] = [];
 	for (const app of APP_LIBRARY) {
 		if (!app.isSystem && isInstalled(app.id, nodes)) {
 			owned.push(app.id);

@@ -15,9 +15,14 @@ import {
 	isFirstVisit,
 	clearAllPreferences
 } from '$lib/persistence';
-import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 import { getAppWindowId } from '$lib/terminalos/apps/app-install';
 import { getAppDef } from '$lib/terminalos/apps/app-library';
+import {
+	synthKnownWindowIds,
+	synthWindowDefs,
+	synthAboutWindowId,
+	synthPrefsWindowId
+} from '$lib/terminalos/apps/app-catalog';
 import type { TerminalFS } from '$lib/terminalos';
 
 export class OsApiClass implements OsApi {
@@ -54,32 +59,9 @@ export class OsApiClass implements OsApi {
 	private DOCK_ALIASES: Record<string, () => void> = {};
 
 	// ── Known window IDs ──────────────────────────────────────────────────
-	private static KNOWN_WINDOW_IDS = new Set([
-		'welcome',
-		'tv-guide',
-		'terminal-prefs',
-		'tvguide-prefs',
-		'chatrbot-prefs',
-		'about',
-		'about-chatrbot',
-		'about-tvguide',
-		'about-textedit',
-		'about-stats',
-		'about-stickies',
-		'about-recorder',
-		'about-software-shop',
-		'stats',
-		'error',
-		'trash',
-		'recorder',
-		'finder',
-		'software-shop',
-		'computer-store',
-		'about-computer-store',
-		'vcr',
-		'vcr-prefs',
-		'about-vcr'
-	]);
+	// Synthesized from the per-app manifests (see manifests.ts /
+	// app-catalog.ts). Byte-identical to the hand-authored set this replaced.
+	private static KNOWN_WINDOW_IDS = synthKnownWindowIds();
 
 	constructor(fs: TerminalFS) {
 		this.fs = fs;
@@ -298,40 +280,10 @@ export class OsApiClass implements OsApi {
 	// ── Window definition lookup ──────────────────────────────────────────
 
 	getWindowDef(id: string): { title: string; w: number; h: number; minW?: number; minH?: number } {
-		const defs: Record<
-			string,
-			{ title: string; w: number; h: number; minW?: number; minH?: number }
-		> = {
-			welcome: { title: 'Welcome.app', w: 460, h: 540 },
-			'tv-guide': { title: 'TV Guide.app', w: 660, h: 700 },
-			'terminal-prefs': { title: 'System Preferences', w: 380, h: 360 },
-			'tvguide-prefs': { title: 'TV Guide Preferences', w: 360, h: 360 },
-			'chatrbot-prefs': { title: 'chatrbot Preferences', w: 360, h: 280 },
-			about: { title: 'About This Terminal', w: 380, h: 380 },
-			'about-chatrbot': { title: 'About chatrbot', w: 420, h: 460 },
-			'about-tvguide': { title: 'About TV Guide', w: 420, h: 460 },
-			'about-textedit': { title: 'About TextEdit', w: 420, h: 380 },
-			'about-stats': { title: 'About Stats', w: 420, h: 360 },
-			'about-stickies': { title: 'About Stickies', w: 420, h: 380 },
-			stats: { title: 'Stats.app', w: 360, h: 360 },
-			error: { title: 'System Error', w: 420, h: 260 },
-			trash: { title: 'Trash', w: 380, h: 320 },
-			recorder: { title: 'Camera.app', w: 360, h: 480 },
-			'about-recorder': { title: 'About Recorder', w: 420, h: 360 },
-			'software-shop': { title: 'My Shelf', w: 420, h: 520 },
-			'about-software-shop': { title: 'About My Shelf', w: 420, h: 380 },
-			'computer-store': { title: 'Computer Store', w: 740, h: 620 },
-			'about-computer-store': { title: 'About Computer Store', w: 420, h: 380 },
-			finder: { title: 'Terminal HD', w: 480, h: 420 },
-			// Size to the selected device — the AG-500R is wide, the Generic deck
-			// near-square.
-			vcr:
-				vcrPrefs.device === 'generic'
-					? { title: 'VCR.app', w: 560, h: 523, minW: 480, minH: 470 }
-					: { title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 },
-			'vcr-prefs': { title: 'VCR Preferences', w: 360, h: 300 },
-			'about-vcr': { title: 'About VCR', w: 420, h: 460 }
-		};
+		// Static window defs are synthesized from the per-app manifests (see
+		// manifests.ts / app-catalog.ts), including the vcr device-sizing.
+		// The minted-prefix windows below stay dynamic.
+		const defs = synthWindowDefs();
 
 		if (id.startsWith('chat-')) {
 			const showSlug = id.replace('chat-', '');
@@ -431,21 +383,16 @@ export class OsApiClass implements OsApi {
 	}
 
 	openPreferences(appId: string): void {
-		const a = APPS[appId];
-		if (a?.preferences) this.openWindow(a.preferences);
+		// The prefs window-id comes straight from the app's manifest (prefs.id),
+		// or null when the app has no Preferences dialog.
+		const prefsId = synthPrefsWindowId(appId);
+		if (prefsId) this.openWindow(prefsId);
 	}
 
 	openAbout(appId: string | null): void {
-		if (appId === 'chatrbot') return this.openWindow('about-chatrbot');
-		if (appId === 'tvguide') return this.openWindow('about-tvguide');
-		if (appId === 'textedit') return this.openWindow('about-textedit');
-		if (appId === 'stats') return this.openWindow('about-stats');
-		if (appId === 'stickies') return this.openWindow('about-stickies');
-		if (appId === 'recorder') return this.openWindow('about-recorder');
-		if (appId === 'software-shop') return this.openWindow('about-software-shop');
-		if (appId === 'computer-store') return this.openWindow('about-computer-store');
-		if (appId === 'vcr') return this.openWindow('about-vcr');
-		this.openWindow('about');
+		// The About window-id comes from the app's manifest (about.id); apps with
+		// no About dialog, and a null id, fall back to the system 'about'.
+		this.openWindow(synthAboutWindowId(appId));
 	}
 
 	startNewConversation(): void {
@@ -463,41 +410,20 @@ export class OsApiClass implements OsApi {
 	}
 
 	launchApp(appId: string, payload?: Record<string, unknown>): void {
-		// Check registered handlers first
+		// Apps with custom launch behavior (stickies/textedit/chatrbot) register a
+		// handler at startup; those win. See the registerLaunchHandler call sites
+		// in Desktop.svelte.
 		const handler = this.launchHandlers.get(appId);
 		if (handler) {
 			handler(payload);
 			return;
 		}
 
-		// Default routing for known apps
-		if (appId === 'tvguide') {
-			this.openWindow('tv-guide');
-			return;
-		}
-		if (appId === 'recorder') {
-			this.openWindow('recorder');
-			return;
-		}
-		if (appId === 'stats') {
-			this.openWindow('stats');
-			return;
-		}
-		if (appId === 'error') {
-			this.openWindow('error');
-			return;
-		}
-		if (appId === 'welcome') {
-			this.openWindow('welcome');
-			return;
-		}
-
-		// Fallback: try to find a window ID
+		// Everything else is a plain "open the app's window" — the window-id comes
+		// from the manifest (via getAppWindowId). The old per-app chain
+		// (tvguide → tv-guide, recorder, stats, error) only repeated that mapping.
 		const windowId = getAppWindowId(appId);
-		if (windowId) {
-			this.openWindow(windowId);
-			return;
-		}
+		if (windowId) this.openWindow(windowId);
 	}
 
 	openChat(group: GroupMeta): void {

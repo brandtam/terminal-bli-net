@@ -1,7 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { marked } from 'marked';
-	import DOMPurify from 'dompurify';
 	import type { Bot, ChatMessage, TextChunk } from '$lib/types';
 	import { loadConversations, saveConversation, getSessionId } from '$lib/persistence';
 	import { formatTimeUntil } from '$lib/schedule';
@@ -57,6 +55,9 @@
 	});
 
 	onMount(() => {
+		// Kick off the markdown parser + sanitizer load on first mount; the
+		// template re-renders bot bubbles through marked once they resolve.
+		void loadMarkdownLibs();
 		const saved = loadConversations()[showSlug];
 		if (saved) {
 			messages = saved.messages;
@@ -251,15 +252,45 @@
 	];
 	const ALLOWED_ATTR = ['href', 'title', 'target', 'rel'];
 
-	// Force all links to open in a new tab with noopener
-	DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-		if (node.tagName === 'A' && node.hasAttribute('href')) {
-			node.setAttribute('target', '_blank');
-			node.setAttribute('rel', 'noopener noreferrer');
-		}
-	});
+	// marked (CommonMark parser) + dompurify (HTML sanitizer) are heavy and only
+	// needed once a bot message renders. Load them lazily so TV-guide-only or
+	// game-only visitors never fetch them. Until they resolve, bot text renders as
+	// escaped plain text — never raw HTML — so there is no XSS window.
+	type Marked = typeof import('marked').marked;
+	type DOMPurifyT = typeof import('dompurify').default;
+	let marked = $state<Marked | null>(null);
+	let DOMPurify = $state<DOMPurifyT | null>(null);
+
+	async function loadMarkdownLibs(): Promise<void> {
+		if (marked && DOMPurify) return;
+		const [markedMod, purifyMod] = await Promise.all([import('marked'), import('dompurify')]);
+		const purify = purifyMod.default;
+		// Force all links to open in a new tab with noopener (registered once the
+		// sanitizer is actually loaded — same hook, same behavior as before).
+		purify.addHook('afterSanitizeAttributes', (node) => {
+			if (node.tagName === 'A' && node.hasAttribute('href')) {
+				node.setAttribute('target', '_blank');
+				node.setAttribute('rel', 'noopener noreferrer');
+			}
+		});
+		marked = markedMod.marked;
+		DOMPurify = purify;
+	}
+
+	function escapeHtml(text: string): string {
+		return text
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+	}
 
 	function renderMarkdown(text: string): string {
+		// Reads the `marked`/`DOMPurify` runes, so the {@html} calling this
+		// re-renders once loadMarkdownLibs() sets them. Before they load, show
+		// escaped plain text — transient, and XSS-safe regardless.
+		if (!marked || !DOMPurify) return escapeHtml(text);
 		const raw = marked.parse(text, { async: false }) as string;
 		return DOMPurify.sanitize(raw, {
 			ALLOWED_TAGS,

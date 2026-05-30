@@ -12,3 +12,4 @@ vite.config.ts.timestamp-*
 .wrangler
 .dev.vars
 /test-results
+bundle-stats.html

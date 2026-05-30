@@ -1,4 +1,5 @@
 import type { WindowState, TweaksState, GroupMeta } from '$lib/types';
+import { synthWindowAppMap, synthWindowAppId } from '$lib/terminalos/apps/app-catalog';
 
 export interface AboutSection {
 	h: string;
@@ -143,39 +144,13 @@ export interface AlertSpec {
 	progress?: { durationMs: number };
 }
 
-export const WINDOW_APP_MAP: Record<string, string> = {
-	'terminal-prefs': 'finder',
-	welcome: 'finder',
-	finder: 'finder',
-	'tv-guide': 'tvguide',
-	'tvguide-prefs': 'tvguide',
-	'chatrbot-prefs': 'chatrbot',
-	stats: 'stats',
-	about: 'finder',
-	'about-chatrbot': 'chatrbot',
-	'about-tvguide': 'tvguide',
-	'about-textedit': 'textedit',
-	'about-stats': 'stats',
-	'about-stickies': 'stickies',
-	error: 'finder',
-	trash: 'finder',
-	recorder: 'recorder',
-	'about-recorder': 'recorder',
-	'software-shop': 'software-shop',
-	'about-software-shop': 'software-shop',
-	'computer-store': 'computer-store',
-	'about-computer-store': 'computer-store',
-	vcr: 'vcr',
-	'vcr-prefs': 'vcr',
-	'about-vcr': 'vcr'
-};
+// Synthesized from the per-app manifests (see manifests.ts / app-catalog.ts).
+// The shape (window-id → app-id) and contents are byte-identical to the
+// hand-authored map this replaced.
+export const WINDOW_APP_MAP: Record<string, string> = synthWindowAppMap();
 
 export function windowAppId(windowId: string): string {
-	if (windowId.startsWith('chat-')) return 'chatrbot';
-	if (windowId.startsWith('sticky-')) return 'stickies';
-	if (windowId.startsWith('textedit-')) return 'textedit';
-	if (windowId.startsWith('recorder-')) return 'recorder';
-	return WINDOW_APP_MAP[windowId] || 'finder';
+	return synthWindowAppId(windowId);
 }
 
 export {
