@@ -6,7 +6,8 @@ export {
 	DESKTOP_ID,
 	SYSTEM_ID,
 	RECORDINGS_ID,
-	TRASH_ID
+	TRASH_ID,
+	APPDATA_ID
 } from './filesystem/terminal-fs';
 export type {
 	FsNode,

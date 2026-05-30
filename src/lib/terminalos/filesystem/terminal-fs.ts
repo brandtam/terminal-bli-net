@@ -39,6 +39,7 @@ export const DESKTOP_ID: NodeId = 'folder_desktop';
 export const SYSTEM_ID: NodeId = 'folder_system';
 export const RECORDINGS_ID: NodeId = 'folder_recordings';
 export const TRASH_ID: NodeId = 'folder_trash';
+export const APPDATA_ID: NodeId = 'folder_appdata';
 
 const VOLUME_ID = 'volume_terminal_hd';
 
@@ -361,6 +362,21 @@ export class TerminalFS {
 			nodes.set(sf.id, folder);
 		}
 
+		// AppData container lives under /System. It's system-flagged (protected
+		// from casual deletion) but NOT hidden, so each app's files ride in the
+		// manifest backup automatically.
+		const appDataFolder: FsFolder = {
+			id: APPDATA_ID,
+			volumeId: VOLUME_ID,
+			kind: 'folder',
+			parentId: SYSTEM_ID,
+			name: 'AppData',
+			flags: { system: true, protected: true },
+			createdAt: now,
+			updatedAt: now
+		};
+		nodes.set(APPDATA_ID, appDataFolder);
+
 		// 4. Seed app file nodes
 		//    - system apps go into /Applications
 		//    - system-folder apps (system-prefs, about-terminal) always go into /System
@@ -596,6 +612,71 @@ export class TerminalFS {
 
 		this.notifyChange([nodeId], [parentId], 'create_folder');
 		return ok(folder);
+	}
+
+	/**
+	 * Get (or lazily create) an app's private folder under /System/AppData/<appId>.
+	 *
+	 * Apps store their files here so they don't collide in the disk root. The
+	 * folder is named by the appId string — human-readable in Finder and stable
+	 * across reloads, so it's looked up by name each call rather than by a fixed
+	 * id.
+	 *
+	 * Self-healing: disks persisted before AppData existed won't have the
+	 * container node. If APPDATA_ID is missing, this recreates it under /System,
+	 * so no separate migration pass is needed.
+	 */
+	async getAppDataFolder(appId: PersistedAppId): Promise<FsResult<NodeId>> {
+		let created = false;
+
+		// Ensure the /System/AppData container exists (seeded on clean disks,
+		// recreated here for older disks).
+		if (!this.nodes.has(APPDATA_ID)) {
+			const system = this.nodes.get(SYSTEM_ID);
+			if (!system) return fail('not_found', `System folder "${SYSTEM_ID}" not found`);
+
+			const now = Date.now();
+			const container: FsFolder = {
+				id: APPDATA_ID,
+				volumeId: this.volume.id,
+				kind: 'folder',
+				parentId: SYSTEM_ID,
+				name: 'AppData',
+				flags: { system: true, protected: true },
+				createdAt: now,
+				updatedAt: now
+			};
+			this.nodes.set(APPDATA_ID, container);
+			created = true;
+		}
+
+		// Find this app's folder by name within the container.
+		for (const n of this.nodes.values()) {
+			if (n.parentId === APPDATA_ID && n.kind === 'folder' && n.name === appId) {
+				if (created) await this.debouncedPersist();
+				return ok(n.id);
+			}
+		}
+
+		// Not found — create a normal (non-system) folder named by appId.
+		const now = Date.now();
+		const folderId = generateUniqueId();
+		const folder: FsFolder = {
+			id: folderId,
+			volumeId: this.volume.id,
+			kind: 'folder',
+			parentId: APPDATA_ID,
+			name: appId,
+			createdAt: now,
+			updatedAt: now
+		};
+		this.nodes.set(folderId, folder);
+
+		const persistResult = await this.debouncedPersist();
+		if (!persistResult.ok) return persistResult as FsResult<NodeId>;
+
+		this.notifyChange([folderId], [APPDATA_ID], 'create_folder');
+		return ok(folderId);
 	}
 
 	async createTextFile(parentId: NodeId, name: string, text: string): Promise<FsResult<FsFile>> {
