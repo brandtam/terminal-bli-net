@@ -1,4 +1,4 @@
-import type { AppId } from '../filesystem/types';
+import type { PersistedAppId } from '../filesystem/types';
 import type { TerminalAppDefinition } from './app-types';
 import { synthAppLibrary } from './app-catalog';
 
@@ -11,7 +11,12 @@ import { synthAppLibrary } from './app-catalog';
  */
 export const APP_LIBRARY: TerminalAppDefinition[] = synthAppLibrary();
 
-export function getAppDef(appId: AppId): TerminalAppDefinition | undefined {
+/**
+ * Looks up a catalog app by id. Takes PersistedAppId because callers feed it ids
+ * read straight off disk — an old disk may name a renamed or removed app, and
+ * that must return undefined, not fail to compile.
+ */
+export function getAppDef(appId: PersistedAppId): TerminalAppDefinition | undefined {
 	return APP_LIBRARY.find((a) => a.id === appId);
 }
 

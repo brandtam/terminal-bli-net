@@ -1,10 +1,24 @@
 export type VolumeId = string;
 export type NodeId = string;
 export type BodyId = string;
-export type AppId = string;
+
+/**
+ * The id types live in a leaf module (apps/app-ids.ts) that derives the closed
+ * `AppId` union from the manifests. The filesystem keeps owning the public type
+ * names by re-exporting them here. These are type-only re-exports — no runtime
+ * import edge from the filesystem into apps/, and the leaf reaches nothing back
+ * here, so there is no cycle.
+ *
+ * Use AppId for catalog-known ids (install/ownership/store). Use PersistedAppId
+ * for anything read off a disk: an old disk may hold a renamed or removed id, so
+ * that boundary must stay open.
+ */
+import type { AppId, PersistedAppId } from '../apps/app-ids';
+export type { AppId, PersistedAppId };
 
 export type InstalledApp = {
-	id: AppId;
+	// Built from a persisted node's appId — the disk may name an unknown app.
+	id: PersistedAppId;
 	name: string;
 	icon: string;
 	windowId: string;
@@ -36,14 +50,17 @@ export type TerminalVolume = {
 	name: string;
 	kind: 'local';
 	rootNodeId: NodeId;
-	ownedApps?: AppId[];
+	// Persisted to disk → stays open. Narrow to AppId only when handing an id to
+	// catalog logic after a successful lookup.
+	ownedApps?: PersistedAppId[];
 };
 
 export type NodeFlags = {
 	system?: boolean;
 	protected?: boolean;
 	hidden?: boolean;
-	packageOwned?: AppId;
+	// Persisted on disk → open.
+	packageOwned?: PersistedAppId;
 };
 
 export type FsFolder = {
@@ -71,8 +88,9 @@ export type FsFile = {
 	parentId: NodeId;
 	name: string;
 	fileType: FileType;
-	opensWith?: AppId;
-	appId?: AppId;
+	// These come off disk → open. An old disk may name an unknown app.
+	opensWith?: PersistedAppId;
+	appId?: PersistedAppId;
 	bodyRef?: BodyRef;
 	flags?: NodeFlags;
 	createdAt: number;

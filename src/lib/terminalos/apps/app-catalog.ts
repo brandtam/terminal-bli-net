@@ -1,4 +1,4 @@
-import type { AppId } from '../filesystem/types';
+import type { AppId, PersistedAppId } from './app-ids';
 import type { AppDef } from '$lib/os/os-api';
 import type { TerminalAppDefinition } from './app-types';
 import { MANIFESTS } from './manifests';
@@ -206,7 +206,10 @@ function stripUndefined(d: WindowDef): WindowDef {
  * about-terminal ('about'), which here come straight from their manifest
  * `window.id`.
  */
-const APP_WINDOW_ID_APPS = new Set<AppId>([
+// Gate set of catalog ids that resolve to a fixed window. Typed as the AppId
+// union (each literal is checked against the union at authoring time) but stored
+// as a plain string set so it can be probed with a PersistedAppId off disk.
+const APP_WINDOW_ID_APPS = new Set<string>([
 	'tvguide',
 	'recorder',
 	'stats',
@@ -217,9 +220,11 @@ const APP_WINDOW_ID_APPS = new Set<AppId>([
 	'computer-store',
 	'finder',
 	'vcr'
-]);
+] satisfies AppId[]);
 
-export function synthAppWindowId(appId: AppId): string | undefined {
+// Takes PersistedAppId: called via getAppWindowId with ids read off disk, so an
+// unknown id falls through to undefined.
+export function synthAppWindowId(appId: PersistedAppId): string | undefined {
 	if (!APP_WINDOW_ID_APPS.has(appId)) return undefined;
 	const m = MANIFESTS.find((x) => x.id === appId);
 	return m?.window?.id;
@@ -227,7 +232,8 @@ export function synthAppWindowId(appId: AppId): string | undefined {
 
 // ── App → icon kind (getAppIconKind) ─────────────────────────────────────────
 
-export function synthAppIconKind(appId: AppId): string {
+// Takes PersistedAppId for the same disk-boundary reason; unknown ids → 'doc'.
+export function synthAppIconKind(appId: PersistedAppId): string {
 	const m = MANIFESTS.find((x) => x.id === appId);
 	return m?.iconKind ?? 'doc';
 }

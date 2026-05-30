@@ -28,7 +28,9 @@ describe('store catalog', () => {
 	});
 
 	it('every store app ID has a matching AppLibrary entry', () => {
-		const libraryIds = new Set(APP_LIBRARY.map((a) => a.id));
+		// Store-catalog ids are plain strings; probe them against the library by
+		// string identity (a Set<AppId>.has() would reject the wider string).
+		const libraryIds = new Set<string>(APP_LIBRARY.map((a) => a.id));
 		for (const app of APPS) {
 			expect(libraryIds.has(app.id)).toBe(true);
 		}

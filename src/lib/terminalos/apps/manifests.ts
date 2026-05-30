@@ -10,7 +10,7 @@ import { defineApp, type TerminalAppManifest } from './app-manifest';
  * Phase 1 keeps these in one file. A later phase can split them into per-app
  * folders alongside their components.
  */
-export const MANIFESTS: TerminalAppManifest[] = [
+export const MANIFESTS = [
 	// ── OS core (protected, not removable) ──────────────────────────────────
 	defineApp({
 		id: 'finder',

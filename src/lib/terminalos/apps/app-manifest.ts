@@ -1,4 +1,3 @@
-import type { AppId } from '../filesystem/types';
 import type { AppCategory, AppStatus } from './app-types';
 import type { AppMenuSpec, AboutSpec, StatusExtra, OsApi } from '$lib/os/os-api';
 
@@ -45,7 +44,10 @@ export type AppPrefsWindowSpec = {
  */
 export type TerminalAppManifest = {
 	// ── Library / lifecycle (from APP_LIBRARY) ──────────────────────────────
-	id: AppId;
+	// The manifest is the SOURCE of the AppId union — `id` is a plain string in
+	// the type, but defineApp() infers each literal so the union stays closed.
+	// Typing this as AppId would be circular (AppId is derived from these ids).
+	id: string;
 	name: string;
 	fileName: string;
 	category: AppCategory;
@@ -84,7 +86,16 @@ export type TerminalAppManifest = {
  * Identity helper. Authors a manifest with full type-checking; returns it
  * unchanged. Using this (rather than a bare object literal) lets the compiler
  * flag a missing required field at the definition site.
+ *
+ * It is generic over the literal `id` only, so `AppId` can be the closed union
+ * of the real ids rather than `string`. The return type is the full
+ * `TerminalAppManifest` with `id` narrowed to that literal — keeping every
+ * optional key (`window`, `prefs`, `status`, …) present on every element, so the
+ * catalog's `m.window?.id` lookups still type-check. (A bare `satisfies` on the
+ * array would instead drop absent optional keys from each element's type.)
  */
-export function defineApp(manifest: TerminalAppManifest): TerminalAppManifest {
+export function defineApp<const Id extends string>(
+	manifest: TerminalAppManifest & { id: Id }
+): TerminalAppManifest & { id: Id } {
 	return manifest;
 }

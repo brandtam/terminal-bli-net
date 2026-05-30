@@ -1,4 +1,4 @@
-import type { AppId } from '../filesystem/types';
+import type { AppId, PersistedAppId } from '../filesystem/types';
 import { synthAppWindowId, synthAppIconKind } from './app-catalog';
 
 /**
@@ -7,18 +7,24 @@ import { synthAppWindowId, synthAppIconKind } from './app-catalog';
  *
  * Returns undefined if the app requires special handling (like chatrbot which needs a show context).
  *
+ * Takes PersistedAppId: getInstalledApps feeds it ids read off disk, so an
+ * unknown id must resolve to undefined rather than fail to compile.
+ *
  * Synthesized from the per-app manifests (see manifests.ts / app-catalog.ts).
  */
-export function getAppWindowId(appId: AppId): string | undefined {
+export function getAppWindowId(appId: PersistedAppId): string | undefined {
 	return synthAppWindowId(appId);
 }
 
 /**
  * Maps an appId to the PixelIcon kind string used by Desktop and Finder.
  *
+ * Takes PersistedAppId for the same reason as getAppWindowId — it falls back to
+ * 'doc' for ids the catalog no longer knows.
+ *
  * Synthesized from the per-app manifests (see manifests.ts / app-catalog.ts).
  */
-export function getAppIconKind(appId: AppId): string {
+export function getAppIconKind(appId: PersistedAppId): string {
 	return synthAppIconKind(appId);
 }
 
