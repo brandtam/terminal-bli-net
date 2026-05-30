@@ -10,6 +10,7 @@
 		onclick,
 		hoverable = true,
 		status,
+		comingSoon = false,
 		lift = false
 	}: {
 		app: StoreApp;
@@ -18,6 +19,7 @@
 		onclick?: () => void;
 		hoverable?: boolean;
 		status?: 'installed' | 'in-cart';
+		comingSoon?: boolean;
 		lift?: boolean;
 	} = $props();
 
@@ -54,6 +56,7 @@
 	style:height="{height}px"
 	style:box-shadow={shadow}
 	style:transform
+	style:opacity={comingSoon ? 0.72 : 1}
 	style:cursor={onclick ? 'pointer' : 'default'}
 	{onclick}
 	onmouseenter={() => {
@@ -85,6 +88,9 @@
 	{/if}
 	{#if status === 'in-cart'}
 		<div class="status-sticker in-cart">IN CART</div>
+	{/if}
+	{#if comingSoon}
+		<div class="status-sticker coming-soon">COMING SOON</div>
 	{/if}
 	{#if stickerCfg}
 		<div
@@ -201,6 +207,10 @@
 	.status-sticker.in-cart {
 		background: #f9bd2b;
 		color: #0a0a0a;
+	}
+	.status-sticker.coming-soon {
+		background: #4a4a8a;
+		color: #ffffff;
 	}
 	.promo-sticker {
 		position: absolute;

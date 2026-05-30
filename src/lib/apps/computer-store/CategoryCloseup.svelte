@@ -1,6 +1,7 @@
 <script lang="ts">
 	import SoftwareBox from './SoftwareBox.svelte';
 	import { CATEGORIES, APP_BY_ID, type StoreApp, type CategoryId } from './store-data';
+	import { getAppDef } from '$lib/terminalos';
 
 	let {
 		categoryId,
@@ -38,6 +39,7 @@
 				<SoftwareBox
 					{app}
 					onclick={() => onpickup(app)}
+					comingSoon={getAppDef(app.id)?.status === 'coming-soon'}
 					status={owned.includes(app.id)
 						? 'installed'
 						: cart.includes(app.id)
