@@ -1,28 +1,28 @@
-<script lang="ts">
-	let { onopen }: { onopen: (id: string) => void } = $props();
-</script>
-
 <div class="welcome">
 	<h1>terminal<span class="accent">.bli.net</span><span class="blink-cursor"></span></h1>
 	<div class="lede">
 		<b>Previously on screens…</b><br />
-		A retro desktop you visit in a browser. Drag windows. Open apps. Tweak things until they feel right.
+		A retro desktop you visit in a browser. Nothing's installed yet — so let's get a movie playing first.
 	</div>
+
 	<p class="tagline">
-		Terminal is a tiny operating system that runs in a tab. Floppy icons, striped title bars, chunky
-		borders, a clock you can change. It's what computers looked like before screens got slick.
+		Follow along. It takes about a minute, and there's a working VCR at the end of it.
 	</p>
+
+	<ol class="steps">
+		<li>Click the <b>bli</b> badge in the <b>top-left corner</b> of the menu bar.</li>
+		<li>Choose <b>Computer Store</b> from that menu.</li>
+		<li>Find the <b>VCR</b> on the shelves and buy it — carry its box to the counter.</li>
+		<li>Open the <b>bli</b> menu again and pick <b>My Shelf</b>.</li>
+		<li>Hit <b>Install</b> next to the VCR. A VCR drops onto your desktop.</li>
+		<li>Double-click the <b>VCR</b>, choose a tape, and press <b>&#9654;</b>. Be kind, rewind.</li>
+	</ol>
+
 	<p class="tagline">
-		Start at the <b>Computer Store</b> — browse the aisles, pick up software boxes, and bring them
-		to the counter. Purchased apps land on <b>My Shelf</b>, where you install and uninstall them.
+		After that the desktop is yours. Drag windows around, stack them, lose one behind another and
+		fish it out of the dock.
 	</p>
-	<p class="tagline">
-		Once you've got apps installed, the desktop is yours. Drag windows around, stack them, lose one
-		behind another and fish it out of the dock.
-	</p>
-	<div class="btn-row">
-		<button class="btn primary" onclick={() => onopen('computer-store')}>VISIT THE STORE</button>
-	</div>
+
 	<div class="logo-marquee">
 		<div class="logo-marquee-track">
 			<span>&#9733; TERMINAL — terminal.bli.net</span>
@@ -36,8 +36,7 @@
 		</div>
 	</div>
 	<p class="muted" style="margin:0;">
-		&uarr; open windows by double-clicking the icons, dragging stuff around, or pretending it's
-		1994.
+		&uarr; everything opens by clicking around. Poke at it like it's 1994.
 	</p>
 </div>
 
@@ -81,11 +80,40 @@
 		line-height: 1.3;
 		margin: 0 0 18px;
 	}
-	.btn-row {
+	.steps {
+		list-style: none;
+		counter-reset: step;
+		margin: 0 0 18px;
+		padding: 0;
+		border: 2px solid var(--ink);
+		background: var(--paper-soft);
+	}
+	.steps li {
+		position: relative;
+		padding: 9px 12px 9px 44px;
+		font-size: 20px;
+		line-height: 1.3;
+		border-bottom: 2px solid var(--ink);
+	}
+	.steps li:last-child {
+		border-bottom: none;
+	}
+	.steps li::before {
+		counter-increment: step;
+		content: counter(step);
+		position: absolute;
+		left: 9px;
+		top: 9px;
+		width: 24px;
+		height: 24px;
 		display: flex;
-		gap: 10px;
-		flex-wrap: wrap;
-		margin-bottom: 14px;
+		align-items: center;
+		justify-content: center;
+		background: var(--accent);
+		color: var(--paper);
+		border: 2px solid var(--ink);
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
+		font-size: 10px;
 	}
 	.logo-marquee {
 		overflow: hidden;

@@ -475,7 +475,7 @@
 					onresize={(id, ww, hh) => os.resizeWindow(id, ww, hh)}
 				>
 					{#if w.id === 'welcome'}
-						<WelcomeWindow onopen={(id) => os.openWindow(id)} />
+						<WelcomeWindow />
 					{:else if w.id === 'tv-guide'}
 						<TVGuide
 							groups={os.groups}
