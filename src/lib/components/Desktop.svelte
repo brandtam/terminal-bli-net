@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, type Component } from 'svelte';
 	import { isShowOnAir } from '$lib/schedule';
 	import { saveWindows } from '$lib/persistence';
 	import { OsApiClass } from '$lib/os/os-api.svelte';
@@ -16,6 +16,8 @@
 	} from '$lib/terminalos';
 	import type { FsFile, FsNode, FsAlias } from '$lib/terminalos';
 	import { createFolderView } from '$lib/terminalos';
+	import type { GroupMeta, TweaksState } from '$lib/types';
+	import type { StickyNote } from '$lib/apps/stickies/types';
 	import { APPS, getWindowComponent } from '$lib/os/app-registry';
 	import Window from './Window.svelte';
 	import MenuBar from './MenuBar.svelte';
@@ -36,7 +38,10 @@
 	// chrome stays statically imported: WelcomeWindow (first-visit greeter) and
 	// AboutAppWindow (renders every about-* dialog) — lazy-loading these would add
 	// a round-trip with no bundle win.
-	type LazyModule = { default: unknown };
+	// A lazily-imported Svelte component module. `default` is typed as the Svelte
+	// 5 `Component` constructor (props left open) so `<Comp ...>` renders without a
+	// cast — the per-branch markup below still type-checks each component's props.
+	type LazyModule = { default: Component<Record<string, unknown>> };
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
@@ -492,8 +497,8 @@
 								gridLoop={os.tweaks.tvGridLoop}
 								marqueeLoop={os.tweaks.marqueeLoop}
 								pauseOnHover={os.tweaks.tvPauseOnHover}
-								onOpenChat={(group) => os.openChat(group)}
-								onFocusChat={(slug) => os.focusWindow(`chat-${slug}`)}
+								onOpenChat={(group: GroupMeta) => os.openChat(group)}
+								onFocusChat={(slug: string) => os.focusWindow(`chat-${slug}`)}
 							/>
 						{/await}
 					{:else if w.id.startsWith('chat-')}
@@ -520,13 +525,18 @@
 							<TerminalPrefs
 								tweaks={os.tweaks}
 								{SYS7_PATTERNS}
-								onSetTweak={(k, v) => os.setTweak(k, v)}
+								onSetTweak={(k: keyof TweaksState, v: TweaksState[keyof TweaksState]) =>
+									os.setTweak(k, v)}
 							/>
 						{/await}
 					{:else if w.id === 'tvguide-prefs'}
 						{#await getWindowComponent('tvguide-prefs')!() then mod}
 							{@const TVGuidePrefs = (mod as LazyModule).default}
-							<TVGuidePrefs tweaks={os.tweaks} onSetTweak={(k, v) => os.setTweak(k, v)} />
+							<TVGuidePrefs
+								tweaks={os.tweaks}
+								onSetTweak={(k: keyof TweaksState, v: TweaksState[keyof TweaksState]) =>
+									os.setTweak(k, v)}
+							/>
 						{/await}
 					{:else if w.id === 'chatrbot-prefs'}
 						{#await getWindowComponent('chatrbot-prefs')!() then mod}
@@ -615,11 +625,11 @@
 								{@const StickiesNote = (mod as LazyModule).default}
 								<StickiesNote
 									{note}
-									ondelete={async (id) => {
+									ondelete={async (id: string) => {
 										await stickies.remove(id);
 										os.closeWindow(`sticky-${id}`);
 									}}
-									onupdate={(n) => stickies.update(n)}
+									onupdate={(n: StickyNote) => stickies.update(n)}
 								/>
 							{/await}
 						{/if}
