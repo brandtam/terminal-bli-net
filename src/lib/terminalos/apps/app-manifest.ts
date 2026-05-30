@@ -35,8 +35,14 @@ export type AppPrefsWindowSpec = {
 	title: string;
 	w: number;
 	h: number;
-	/** Lazily-loaded prefs UI ({ default: SvelteComponent }). */
-	component?: () => Promise<unknown>;
+	/**
+	 * Lazily-loaded prefs UI ({ default: SvelteComponent }). Required: every
+	 * consumer treats it as present — synthWindowComponent returns it directly
+	 * and Desktop invokes it with a non-null assertion — so a prefs block with
+	 * no component would crash on first open. Keeping it required turns that into
+	 * a compile error at the manifest authoring site instead.
+	 */
+	component: () => Promise<unknown>;
 };
 
 /**

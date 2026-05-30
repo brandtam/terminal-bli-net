@@ -702,10 +702,11 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tv',
-		// recorder has BOTH a fixed window and minted instances. The fixed
-		// window's size/title is what getWindowDef returns for 'recorder';
-		// the 'recorder-' prefix mints per-clip windows (sized dynamically
-		// from the file node, so the prefix carries the fallback def).
+		// recorder has BOTH a fixed window and minted instances. The w/h/title
+		// here size the fixed 'recorder' window (Camera.app) only —
+		// synthWindowDefs emits a static def for `id`, never for `idPrefix`. The
+		// 'recorder-' clip windows are sized dynamically in getWindowDef (os-api)
+		// from the recorded file node and do NOT read these dimensions.
 		window: { id: 'recorder', idPrefix: 'recorder-', title: 'Camera.app', w: 360, h: 480 },
 		about: { id: 'about-recorder' },
 		// Only the fixed 'recorder' window has a component. The 'recorder-' prefix

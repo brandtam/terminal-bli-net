@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { MANIFESTS } from './manifests';
 import { synthAboutWindowId, synthWindowComponent } from './app-catalog';
 import type { TerminalAppManifest } from './app-manifest';
+import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
 /**
  * Conformance test: the manifest list is the single source of truth, so every
@@ -83,6 +84,24 @@ describe('manifest conformance', () => {
 			expect(typeof manifest.component).toBe('function');
 			// The whole point: actually invoke the dynamic import so a bad path
 			// fails the test here instead of at runtime in the browser.
+			//
+			// VCR is the one device-aware loader — it returns a different deck per
+			// vcrPrefs.device (see manifests.ts). Invoking it once would only ever
+			// hit the ag500r default, so a broken import in the generic deck would
+			// slip through CI. Exercise both decks and restore the prior setting.
+			if (manifest.id === 'vcr') {
+				const prev = vcrPrefs.device;
+				try {
+					for (const device of ['ag500r', 'generic'] as const) {
+						vcrPrefs.setDevice(device);
+						const mod = (await manifest.component()) as { default?: unknown };
+						expect(mod.default, `vcr deck for device=${device}`).toBeTruthy();
+					}
+				} finally {
+					vcrPrefs.setDevice(prev);
+				}
+				return;
+			}
 			const mod = (await manifest.component()) as { default?: unknown };
 			expect(mod.default).toBeTruthy();
 		});

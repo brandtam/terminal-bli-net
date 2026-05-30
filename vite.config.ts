@@ -29,9 +29,11 @@ export default defineConfig({
 	},
 	build: {
 		// Chunk-size guardrail: warn (non-fatal, non-flaky) if any single chunk
-		// exceeds this raw-KB budget. The home/index chunk was ~106 KB gz before the
-		// lazy-loading work; 250 KB leaves headroom while still catching a regression
-		// where a whole app or library lands back in the eager graph.
+		// exceeds this budget. Vite measures uncompressed bytes, so this is a
+		// raw-KB limit — the gzipped number you'd see in devtools is ~3x smaller.
+		// After the lazy-loading work the largest chunk is ~165 KB raw (~45 KB gz);
+		// 250 KB raw leaves headroom while still catching a regression where a
+		// whole app or library lands back in the eager graph.
 		chunkSizeWarningLimit: 250
 	},
 	test: {

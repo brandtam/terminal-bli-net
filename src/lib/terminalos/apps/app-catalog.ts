@@ -125,11 +125,20 @@ export function synthWindowAppMap(): Record<string, AppId> {
 	return out;
 }
 
+/**
+ * Memoized once at module load. The map is a pure function of MANIFESTS (a
+ * module constant) and the static overrides, so it never changes within a
+ * session. synthWindowAppId reads this on every lookup instead of rebuilding —
+ * the lookup is on the hot path (os.activeAppId re-runs it on each reactive
+ * read). synthWindowAppMap() stays a fresh-object builder for its own callers.
+ */
+const WINDOW_APP_MAP = synthWindowAppMap();
+
 export function synthWindowAppId(windowId: string): AppId {
 	for (const route of PREFIX_ROUTES) {
 		if (windowId.startsWith(route.prefix)) return route.appId;
 	}
-	return synthWindowAppMap()[windowId] || 'finder';
+	return WINDOW_APP_MAP[windowId] || 'finder';
 }
 
 // ── Known window ids (KNOWN_WINDOW_IDS) ──────────────────────────────────────

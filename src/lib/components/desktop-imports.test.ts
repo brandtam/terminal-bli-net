@@ -8,10 +8,12 @@ import { fileURLToPath } from 'node:url';
  * into the main desktop chunk, which defeats the code-splitting from Phase 3 —
  * the lazy chunk would end up downloaded twice (once eager, once on open).
  *
- * Cheap chrome that intentionally stays static (FinderWindow, AboutAppWindow,
- * AboutTerminal, ErrorDialog, WelcomeWindow, StickiesNote) has no `component`
- * loader in its manifest, so deriving the lazy set from the manifest source
- * excludes it automatically. No hardcoded allowlist to rot.
+ * The two components that intentionally stay static — WelcomeWindow (the
+ * first-visit greeter, shown before any lazy chunk could load) and
+ * AboutAppWindow (the shared renderer behind every about-* dialog, which would
+ * round-trip a chunk on each open) — have no `component` loader in any manifest,
+ * so deriving the lazy set from the manifest source excludes them automatically.
+ * No hardcoded allowlist to rot.
  *
  * Why parse the manifest's SOURCE rather than call loader.toString(): vitest
  * rewrites `() => import('$lib/...')` into `() => __vite_ssr_dynamic_import__(...)`
