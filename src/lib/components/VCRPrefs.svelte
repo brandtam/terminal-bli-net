@@ -3,8 +3,8 @@
 	import Dropdown from '$lib/components/Dropdown.svelte';
 
 	const DEVICE_OPTIONS: { value: VcrDevice; label: string }[] = [
-		{ value: 'classic', label: 'Classic VCR' },
-		{ value: 'ag500r', label: 'Panasonic AG-500R' }
+		{ value: 'ag500r', label: 'Panasonic AG-500R' },
+		{ value: 'generic', label: 'Generic' }
 	];
 
 	let device = $state<VcrDevice>(vcrPrefs.device);
@@ -19,8 +19,8 @@
 		<div class="pref-label">DEVICE</div>
 		<Dropdown options={DEVICE_OPTIONS} bind:value={device} />
 		<div class="pref-hint">
-			Classic is the standard deck. The AG-500R is a heavier monitor/player — same tapes, different
-			machine.
+			The AG-500R is the default — a heavy Panasonic monitor/player. Generic is the plain deck. Same
+			tapes, different machine.
 		</div>
 	</div>
 </div>

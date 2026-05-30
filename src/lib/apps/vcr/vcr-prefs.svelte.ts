@@ -1,8 +1,9 @@
 import { appRead, appWrite } from '$lib/persistence';
 
-export type VcrDevice = 'classic' | 'ag500r';
+export type VcrDevice = 'generic' | 'ag500r';
 
-let device = $state<VcrDevice>(appRead<VcrDevice>('vcr', 'device', 'classic'));
+// The Panasonic AG-500R is the default device.
+let device = $state<VcrDevice>(appRead<VcrDevice>('vcr', 'device', 'ag500r'));
 
 export const vcrPrefs = {
 	get device(): VcrDevice {
