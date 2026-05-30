@@ -6,6 +6,7 @@
 	import {
 		TerminalFS,
 		LocalStorageManifestStore,
+		IndexedDBBodyStore,
 		DOCUMENTS_ID,
 		DESKTOP_ID,
 		ROOT_ID,
@@ -187,7 +188,10 @@
 		const bootStart = Date.now();
 
 		// Open filesystem
-		const fs = await TerminalFS.open(new LocalStorageManifestStore());
+		// Bodies persist to IndexedDB (blob bytes), nodes to localStorage (the
+		// manifest). Backup round-trips blobs as base64, so this is safe to wire
+		// before any app writes a blob.
+		const fs = await TerminalFS.open(new LocalStorageManifestStore(), new IndexedDBBodyStore());
 		terminalFs = fs;
 
 		// Create OS API
