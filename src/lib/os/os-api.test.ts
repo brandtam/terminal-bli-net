@@ -287,7 +287,7 @@ describe('system actions', () => {
 			ok: true as const,
 			value: {
 				format: 'terminal-hd' as const,
-				version: 2 as const,
+				version: 3 as const,
 				exportedAt: new Date().toISOString(),
 				disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
 				nodes: [],

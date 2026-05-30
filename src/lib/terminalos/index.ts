@@ -38,6 +38,7 @@ export type {
 	BackupFile,
 	BackupFileV1,
 	BackupFileV2,
+	BackupFileV3,
 	BackupPreview,
 	BackupPreferences,
 	BackupRestoreResult

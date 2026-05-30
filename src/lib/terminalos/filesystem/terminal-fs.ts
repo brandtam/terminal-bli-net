@@ -21,7 +21,8 @@ import { getAppWindowId } from '../apps/app-install';
 import { findAppFile, isOwned as checkOwned, deriveOwnedApps } from '../apps/software-shop';
 import type { UndoRecord } from './operations';
 import { buildBackup, validateBackup, previewBackup, validateDiskForExport } from './backup';
-import type { BackupFileV2, BackupPreferences, BackupRestoreResult } from './backup';
+import type { BackupFileV3, BackupPreferences, BackupRestoreResult } from './backup';
+import { arrayBufferToBase64, base64ToArrayBuffer } from './storage/base64';
 import type { ManifestStore, BodyStore } from './storage/storage-types';
 import { InMemoryManifestStore, InMemoryBodyStore } from './storage/storage-types';
 import { computeDiskUsage } from './usage';
@@ -1278,11 +1279,26 @@ export class TerminalFS {
 
 	// --- Backup / Restore ---
 
-	async exportBackup(preferences?: BackupPreferences): Promise<FsResult<BackupFileV2>> {
+	async exportBackup(preferences?: BackupPreferences): Promise<FsResult<BackupFileV3>> {
 		const validation = validateDiskForExport(this.volume, this.nodes);
-		if (!validation.ok) return validation as FsResult<BackupFileV2>;
+		if (!validation.ok) return validation as FsResult<BackupFileV3>;
 
-		const backup = buildBackup(this.volume, this.nodes, preferences);
+		// Collect blob bytes from the body store, keyed by bodyId. Inline text
+		// rides inside the node, so only indexeddb-blob refs need exporting.
+		const bodies: Record<string, string> = {};
+		for (const node of this.nodes.values()) {
+			if (node.flags?.hidden) continue;
+			if (node.kind !== 'file' || node.bodyRef?.kind !== 'indexeddb-blob') continue;
+
+			const { bodyId } = node.bodyRef;
+			const data = await this.bodies.read(bodyId);
+			if (!data) {
+				return fail('not_found', `Body "${bodyId}" for "${node.name}" not found`);
+			}
+			bodies[bodyId] = arrayBufferToBase64(data);
+		}
+
+		const backup = buildBackup(this.volume, this.nodes, preferences, bodies);
 		return ok(backup);
 	}
 
@@ -1299,6 +1315,23 @@ export class TerminalFS {
 		if (!validated.ok) return validated as FsResult<BackupRestoreResult>;
 
 		const backup = validated.value;
+
+		// Fail loud BEFORE mutating any state: a v3 backup must carry the bytes
+		// for every blob its nodes reference, or restore would leave dangling
+		// pointers.
+		if (backup.version === 3) {
+			for (const node of backup.nodes) {
+				if (node.kind !== 'file' || node.bodyRef?.kind !== 'indexeddb-blob') continue;
+				const { bodyId } = node.bodyRef;
+				if (!(bodyId in backup.bodies)) {
+					return fail(
+						'invalid_backup',
+						`Backup references missing body "${bodyId}" for "${node.name}"`
+					);
+				}
+			}
+		}
+
 		const preview = previewBackup(backup);
 
 		await this.flushPersist();
@@ -1307,9 +1340,19 @@ export class TerminalFS {
 			this.nodes.set(node.id, node as FsNode);
 		}
 
-		// Restore ownedApps from v2 backups (always set — even if empty/undefined)
-		if (backup.version === 2) {
+		// Restore ownedApps from v2/v3 backups (always set — even if empty/undefined)
+		if (backup.version !== 1) {
 			this.volume = { ...this.volume, ownedApps: backup.disk.ownedApps ?? [] };
+		}
+
+		// Restore blob bodies. Restore is a full disk replacement, so clear the
+		// body store first, then write each blob back from its base64.
+		if (backup.version === 3) {
+			await this.bodies.clear();
+			for (const [bodyId, b64] of Object.entries(backup.bodies)) {
+				const res = await this.writeBody(bodyId, base64ToArrayBuffer(b64));
+				if (!res.ok) return res as FsResult<BackupRestoreResult>;
+			}
 		}
 
 		// Persist the restored state
@@ -1325,7 +1368,7 @@ export class TerminalFS {
 
 		const result: BackupRestoreResult = {
 			...preview,
-			preferences: backup.version === 2 ? backup.preferences : undefined
+			preferences: backup.version !== 1 ? backup.preferences : undefined
 		};
 		return ok(result);
 	}

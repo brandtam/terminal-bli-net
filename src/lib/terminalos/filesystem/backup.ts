@@ -98,7 +98,23 @@ export type BackupFileV2 = {
 	preferences?: BackupPreferences;
 };
 
-export type BackupFile = BackupFileV1 | BackupFileV2;
+export type BackupFileV3 = {
+	format: 'terminal-hd';
+	version: 3;
+	exportedAt: string;
+	disk: {
+		id: string;
+		name: string;
+		ownedApps?: string[];
+	};
+	nodes: FsNode[];
+	// bodyId → base64 of the blob's raw bytes. Mirrors the body store (blobs
+	// only). Inline-text is NOT here — it rides inside the node.
+	bodies: Record<string, string>;
+	preferences?: BackupPreferences;
+};
+
+export type BackupFile = BackupFileV1 | BackupFileV2 | BackupFileV3;
 
 export type BackupPreview = {
 	diskName: string;
@@ -143,31 +159,43 @@ const backupSchemaV2 = z.object({
 	preferences: backupPreferencesSchema.optional()
 });
 
-const backupSchema = z.discriminatedUnion('version', [backupSchemaV1, backupSchemaV2]);
+const backupSchemaV3 = z.object({
+	format: z.literal('terminal-hd'),
+	version: z.literal(3),
+	exportedAt: z.string(),
+	disk: z.object({
+		id: z.string(),
+		name: z.string(),
+		ownedApps: z.array(z.string()).optional()
+	}),
+	nodes: z.array(fsNodeSchema),
+	bodies: z.record(z.string()),
+	preferences: backupPreferencesSchema.optional()
+});
+
+const backupSchema = z.discriminatedUnion('version', [
+	backupSchemaV1,
+	backupSchemaV2,
+	backupSchemaV3
+]);
 
 // --- Export ---
 
 export function buildBackup(
 	volume: TerminalVolume,
 	nodes: Map<NodeId, FsNode>,
-	preferences?: BackupPreferences
-): BackupFileV2 {
+	preferences?: BackupPreferences,
+	bodies: Record<string, string> = {}
+): BackupFileV3 {
 	const visibleNodes: FsNode[] = [];
-	const bodies: Record<string, string> = {};
-
 	for (const node of nodes.values()) {
 		if (node.flags?.hidden) continue;
-
 		visibleNodes.push(node);
-
-		if (node.kind === 'file' && node.bodyRef?.kind === 'inline-text') {
-			bodies[node.id] = node.bodyRef.text;
-		}
 	}
 
 	return {
 		format: 'terminal-hd',
-		version: 2,
+		version: 3,
 		exportedAt: new Date().toISOString(),
 		disk: {
 			id: volume.id,
@@ -210,7 +238,7 @@ export function previewBackup(backup: BackupFile): BackupPreview {
 	}
 
 	const hasPreferences =
-		backup.version === 2 &&
+		backup.version !== 1 &&
 		backup.preferences != null &&
 		Object.values(backup.preferences).some((v) => v != null);
 

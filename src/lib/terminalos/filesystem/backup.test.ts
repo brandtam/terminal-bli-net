@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { TerminalFS, DOCUMENTS_ID, APPLICATIONS_ID, ROOT_ID } from './terminal-fs';
 import { validateBackup, previewBackup, validateDiskForExport } from './backup';
-import type { BackupPreferences } from './backup';
+import type { BackupPreferences, BackupFileV3 } from './backup';
 
 describe('exportBackup', () => {
-	it('produces a valid v2 backup file', async () => {
+	it('produces a valid v3 backup file', async () => {
 		const fs = TerminalFS.createCleanDisk();
 		const result = await fs.exportBackup();
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value.format).toBe('terminal-hd');
-			expect(result.value.version).toBe(2);
+			expect(result.value.version).toBe(3);
 			expect(result.value.disk.name).toBe('Terminal HD');
 			expect(result.value.nodes.length).toBeGreaterThan(0);
 		}
@@ -36,15 +36,18 @@ describe('exportBackup', () => {
 		}
 	});
 
-	it('backup includes inline text bodies', async () => {
+	it('inline text rides in nodes, not the bodies dict', async () => {
 		const fs = TerminalFS.createCleanDisk();
 		const result = await fs.exportBackup();
 		if (result.ok) {
+			// Inline-text files still survive — their text is inside the node.
 			const textFiles = result.value.nodes.filter(
 				(n) => n.kind === 'file' && n.bodyRef?.kind === 'inline-text'
 			);
 			expect(textFiles.length).toBeGreaterThan(0);
-			expect(Object.keys(result.value.bodies).length).toBeGreaterThan(0);
+			// In v3, bodies is the blob store (bodyId → base64), not inline text.
+			// A clean disk has no blobs, so it's empty.
+			expect(Object.keys(result.value.bodies).length).toBe(0);
 		}
 	});
 
@@ -99,6 +102,92 @@ describe('exportBackup', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value.preferences).toBeUndefined();
+		}
+	});
+});
+
+describe('blob body round-trip', () => {
+	it('export captures blob bytes as base64 keyed by bodyId', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		const bytes = new TextEncoder().encode('binary clip').buffer as ArrayBuffer;
+		const bodyId = 'body_test_1';
+		await fs.writeBody(bodyId, bytes);
+
+		// No public API to make a blob-backed file yet (later phase), so attach
+		// the ref directly to the live node.
+		const created = await fs.createFile(DOCUMENTS_ID, 'clip.webm', { fileType: 'recording' });
+		if (!created.ok) throw new Error('createFile failed');
+		const node = fs.getAllNodes().get(created.value.id);
+		if (!node || node.kind !== 'file') throw new Error('node missing');
+		node.bodyRef = { kind: 'indexeddb-blob', bodyId, size: bytes.byteLength };
+
+		const result = await fs.exportBackup();
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.version).toBe(3);
+			expect(typeof result.value.bodies[bodyId]).toBe('string');
+			expect(result.value.bodies[bodyId].length).toBeGreaterThan(0);
+		}
+	});
+
+	it('round-trip restores blob bytes into a fresh disk', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		const bytes = new TextEncoder().encode('binary clip').buffer as ArrayBuffer;
+		const bodyId = 'body_test_1';
+		await fs.writeBody(bodyId, bytes);
+
+		const created = await fs.createFile(DOCUMENTS_ID, 'clip.webm', { fileType: 'recording' });
+		if (!created.ok) throw new Error('createFile failed');
+		const node = fs.getAllNodes().get(created.value.id);
+		if (!node || node.kind !== 'file') throw new Error('node missing');
+		node.bodyRef = { kind: 'indexeddb-blob', bodyId, size: bytes.byteLength };
+
+		const exported = await fs.exportBackup();
+		if (!exported.ok) throw new Error('export failed');
+
+		const fresh = TerminalFS.createCleanDisk();
+		const restored = await fresh.restoreBackup(exported.value);
+		expect(restored.ok).toBe(true);
+
+		const read = await fresh.readBody(bodyId);
+		expect(read.ok).toBe(true);
+		if (read.ok) {
+			expect(new TextDecoder().decode(read.value)).toBe('binary clip');
+		}
+
+		const restoredNode = fresh.getAllNodes().get(created.value.id);
+		expect(restoredNode?.kind).toBe('file');
+		if (restoredNode?.kind === 'file') {
+			expect(restoredNode.bodyRef?.kind).toBe('indexeddb-blob');
+		}
+	});
+
+	it('restore fails loud when a referenced body is missing', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		const fileNode = {
+			id: 'node_dangling',
+			volumeId: 'volume_terminal_hd',
+			kind: 'file' as const,
+			parentId: DOCUMENTS_ID,
+			name: 'dangling.webm',
+			fileType: 'recording' as const,
+			bodyRef: { kind: 'indexeddb-blob' as const, bodyId: 'body_missing', size: 10 },
+			createdAt: 1,
+			updatedAt: 1
+		};
+		const backup: BackupFileV3 = {
+			format: 'terminal-hd',
+			version: 3,
+			exportedAt: new Date().toISOString(),
+			disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
+			nodes: [...Array.from(fs.getAllNodes().values()).filter((n) => !n.flags?.hidden), fileNode],
+			bodies: {}
+		};
+
+		const result = await fs.restoreBackup(backup);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('invalid_backup');
 		}
 	});
 });
@@ -172,10 +261,22 @@ describe('validateBackup', () => {
 		expect(result.ok).toBe(false);
 	});
 
-	it('rejects version 3 (future)', () => {
+	it('accepts version 3 backups', () => {
 		const result = validateBackup({
 			format: 'terminal-hd',
 			version: 3,
+			exportedAt: '2025-01-01T00:00:00.000Z',
+			disk: { id: 'v', name: 'V', ownedApps: ['tvguide'] },
+			nodes: [],
+			bodies: { body_x: 'YmluYXJ5' }
+		});
+		expect(result.ok).toBe(true);
+	});
+
+	it('rejects version 4 (future)', () => {
+		const result = validateBackup({
+			format: 'terminal-hd',
+			version: 4,
 			exportedAt: '',
 			disk: { id: '', name: '' },
 			nodes: [],
