@@ -166,6 +166,7 @@ export const WINDOW_APP_MAP: Record<string, string> = {
 	'computer-store': 'computer-store',
 	'about-computer-store': 'computer-store',
 	vcr: 'vcr',
+	'vcr-prefs': 'vcr',
 	'about-vcr': 'vcr'
 };
 

@@ -44,6 +44,9 @@
 	import SoftwareShopWindow from '$lib/apps/software-shop/SoftwareShopWindow.svelte';
 	import ComputerStoreWindow from '$lib/apps/computer-store/ComputerStoreWindow.svelte';
 	import VCRWindow from '$lib/apps/vcr/VCRWindow.svelte';
+	import VCRWindowAG500R from '$lib/apps/vcr/VCRWindowAG500R.svelte';
+	import VCRPrefs from './VCRPrefs.svelte';
+	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
@@ -513,6 +516,8 @@
 						<TVGuidePrefs tweaks={os.tweaks} onSetTweak={(k, v) => os.setTweak(k, v)} />
 					{:else if w.id === 'chatrbot-prefs'}
 						<ChatrbotPrefs />
+					{:else if w.id === 'vcr-prefs'}
+						<VCRPrefs />
 					{:else if w.id.startsWith('textedit-')}
 						{@const fileId = w.id.replace('textedit-', '')}
 						<TextEditWindow docId={fileId} fs={terminalFs} />
@@ -538,7 +543,11 @@
 					{:else if w.id === 'trash'}
 						<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
 					{:else if w.id === 'vcr'}
-						<VCRWindow />
+						{#if vcrPrefs.device === 'ag500r'}
+							<VCRWindowAG500R />
+						{:else}
+							<VCRWindow />
+						{/if}
 					{:else if w.id === 'recorder'}
 						<RecorderWindow bind:recording={cameraRecording} fs={terminalFs} />
 					{:else if w.id.startsWith('recorder-')}

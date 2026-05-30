@@ -76,6 +76,7 @@ export class OsApiClass implements OsApi {
 		'computer-store',
 		'about-computer-store',
 		'vcr',
+		'vcr-prefs',
 		'about-vcr'
 	]);
 
@@ -321,7 +322,8 @@ export class OsApiClass implements OsApi {
 			'computer-store': { title: 'Computer Store', w: 740, h: 620 },
 			'about-computer-store': { title: 'About Computer Store', w: 420, h: 380 },
 			finder: { title: 'Terminal HD', w: 480, h: 420 },
-			vcr: { title: 'VCR.app', w: 560, h: 523, minW: 480, minH: 470 },
+			vcr: { title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 },
+			'vcr-prefs': { title: 'VCR Preferences', w: 360, h: 300 },
 			'about-vcr': { title: 'About VCR', w: 420, h: 460 }
 		};
 
