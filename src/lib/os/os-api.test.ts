@@ -19,7 +19,10 @@ vi.mock('$lib/persistence', () => ({
 	loadConversations: () => ({}),
 	saveConversations: vi.fn(),
 	isFirstVisit: () => false,
-	clearAllPreferences: vi.fn()
+	clearAllPreferences: vi.fn(),
+	// Pulled in transitively via vcr-prefs (device-aware VCR window sizing).
+	appRead: (_app: string, _key: string, fallback: unknown) => fallback,
+	appWrite: vi.fn()
 }));
 
 import { OsApiClass } from './os-api.svelte';

@@ -44,6 +44,9 @@
 	import SoftwareShopWindow from '$lib/apps/software-shop/SoftwareShopWindow.svelte';
 	import ComputerStoreWindow from '$lib/apps/computer-store/ComputerStoreWindow.svelte';
 	import VCRWindow from '$lib/apps/vcr/VCRWindow.svelte';
+	import VCRWindowAG500R from '$lib/apps/vcr/VCRWindowAG500R.svelte';
+	import VCRPrefs from './VCRPrefs.svelte';
+	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
@@ -295,6 +298,20 @@
 		window.history.replaceState(null, '', hash ? `#${hash}` : window.location.pathname);
 	});
 
+	// Reflow an open VCR window when the device changes — the two decks have
+	// different aspect ratios, so the old window dimensions would leave the new
+	// deck either squished or overflowing until reopened.
+	let prevVcrDevice = vcrPrefs.device;
+	$effect(() => {
+		const device = vcrPrefs.device;
+		if (!booted || device === prevVcrDevice) return;
+		prevVcrDevice = device;
+		if (os.listWindows().some((w) => w.id === 'vcr')) {
+			const def = os.getWindowDef('vcr');
+			os.resizeWindow('vcr', def.w, def.h);
+		}
+	});
+
 	// Window save debounce
 	$effect(() => {
 		if (!os?.mounted) return;
@@ -472,7 +489,7 @@
 					onresize={(id, ww, hh) => os.resizeWindow(id, ww, hh)}
 				>
 					{#if w.id === 'welcome'}
-						<WelcomeWindow onopen={(id) => os.openWindow(id)} />
+						<WelcomeWindow />
 					{:else if w.id === 'tv-guide'}
 						<TVGuide
 							groups={os.groups}
@@ -513,6 +530,8 @@
 						<TVGuidePrefs tweaks={os.tweaks} onSetTweak={(k, v) => os.setTweak(k, v)} />
 					{:else if w.id === 'chatrbot-prefs'}
 						<ChatrbotPrefs />
+					{:else if w.id === 'vcr-prefs'}
+						<VCRPrefs />
 					{:else if w.id.startsWith('textedit-')}
 						{@const fileId = w.id.replace('textedit-', '')}
 						<TextEditWindow docId={fileId} fs={terminalFs} />
@@ -538,7 +557,11 @@
 					{:else if w.id === 'trash'}
 						<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
 					{:else if w.id === 'vcr'}
-						<VCRWindow />
+						{#if vcrPrefs.device === 'ag500r'}
+							<VCRWindowAG500R />
+						{:else}
+							<VCRWindow />
+						{/if}
 					{:else if w.id === 'recorder'}
 						<RecorderWindow bind:recording={cameraRecording} fs={terminalFs} />
 					{:else if w.id.startsWith('recorder-')}

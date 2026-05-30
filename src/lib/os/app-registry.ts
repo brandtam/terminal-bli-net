@@ -579,7 +579,7 @@ export const APPS: Record<string, AppDef> = {
 				}
 			]
 		},
-		preferences: null,
+		preferences: 'vcr-prefs',
 		menus: (os) => [
 			{
 				label: 'File',
@@ -595,7 +595,16 @@ export const APPS: Record<string, AppDef> = {
 			},
 			{
 				label: 'Help',
-				items: [{ type: 'action', label: 'About VCR', action: () => os.openAbout('vcr') }]
+				items: [
+					{
+						type: 'action',
+						label: 'Preferences…',
+						shortcut: '⌘,',
+						action: () => os.openPreferences('vcr')
+					},
+					{ type: 'separator' },
+					{ type: 'action', label: 'About VCR', action: () => os.openAbout('vcr') }
+				]
 			}
 		],
 		statusExtra: () => null
