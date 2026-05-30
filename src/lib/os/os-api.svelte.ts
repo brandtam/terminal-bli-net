@@ -17,7 +17,12 @@ import {
 } from '$lib/persistence';
 import { getAppWindowId } from '$lib/terminalos/apps/app-install';
 import { getAppDef } from '$lib/terminalos/apps/app-library';
-import { synthKnownWindowIds, synthWindowDefs } from '$lib/terminalos/apps/app-catalog';
+import {
+	synthKnownWindowIds,
+	synthWindowDefs,
+	synthAboutWindowId,
+	synthPrefsWindowId
+} from '$lib/terminalos/apps/app-catalog';
 import type { TerminalFS } from '$lib/terminalos';
 
 export class OsApiClass implements OsApi {
@@ -378,21 +383,16 @@ export class OsApiClass implements OsApi {
 	}
 
 	openPreferences(appId: string): void {
-		const a = APPS[appId];
-		if (a?.preferences) this.openWindow(a.preferences);
+		// The prefs window-id comes straight from the app's manifest (prefs.id),
+		// or null when the app has no Preferences dialog.
+		const prefsId = synthPrefsWindowId(appId);
+		if (prefsId) this.openWindow(prefsId);
 	}
 
 	openAbout(appId: string | null): void {
-		if (appId === 'chatrbot') return this.openWindow('about-chatrbot');
-		if (appId === 'tvguide') return this.openWindow('about-tvguide');
-		if (appId === 'textedit') return this.openWindow('about-textedit');
-		if (appId === 'stats') return this.openWindow('about-stats');
-		if (appId === 'stickies') return this.openWindow('about-stickies');
-		if (appId === 'recorder') return this.openWindow('about-recorder');
-		if (appId === 'software-shop') return this.openWindow('about-software-shop');
-		if (appId === 'computer-store') return this.openWindow('about-computer-store');
-		if (appId === 'vcr') return this.openWindow('about-vcr');
-		this.openWindow('about');
+		// The About window-id comes from the app's manifest (about.id); apps with
+		// no About dialog, and a null id, fall back to the system 'about'.
+		this.openWindow(synthAboutWindowId(appId));
 	}
 
 	startNewConversation(): void {
@@ -410,41 +410,20 @@ export class OsApiClass implements OsApi {
 	}
 
 	launchApp(appId: string, payload?: Record<string, unknown>): void {
-		// Check registered handlers first
+		// Apps with custom launch behavior (stickies/textedit/chatrbot) register a
+		// handler at startup; those win. See the registerLaunchHandler call sites
+		// in Desktop.svelte.
 		const handler = this.launchHandlers.get(appId);
 		if (handler) {
 			handler(payload);
 			return;
 		}
 
-		// Default routing for known apps
-		if (appId === 'tvguide') {
-			this.openWindow('tv-guide');
-			return;
-		}
-		if (appId === 'recorder') {
-			this.openWindow('recorder');
-			return;
-		}
-		if (appId === 'stats') {
-			this.openWindow('stats');
-			return;
-		}
-		if (appId === 'error') {
-			this.openWindow('error');
-			return;
-		}
-		if (appId === 'welcome') {
-			this.openWindow('welcome');
-			return;
-		}
-
-		// Fallback: try to find a window ID
+		// Everything else is a plain "open the app's window" — the window-id comes
+		// from the manifest (via getAppWindowId). The old per-app chain
+		// (tvguide → tv-guide, recorder, stats, error) only repeated that mapping.
 		const windowId = getAppWindowId(appId);
-		if (windowId) {
-			this.openWindow(windowId);
-			return;
-		}
+		if (windowId) this.openWindow(windowId);
 	}
 
 	openChat(group: GroupMeta): void {

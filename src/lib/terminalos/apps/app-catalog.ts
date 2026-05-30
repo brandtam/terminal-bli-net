@@ -238,6 +238,30 @@ export function synthAppIconKind(appId: PersistedAppId): string {
 	return m?.iconKind ?? 'doc';
 }
 
+// ── App → about / prefs window id (os-api routing) ───────────────────────────
+
+/**
+ * The About-dialog window-id for an app. Each manifest carries its own
+ * `about.id` (e.g. vcr → 'about-vcr', finder → 'about'); apps with no About
+ * dialog (trash, error, system-prefs, the games, or a null/unknown id) fall
+ * back to the shared system 'about'. Replaces openAbout()'s hardcoded chain.
+ */
+export function synthAboutWindowId(appId: string | null): string {
+	if (!appId) return 'about';
+	const m = MANIFESTS.find((x) => x.id === appId);
+	return m?.about?.id ?? 'about';
+}
+
+/**
+ * The Preferences-dialog window-id for an app, or null if it has none. Mirrors
+ * the original APPS[appId].preferences lookup (prefs.id when the manifest
+ * declares a `prefs` block, else null). Replaces openPreferences()'s APPS read.
+ */
+export function synthPrefsWindowId(appId: string): string | null {
+	const m = MANIFESTS.find((x) => x.id === appId);
+	return m?.prefs?.id ?? null;
+}
+
 // ── Window → lazy component (Desktop render chain) ───────────────────────────
 
 /** A loader returning a module whose `default` is the window's Svelte component. */
