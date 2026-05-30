@@ -8,6 +8,8 @@ import {
 	getOwnedAppIds,
 	deriveOwnedApps
 } from './software-shop';
+import { APP_LIBRARY, getAppDef } from './app-library';
+import { getAppWindowId, isSpecialLaunchApp } from './app-install';
 
 describe('getShopCatalog', () => {
 	it('returns catalog items', () => {
@@ -409,5 +411,47 @@ describe('reinstall clears ownership', () => {
 		await fs.reinstallOS();
 		expect(isInstalled('textedit', fs.getAllNodes())).toBe(true);
 		expect(isInstalled('stickies', fs.getAllNodes())).toBe(true);
+	});
+});
+
+describe('app lifecycle data model (issue 25)', () => {
+	const COMING_SOON_GAMES = ['tetra', 'solitaire', 'minesweep', 'zorquest', 'calc', 'paint'];
+
+	it('the six unbuilt games are coming-soon, not released', () => {
+		for (const id of COMING_SOON_GAMES) {
+			const def = getAppDef(id);
+			expect(def?.isSystem).toBe(false);
+			expect(def?.status).toBe('coming-soon');
+		}
+	});
+
+	it('coming-soon apps still appear in the shop catalog (shown, tagged by UI)', () => {
+		const fs = TerminalFS.createCleanDisk();
+		const ids = getShopCatalog(fs.getAllNodes()).map((i) => i.app.id);
+		for (const id of COMING_SOON_GAMES) expect(ids).toContain(id);
+	});
+
+	it('conformance: every released store app resolves a launch target', () => {
+		const released = APP_LIBRARY.filter((a) => !a.isSystem && a.status === 'released');
+		expect(released.length).toBeGreaterThan(0);
+		for (const app of released) {
+			const launchable = getAppWindowId(app.id) !== undefined || isSpecialLaunchApp(app.id);
+			expect(launchable, `${app.id} has no window or special-launch handler`).toBe(true);
+		}
+	});
+
+	it('a deprecated owned app is hidden from the shop but stays owned', () => {
+		// Synthetic: flip a real store app to deprecated for this assertion.
+		const def = getAppDef('stats')!;
+		const original = def.status;
+		def.status = 'deprecated';
+		try {
+			const fs = TerminalFS.createCleanDisk();
+			const ids = getShopCatalog(fs.getAllNodes()).map((i) => i.app.id);
+			expect(ids).not.toContain('stats');
+			expect(isOwned('stats', ['stats'])).toBe(true);
+		} finally {
+			def.status = original;
+		}
 	});
 });

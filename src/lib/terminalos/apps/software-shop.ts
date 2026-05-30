@@ -8,25 +8,13 @@ export type ShopItem = {
 	installed: boolean;
 };
 
-/** Apps that don't appear in the shop — they're the shell/system, not installable. */
-const HIDDEN_FROM_SHOP = new Set<AppId>([
-	'finder',
-	'trash',
-	'system-prefs',
-	'about-terminal',
-	'software-shop',
-	'computer-store',
-	'textedit',
-	'stickies'
-]);
-
 /**
  * Get the Software Shop catalog — all apps that should appear in the shop.
- * Excludes system-only apps that aren't meaningful to show (finder, trash).
+ * Store apps only (not system chrome), and deprecated apps are hidden.
  * Marks each as installed or not based on whether an app file exists.
  */
 export function getShopCatalog(nodes: Map<NodeId, FsNode>): ShopItem[] {
-	return APP_LIBRARY.filter((app) => !HIDDEN_FROM_SHOP.has(app.id)).map((app) => ({
+	return APP_LIBRARY.filter((app) => !app.isSystem && app.status !== 'deprecated').map((app) => ({
 		app,
 		installed: isInstalled(app.id, nodes)
 	}));
@@ -74,7 +62,7 @@ export function canUninstall(appId: AppId): boolean {
 export function isOwned(appId: AppId, ownedApps: AppId[]): boolean {
 	const def = getAppDef(appId);
 	if (!def) return false;
-	if (def.visibility === 'system') return true;
+	if (def.isSystem) return true;
 	return ownedApps.includes(appId);
 }
 
@@ -93,7 +81,7 @@ export function getOwnedAppIds(ownedApps: AppId[]): AppId[] {
 export function deriveOwnedApps(nodes: Map<NodeId, FsNode>): AppId[] {
 	const owned: AppId[] = [];
 	for (const app of APP_LIBRARY) {
-		if (app.visibility === 'store' && isInstalled(app.id, nodes)) {
+		if (!app.isSystem && isInstalled(app.id, nodes)) {
 			owned.push(app.id);
 		}
 	}
