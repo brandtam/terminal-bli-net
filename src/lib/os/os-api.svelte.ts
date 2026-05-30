@@ -15,6 +15,7 @@ import {
 	isFirstVisit,
 	clearAllPreferences
 } from '$lib/persistence';
+import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 import { getAppWindowId } from '$lib/terminalos/apps/app-install';
 import { getAppDef } from '$lib/terminalos/apps/app-library';
 import type { TerminalFS } from '$lib/terminalos';
@@ -322,7 +323,14 @@ export class OsApiClass implements OsApi {
 			'computer-store': { title: 'Computer Store', w: 740, h: 620 },
 			'about-computer-store': { title: 'About Computer Store', w: 420, h: 380 },
 			finder: { title: 'Terminal HD', w: 480, h: 420 },
-			vcr: { title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 },
+			// The two VCR devices have very different aspect ratios, so size the
+			// window to the selected one. The AG-500R is wide (REF 1170×720); the
+			// Generic deck is near-square (REF 560×523) and looks marooned in the
+			// AG-500R's 900-wide frame.
+			vcr:
+				vcrPrefs.device === 'generic'
+					? { title: 'VCR.app', w: 560, h: 523, minW: 480, minH: 470 }
+					: { title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 },
 			'vcr-prefs': { title: 'VCR Preferences', w: 360, h: 300 },
 			'about-vcr': { title: 'About VCR', w: 420, h: 460 }
 		};
@@ -438,6 +446,7 @@ export class OsApiClass implements OsApi {
 		if (appId === 'recorder') return this.openWindow('about-recorder');
 		if (appId === 'software-shop') return this.openWindow('about-software-shop');
 		if (appId === 'computer-store') return this.openWindow('about-computer-store');
+		if (appId === 'vcr') return this.openWindow('about-vcr');
 		this.openWindow('about');
 	}
 

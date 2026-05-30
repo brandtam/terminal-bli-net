@@ -10,10 +10,12 @@
 	</p>
 
 	<ol class="steps">
-		<li>Click the <b>bli</b> badge in the <b>top-left corner</b> of the menu bar.</li>
+		<li>Click the <b>icon</b> in the <b>top-left corner</b> of the menu bar.</li>
 		<li>Choose <b>Computer Store</b> from that menu.</li>
-		<li>Find the <b>VCR</b> on the shelves and buy it — carry its box to the counter.</li>
-		<li>Open the <b>bli</b> menu again and pick <b>My Shelf</b>.</li>
+		<li>
+			Find the <b>VCR</b> on the shelves and buy it at the <b>checkout</b>, then leave the store.
+		</li>
+		<li>Open that menu again and pick <b>My Shelf</b>.</li>
 		<li>Hit <b>Install</b> next to the VCR. A VCR drops onto your desktop.</li>
 		<li>Double-click the <b>VCR</b>, choose a tape, and press <b>&#9654;</b>. Be kind, rewind.</li>
 	</ol>
@@ -21,6 +23,11 @@
 	<p class="tagline">
 		After that the desktop is yours. Drag windows around, stack them, lose one behind another and
 		fish it out of the dock.
+	</p>
+
+	<p class="tagline">
+		Then head back to the <b>Computer Store</b> — there's a whole shelf of apps to play with, and plenty
+		of hidden features tucked away. Poke around and see how many retro Easter eggs you can dig up.
 	</p>
 
 	<div class="logo-marquee">
@@ -35,9 +42,7 @@
 			<span>&#9733; ONE PERSON'S PROJECT, NOT A PLATFORM</span>
 		</div>
 	</div>
-	<p class="muted" style="margin:0;">
-		&uarr; everything opens by clicking around. Poke at it like it's 1994.
-	</p>
+	<p class="muted" style="margin:0;">&uarr; everything opens by clicking around.</p>
 </div>
 
 <style>

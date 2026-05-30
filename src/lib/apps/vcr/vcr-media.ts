@@ -64,17 +64,26 @@ export async function resolvePlayableUrl(episode: VCREpisode): Promise<string | 
 		return urlCache.get(episode.archiveId) ?? null;
 	}
 
-	let resolved: string | null;
+	let resolved: string | null = null;
+	// Only cache a result we actually trust. A 2xx with a valid body is a real
+	// answer — even `null` means "no playable file", which is worth remembering.
+	// A network error, a non-2xx, or a parse failure is transient: don't cache it,
+	// or a single archive.org blip would pin this show to the iframe fallback for
+	// the rest of the session.
+	let cacheable = false;
 	try {
 		const res = await fetch(`https://archive.org/metadata/${episode.archiveId}`);
-		const json: { files?: ArchiveFile[] } = await res.json();
-		const files: ArchiveFile[] = Array.isArray(json?.files) ? json.files : [];
-		const name = pickPlayableFile(files);
-		resolved = name ? downloadUrl(episode.archiveId, name) : null;
+		if (res.ok) {
+			const json: { files?: ArchiveFile[] } = await res.json();
+			const files: ArchiveFile[] = Array.isArray(json?.files) ? json.files : [];
+			const name = pickPlayableFile(files);
+			resolved = name ? downloadUrl(episode.archiveId, name) : null;
+			cacheable = true;
+		}
 	} catch {
-		resolved = null;
+		// transient — leave resolved=null, cacheable=false so the next PLAY retries
 	}
 
-	urlCache.set(episode.archiveId, resolved);
+	if (cacheable) urlCache.set(episode.archiveId, resolved);
 	return resolved;
 }

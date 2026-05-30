@@ -298,6 +298,20 @@
 		window.history.replaceState(null, '', hash ? `#${hash}` : window.location.pathname);
 	});
 
+	// Reflow an open VCR window when the device changes — the two decks have
+	// different aspect ratios, so the old window dimensions would leave the new
+	// deck either squished or overflowing until reopened.
+	let prevVcrDevice = vcrPrefs.device;
+	$effect(() => {
+		const device = vcrPrefs.device;
+		if (!booted || device === prevVcrDevice) return;
+		prevVcrDevice = device;
+		if (os.listWindows().some((w) => w.id === 'vcr')) {
+			const def = os.getWindowDef('vcr');
+			os.resizeWindow('vcr', def.w, def.h);
+		}
+	});
+
 	// Window save debounce
 	$effect(() => {
 		if (!os?.mounted) return;
