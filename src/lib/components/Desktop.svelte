@@ -298,9 +298,7 @@
 		window.history.replaceState(null, '', hash ? `#${hash}` : window.location.pathname);
 	});
 
-	// Reflow an open VCR window when the device changes — the two decks have
-	// different aspect ratios, so the old window dimensions would leave the new
-	// deck either squished or overflowing until reopened.
+	// Resize an open VCR window to fit the newly-selected device.
 	let prevVcrDevice = vcrPrefs.device;
 	$effect(() => {
 		const device = vcrPrefs.device;
