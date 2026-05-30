@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { TerminalFS } from '$lib/terminalos';
-	import { getOwnedAppIds } from '$lib/terminalos';
+	import { getOwnedAppIds, getAppDef } from '$lib/terminalos';
 	import type { OsApi } from '$lib/os/os-api';
 	import TopBar from './TopBar.svelte';
 	import AisleView from './AisleView.svelte';
@@ -39,6 +39,7 @@
 	);
 
 	function addToCart(id: string) {
+		if (getAppDef(id)?.status === 'coming-soon') return;
 		if (!cart.includes(id)) cart = [...cart, id];
 	}
 
@@ -49,6 +50,7 @@
 	async function ringUp() {
 		if (cart.length === 0) return;
 		for (const id of cart) {
+			if (getAppDef(id)?.status === 'coming-soon') continue;
 			if (!fs.isAppOwned(id)) {
 				const result = await fs.buyApp(id);
 				if (!result.ok) {
@@ -136,6 +138,7 @@
 				app={pickedUp}
 				owned={owned.includes(pickedUp.id)}
 				inCart={cart.includes(pickedUp.id)}
+				comingSoon={getAppDef(pickedUp.id)?.status === 'coming-soon'}
 				onclose={() => {
 					pickedUp = null;
 				}}

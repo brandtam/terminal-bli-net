@@ -114,7 +114,7 @@ export class OsApiClass implements OsApi {
 		const saved = loadWindows().filter((w) => {
 			const wAppId = windowAppId(w.id);
 			const def = getAppDef(wAppId);
-			return !def || def.visibility !== 'store' || this.fs.isAppInstalledSync(wAppId);
+			return !def || def.isSystem || this.fs.isAppInstalledSync(wAppId);
 		});
 		if (saved.length > 0) {
 			this.windows = saved;
@@ -209,7 +209,7 @@ export class OsApiClass implements OsApi {
 		// Gate: store apps must be installed before any of their windows open
 		const appId = windowAppId(id);
 		const appDef = getAppDef(appId);
-		if (appDef?.visibility === 'store') {
+		if (appDef && !appDef.isSystem) {
 			const installed = this.fs.isAppInstalledSync(appId);
 			if (!installed) {
 				const name = appDef.name;

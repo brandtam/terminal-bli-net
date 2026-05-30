@@ -15,7 +15,7 @@ import { ok, fail } from './errors';
 import { generateUniqueId, hasSiblingConflict } from './names';
 import { derivePath } from './paths';
 import { resolveAlias as resolveAliasTarget, buildFingerprint } from './aliases';
-import { getDefaultInstalledApps, getDesktopAliasApps, getAppDef } from '../apps/app-library';
+import { getSystemApps, getDesktopAliasApps, getAppDef } from '../apps/app-library';
 import { getAppWindowId } from '../apps/app-install';
 import { findAppFile, isOwned as checkOwned, deriveOwnedApps } from '../apps/software-shop';
 import type { UndoRecord } from './operations';
@@ -105,7 +105,7 @@ const NON_FILE_APPS = new Set(['finder', 'trash']);
 /** System apps that go in /System instead of /Applications. */
 const SYSTEM_FOLDER_APPS = new Set(['system-prefs', 'about-terminal']);
 
-/** IDs of system-folder apps that are always seeded regardless of defaultInstalled. */
+/** IDs of system-folder apps that are always seeded into /System. */
 const SYSTEM_FOLDER_APP_IDS = ['system-prefs', 'about-terminal'];
 
 /**
@@ -311,10 +311,8 @@ export class TerminalFS {
 		const now = Date.now();
 		const nodes = new Map<NodeId, FsNode>();
 
-		// 1. Volume — pre-own all defaultInstalled store apps
-		const preOwnedStoreApps = getDefaultInstalledApps()
-			.filter((a) => a.visibility === 'store')
-			.map((a) => a.id);
+		// 1. Volume — store apps must be bought; a clean disk owns none.
+		const preOwnedStoreApps: AppId[] = [];
 		const volume: TerminalVolume = {
 			id: VOLUME_ID,
 			name: 'Terminal HD',
@@ -361,13 +359,12 @@ export class TerminalFS {
 		}
 
 		// 4. Seed app file nodes
-		//    - defaultInstalled apps go into /Applications
+		//    - system apps go into /Applications
 		//    - system-folder apps (system-prefs, about-terminal) always go into /System
 		//    - non-file apps (finder, trash) are never created as files
 		const appsToSeed = [
-			...getDefaultInstalledApps(),
-			// System-folder apps aren't defaultInstalled (they don't go in /Applications)
-			// but they always get seeded into /System
+			...getSystemApps(),
+			// System-folder apps always get seeded into /System
 			...SYSTEM_FOLDER_APP_IDS.map((id) => getAppDef(id)).filter(Boolean)
 		] as import('../apps/app-types').TerminalAppDefinition[];
 

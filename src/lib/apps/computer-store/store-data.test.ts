@@ -35,7 +35,7 @@ describe('store catalog', () => {
 	});
 
 	it('no system apps appear in the store catalog', () => {
-		const systemIds = APP_LIBRARY.filter((a) => a.visibility === 'system').map((a) => a.id);
+		const systemIds = APP_LIBRARY.filter((a) => a.isSystem).map((a) => a.id);
 		const storeIds = new Set(APPS.map((a) => a.id));
 		for (const id of systemIds) {
 			expect(storeIds.has(id)).toBe(false);

@@ -10,10 +10,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'system',
 		description: 'File manager and desktop shell',
 		icon: ':)',
-		defaultInstalled: false,
 		removable: false,
 		desktopAliasByDefault: false,
-		visibility: 'system'
+		isSystem: true
 	},
 	{
 		id: 'system-prefs',
@@ -22,10 +21,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'system',
 		description: 'Terminal OS settings',
 		icon: '⚙',
-		defaultInstalled: false,
 		removable: false,
 		desktopAliasByDefault: false,
-		visibility: 'system'
+		isSystem: true
 	},
 	{
 		id: 'about-terminal',
@@ -34,10 +32,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'system',
 		description: 'System information',
 		icon: ':)',
-		defaultInstalled: false,
 		removable: false,
 		desktopAliasByDefault: false,
-		visibility: 'system'
+		isSystem: true
 	},
 	{
 		id: 'software-shop',
@@ -46,10 +43,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'system',
 		description: 'Your owned apps',
 		icon: '💾',
-		defaultInstalled: true,
 		removable: false,
 		desktopAliasByDefault: true,
-		visibility: 'system'
+		isSystem: true
 	},
 	{
 		id: 'computer-store',
@@ -58,10 +54,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'system',
 		description: 'Browse and buy software',
 		icon: '🏪',
-		defaultInstalled: true,
 		removable: false,
 		desktopAliasByDefault: false,
-		visibility: 'system'
+		isSystem: true
 	},
 	{
 		id: 'trash',
@@ -70,10 +65,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'system',
 		description: 'Deleted items',
 		icon: '🗑',
-		defaultInstalled: false,
 		removable: false,
 		desktopAliasByDefault: false,
-		visibility: 'system'
+		isSystem: true
 	},
 
 	// --- System apps bundled with OS (not in the Computer Store) ---
@@ -84,10 +78,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'productivity',
 		description: 'Plain text editor',
 		icon: 'txt',
-		defaultInstalled: true,
 		removable: false,
 		desktopAliasByDefault: false,
-		visibility: 'system'
+		isSystem: true
 	},
 	{
 		id: 'stickies',
@@ -96,10 +89,9 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'productivity',
 		description: 'Desktop sticky notes',
 		icon: '▤',
-		defaultInstalled: true,
 		removable: false,
 		desktopAliasByDefault: true,
-		visibility: 'system'
+		isSystem: true
 	},
 
 	// --- Store apps (must be bought at the Computer Store) ---
@@ -110,10 +102,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'entertainment',
 		description: 'Channel guide and schedule',
 		icon: 'TV',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: true,
-		visibility: 'store'
+		isSystem: false,
+		status: 'released'
 	},
 	{
 		id: 'chatrbot',
@@ -122,10 +114,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'entertainment',
 		description: 'Chat with TV characters',
 		icon: 'cb',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: false,
-		visibility: 'store'
+		isSystem: false,
+		status: 'released'
 	},
 	{
 		id: 'recorder',
@@ -134,10 +126,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'utilities',
 		description: 'Record short webcam clips',
 		icon: 'REC',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: true,
-		visibility: 'store'
+		isSystem: false,
+		status: 'released'
 	},
 	{
 		id: 'stats',
@@ -146,10 +138,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'utilities',
 		description: 'System statistics',
 		icon: '≡',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: true,
-		visibility: 'store'
+		isSystem: false,
+		status: 'released'
 	},
 	{
 		id: 'error',
@@ -158,10 +150,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'utilities',
 		description: 'Mystery app',
 		icon: '⚠',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: true,
-		visibility: 'store'
+		isSystem: false,
+		status: 'released'
 	},
 	{
 		id: 'tetra',
@@ -170,10 +162,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'entertainment',
 		description: 'Falling block puzzle',
 		icon: '▦',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: false,
-		visibility: 'store'
+		isSystem: false,
+		status: 'coming-soon'
 	},
 	{
 		id: 'solitaire',
@@ -182,10 +174,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'entertainment',
 		description: 'Card game',
 		icon: '♠',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: false,
-		visibility: 'store'
+		isSystem: false,
+		status: 'coming-soon'
 	},
 	{
 		id: 'minesweep',
@@ -194,10 +186,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'entertainment',
 		description: 'Grid puzzle with bombs',
 		icon: '💣',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: false,
-		visibility: 'store'
+		isSystem: false,
+		status: 'coming-soon'
 	},
 	{
 		id: 'zorquest',
@@ -206,10 +198,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'entertainment',
 		description: 'Text adventure',
 		icon: '📜',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: false,
-		visibility: 'store'
+		isSystem: false,
+		status: 'coming-soon'
 	},
 	{
 		id: 'calc',
@@ -218,10 +210,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'productivity',
 		description: 'Calculator',
 		icon: '🧮',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: false,
-		visibility: 'store'
+		isSystem: false,
+		status: 'coming-soon'
 	},
 	{
 		id: 'paint',
@@ -230,10 +222,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'productivity',
 		description: 'Bitmap painting',
 		icon: '🖌',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: false,
-		visibility: 'store'
+		isSystem: false,
+		status: 'coming-soon'
 	},
 	{
 		id: 'vcr',
@@ -242,10 +234,10 @@ export const APP_LIBRARY: TerminalAppDefinition[] = [
 		category: 'entertainment',
 		description: 'Retro video player',
 		icon: '📼',
-		defaultInstalled: false,
 		removable: true,
 		desktopAliasByDefault: true,
-		visibility: 'store'
+		isSystem: false,
+		status: 'released'
 	}
 ];
 
@@ -253,8 +245,9 @@ export function getAppDef(appId: AppId): TerminalAppDefinition | undefined {
 	return APP_LIBRARY.find((a) => a.id === appId);
 }
 
-export function getDefaultInstalledApps(): TerminalAppDefinition[] {
-	return APP_LIBRARY.filter((a) => a.defaultInstalled);
+/** System apps — always owned, seeded on a clean disk. */
+export function getSystemApps(): TerminalAppDefinition[] {
+	return APP_LIBRARY.filter((a) => a.isSystem);
 }
 
 export function getDesktopAliasApps(): TerminalAppDefinition[] {
@@ -262,5 +255,5 @@ export function getDesktopAliasApps(): TerminalAppDefinition[] {
 }
 
 export function getStoreApps(): TerminalAppDefinition[] {
-	return APP_LIBRARY.filter((a) => a.visibility === 'store');
+	return APP_LIBRARY.filter((a) => !a.isSystem);
 }

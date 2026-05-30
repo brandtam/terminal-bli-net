@@ -10,6 +10,7 @@
 		app,
 		owned = false,
 		inCart = false,
+		comingSoon = false,
 		onclose,
 		onaddtocart,
 		onremovefromcart,
@@ -18,6 +19,7 @@
 		app: StoreApp;
 		owned?: boolean;
 		inCart?: boolean;
+		comingSoon?: boolean;
 		onclose: () => void;
 		onaddtocart: () => void;
 		onremovefromcart: () => void;
@@ -56,7 +58,13 @@
 		<div class="body">
 			<div class="box-col">
 				<SoftwareBox {app} width={170} height={228} hoverable={false} lift />
-				<div class="price"><span class="price-label">$0.00</span></div>
+				<div class="price">
+					{#if comingSoon}
+						<span class="price-label">COMING SOON</span>
+					{:else}
+						<span class="price-label">$0.00</span>
+					{/if}
+				</div>
 			</div>
 
 			<div class="info-col">
@@ -87,6 +95,9 @@
 				<div class="chip chip-cart">● IN YOUR CART</div>
 				<button class="btn btn-warn" onclick={onremovefromcart}>TAKE OUT OF CART</button>
 				<button class="btn btn-plain ml-auto" onclick={onclose}>× CLOSE</button>
+			{:else if comingSoon}
+				<div class="chip chip-soon">● NOT YET AVAILABLE</div>
+				<button class="btn btn-plain ml-auto" onclick={onclose}>◂ PUT BACK ON SHELF</button>
 			{:else}
 				<button class="btn btn-primary" onclick={onaddtocart}>▸ ADD TO CART</button>
 				<button class="btn btn-plain ml-auto" onclick={onclose}>◂ PUT BACK ON SHELF</button>
@@ -243,6 +254,11 @@
 
 	.chip-cart {
 		background: #f9bd2b;
+	}
+
+	.chip-soon {
+		background: #4a4a8a;
+		color: #ffffff;
 	}
 
 	.btn {

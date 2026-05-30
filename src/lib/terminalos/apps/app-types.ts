@@ -2,7 +2,7 @@ import type { AppId } from '../filesystem/types';
 
 export type AppCategory = 'system' | 'entertainment' | 'productivity' | 'utilities';
 
-export type AppVisibility = 'store' | 'system';
+export type AppStatus = 'coming-soon' | 'released' | 'deprecated';
 
 export type TerminalAppDefinition = {
 	id: AppId;
@@ -11,8 +11,9 @@ export type TerminalAppDefinition = {
 	category: AppCategory;
 	description: string;
 	icon: string;
-	defaultInstalled: boolean;
 	removable: boolean;
 	desktopAliasByDefault: boolean;
-	visibility: AppVisibility;
+	isSystem: boolean;
+	/** Store-app lifecycle. Undefined for system apps. */
+	status?: AppStatus;
 };
