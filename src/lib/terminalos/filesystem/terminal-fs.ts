@@ -1,6 +1,7 @@
 import type {
 	NodeId,
 	BodyId,
+	BodyRef,
 	AppId,
 	PersistedAppId,
 	FileType,
@@ -660,6 +661,62 @@ export class TerminalFS {
 			opensWith: opts.appId,
 			appId: opts.appId,
 			bodyRef: opts.text !== undefined ? { kind: 'inline-text', text: opts.text } : undefined,
+			createdAt: now,
+			updatedAt: now
+		};
+		this.nodes.set(nodeId, file);
+
+		this.lastUndo = {
+			kind: 'create_file',
+			label: `Create file "${name}"`,
+			undoData: { type: 'delete_node', nodeId }
+		};
+
+		const persistResult = await this.debouncedPersist();
+		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+
+		this.notifyChange([nodeId], [parentId], 'create_file');
+		return ok(file);
+	}
+
+	async createBlobFile(
+		parentId: NodeId,
+		name: string,
+		data: ArrayBuffer,
+		opts: { appId?: AppId; fileType?: FileType; contentType?: string }
+	): Promise<FsResult<FsFile>> {
+		const parent = this.nodes.get(parentId);
+		if (!parent) return fail('not_found', `Parent "${parentId}" not found`);
+		if (parent.kind !== 'folder') return fail('not_folder', `Parent "${parentId}" is not a folder`);
+
+		if (hasSiblingConflict(name, this.siblings(parentId))) {
+			return fail('duplicate_name', `A node named "${name}" already exists in this folder`);
+		}
+
+		const nodeId = generateUniqueId();
+		const bodyId: BodyId = `body_${generateUniqueId()}`;
+
+		// Write the bytes first so a quota failure aborts before a dangling node exists.
+		const w = await this.bodies.write(bodyId, data);
+		if (!w.ok) return w as FsResult<FsFile>;
+
+		const now = Date.now();
+		const bodyRef: BodyRef = {
+			kind: 'indexeddb-blob',
+			bodyId,
+			size: data.byteLength,
+			...(opts.contentType !== undefined ? { contentType: opts.contentType } : {})
+		};
+		const file: FsFile = {
+			id: nodeId,
+			volumeId: this.volume.id,
+			kind: 'file',
+			parentId,
+			name,
+			fileType: opts.fileType ?? 'data',
+			opensWith: opts.appId,
+			appId: opts.appId,
+			bodyRef,
 			createdAt: now,
 			updatedAt: now
 		};

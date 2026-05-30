@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TerminalFS, DOCUMENTS_ID, DESKTOP_ID, TRASH_ID } from './terminal-fs';
+import { TerminalFS, DOCUMENTS_ID, DESKTOP_ID, TRASH_ID, RECORDINGS_ID } from './terminal-fs';
 import type { FsFolder, FsFile, FsAlias } from './types';
 
 function createDisk() {
@@ -73,6 +73,65 @@ describe('createTextFile', () => {
 		const fs = createDisk();
 		// README.TXT already exists in Documents
 		const result = await fs.createTextFile(DOCUMENTS_ID, 'README.TXT', 'dupe');
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('duplicate_name');
+		}
+	});
+});
+
+describe('createBlobFile', () => {
+	it('creates a file with an indexeddb-blob bodyRef and round-trips the bytes', async () => {
+		const fs = createDisk();
+		const bytes = new Uint8Array([1, 2, 3, 4, 5, 200, 255]);
+		const result = await fs.createBlobFile(RECORDINGS_ID, 'Clip.webm', bytes.buffer, {
+			appId: 'recorder',
+			fileType: 'recording',
+			contentType: 'video/webm'
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const file = result.value;
+		expect(file.bodyRef?.kind).toBe('indexeddb-blob');
+		if (file.bodyRef?.kind !== 'indexeddb-blob') return;
+		expect(file.bodyRef.size).toBe(bytes.byteLength);
+		expect(file.bodyRef.contentType).toBe('video/webm');
+
+		const read = await fs.readBody(file.bodyRef.bodyId);
+		expect(read.ok).toBe(true);
+		if (!read.ok) return;
+		expect(new Uint8Array(read.value)).toEqual(bytes);
+	});
+
+	it('sets fileType and appId from opts', async () => {
+		const fs = createDisk();
+		const result = await fs.createBlobFile(
+			RECORDINGS_ID,
+			'Clip2.webm',
+			new Uint8Array([9]).buffer,
+			{
+				appId: 'recorder',
+				fileType: 'recording'
+			}
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.fileType).toBe('recording');
+		expect(result.value.appId).toBe('recorder');
+		expect(result.value.opensWith).toBe('recorder');
+	});
+
+	it('rejects duplicate name', async () => {
+		const fs = createDisk();
+		await fs.createBlobFile(RECORDINGS_ID, 'Dupe.webm', new Uint8Array([1]).buffer, {});
+		const result = await fs.createBlobFile(
+			RECORDINGS_ID,
+			'dupe.webm',
+			new Uint8Array([2]).buffer,
+			{}
+		);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe('duplicate_name');
