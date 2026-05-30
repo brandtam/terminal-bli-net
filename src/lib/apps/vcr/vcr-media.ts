@@ -65,11 +65,8 @@ export async function resolvePlayableUrl(episode: VCREpisode): Promise<string | 
 	}
 
 	let resolved: string | null = null;
-	// Only cache a result we actually trust. A 2xx with a valid body is a real
-	// answer — even `null` means "no playable file", which is worth remembering.
-	// A network error, a non-2xx, or a parse failure is transient: don't cache it,
-	// or a single archive.org blip would pin this show to the iframe fallback for
-	// the rest of the session.
+	// Only cache a trusted result — a 2xx with a valid body (even a `null` "no
+	// playable file"). Transient failures aren't cached, so the next PLAY retries.
 	let cacheable = false;
 	try {
 		const res = await fetch(`https://archive.org/metadata/${episode.archiveId}`);

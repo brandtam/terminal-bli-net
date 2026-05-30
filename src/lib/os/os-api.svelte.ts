@@ -323,10 +323,8 @@ export class OsApiClass implements OsApi {
 			'computer-store': { title: 'Computer Store', w: 740, h: 620 },
 			'about-computer-store': { title: 'About Computer Store', w: 420, h: 380 },
 			finder: { title: 'Terminal HD', w: 480, h: 420 },
-			// The two VCR devices have very different aspect ratios, so size the
-			// window to the selected one. The AG-500R is wide (REF 1170×720); the
-			// Generic deck is near-square (REF 560×523) and looks marooned in the
-			// AG-500R's 900-wide frame.
+			// Size to the selected device — the AG-500R is wide, the Generic deck
+			// near-square.
 			vcr:
 				vcrPrefs.device === 'generic'
 					? { title: 'VCR.app', w: 560, h: 523, minW: 480, minH: 470 }

@@ -18,9 +18,10 @@
 	let useIframe = $state(false);
 	let loadingVideo = $state(false);
 	let curTime = $state(0);
-	// When a tape is re-inserted after eject, we remember where it was and seek
-	// the freshly-mounted <video> there once its metadata loads (see ejectTape).
+	// Position to seek to once the <video> mounts (eject/re-insert resume).
 	let pendingSeek = $state<number | null>(null);
+	// Play as soon as the <video> can, for a PLAY pressed before it mounted.
+	let pendingPlay = $state(false);
 
 	// ── Variable-speed shuttle (FF/REW) ────────────────────────────────
 	let shuttle = $state<Shuttle | null>(null);
@@ -39,10 +40,11 @@
 		browseMode = 'episodes';
 	}
 
-	// Selecting an episode CUES the tape — loads it into the bay and shows
-	// color bars, but does NOT resolve the media or start playing. PLAY
-	// resolves the URL lazily on first press.
-	function cueEpisode(ep: VCREpisode) {
+	// Cue a tape: load it into the bay, show color bars, and resolve the playable
+	// URL now so the <video> mounts (paused, behind the bars) before PLAY. PLAY
+	// then starts it synchronously inside the tap, which iOS requires. Tapes with
+	// no native file stay unresolved and use the iframe fallback on PLAY.
+	async function cueEpisode(ep: VCREpisode) {
 		if (!powered) return;
 		currentEpisode = ep;
 		ejected = false;
@@ -53,36 +55,38 @@
 		loadingVideo = false;
 		curTime = 0;
 		pendingSeek = null;
+		pendingPlay = false;
 		clearShuttle();
 		clearSlow();
+		const url = await resolvePlayableUrl(ep);
+		if (currentEpisode !== ep) return; // tape changed mid-resolve
+		if (url) videoUrl = url; // null → unresolved, PLAY uses the iframe fallback
 	}
 
-	// Resolve the playable URL the first time PLAY is pressed from `cued`,
-	// then let the <video autoplay> (or iframe fallback) take over.
+	// PLAY pressed before the cue-time resolve finished: resolve, then play.
 	async function startPlayback() {
 		if (!currentEpisode) return;
-		if (videoUrl || useIframe) {
-			// already resolved — just resume
-			if (videoEl) videoEl.play();
-			else transport = 'play';
-			return;
-		}
 		const ep = currentEpisode;
 		loadingVideo = true;
 		transport = 'play';
+		pendingPlay = true;
 		const url = await resolvePlayableUrl(ep);
 		loadingVideo = false;
-		// The <video> isn't mounted yet, so any STOP/STILL/POWER-OFF pressed during
-		// the await only mutated local state — their `videoEl.pause()` guards were
-		// no-ops. If PLAY is no longer the active intent, drop the result rather than
-		// mounting an autoplaying <video> over a stopped/off deck. The next PLAY
-		// re-resolves (the URL is cached, so it's cheap).
-		if (currentEpisode !== ep || transport !== 'play' || !powered) return;
+		// Bail if PLAY is no longer the active intent (STOP/STILL/power-off meanwhile).
+		if (currentEpisode !== ep || transport !== 'play' || !powered) {
+			pendingPlay = false;
+			return;
+		}
 		if (url) {
 			videoUrl = url;
 			useIframe = false;
+			if (videoEl) {
+				videoEl.play(); // already mounted; otherwise oncanplay plays it
+				pendingPlay = false;
+			}
 		} else {
-			useIframe = true; // fall back to the archive.org iframe
+			useIframe = true;
+			pendingPlay = false;
 		}
 	}
 
@@ -90,11 +94,6 @@
 
 	function pressPlayPause() {
 		if (!powered || !currentEpisode) return;
-		// Cued, or resolved-but-not-yet-loaded → start playback (lazy resolve).
-		if (transport === 'cued' || (hasTape && !videoUrl && !useIframe)) {
-			startPlayback();
-			return;
-		}
 		if (useIframe) {
 			// can't control the cross-origin iframe; just track our own flag
 			transport = transport === 'play' ? 'pause' : 'play';
@@ -102,12 +101,15 @@
 		}
 		clearShuttle();
 		clearSlow();
-		if (videoEl) {
+		if (videoEl && videoUrl) {
+			// Toggle within the tap gesture so iOS allows play() to start.
 			videoEl.playbackRate = 1;
 			videoEl.muted = false;
 			if (videoEl.paused) videoEl.play();
 			else videoEl.pause();
+			return;
 		}
+		startPlayback(); // not resolved yet
 	}
 
 	function pressEject() {
@@ -120,6 +122,7 @@
 		loadingVideo = false;
 		curTime = 0;
 		pendingSeek = null;
+		pendingPlay = false;
 	}
 
 	// ── Shuttle plumbing ────────────────────────────────────────────────
@@ -138,14 +141,14 @@
 	}
 
 	function pressRew() {
-		if (!powered || !videoUrl || useIframe) return;
+		if (!canShuttle) return;
 		clearSlow();
 		shuttle = nextShuttle(shuttle, 'rew');
 		applyShuttle();
 	}
 
 	function pressFf() {
-		if (!powered || !videoUrl || useIframe) return;
+		if (!canShuttle) return;
 		clearSlow();
 		shuttle = nextShuttle(shuttle, 'ff');
 		applyShuttle();
@@ -208,10 +211,8 @@
 
 	// ── Power button — classic CRT on/off ───────────────────────────────
 	let crtAnimating = $state(false);
-	// `collapsing` selects the power-OFF collapse animation over the power-ON
-	// warm-up. It's a distinct flag (not `.off`) because the collapse must play
-	// WHILE the picture is still lit — `powered` only flips to false after it
-	// finishes, so `.off` isn't present during the animation window.
+	// Picks the collapse animation over warm-up. Separate from `.off` because the
+	// collapse plays while the picture is still lit (powered flips off after it).
 	let collapsing = $state(false);
 	let powerTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -224,9 +225,7 @@
 			// OFF: pause everything, reset shuttle, run the collapse, then black out.
 			clearShuttle();
 			clearSlow();
-			// Set the intended transport BEFORE pausing: the async onpause event
-			// fires after this function returns and would otherwise downgrade a
-			// playing tape to 'pause' — flashing the green PLAY lamp on power-on.
+			// Freeze before pausing so the async onpause doesn't flag it 'pause'.
 			if (transport === 'play') transport = 'still';
 			if (videoEl) videoEl.pause();
 			crtAnimating = true;
@@ -238,15 +237,12 @@
 				powerTimer = null;
 			}, 520);
 		} else {
-			// ON: warm up, then reveal the prior screen but PAUSED. The <video>
-			// element was never unmounted, so it still holds its currentTime —
-			// we must NOT seek to 0 or reload. Just make sure it stays paused
-			// (autoplay only fires on initial mount, not on this reveal) so the
-			// retained frame comes back frozen.
+			// ON: warm up and reveal the retained frame, frozen. The <video> kept
+			// its currentTime while off, so just keep it paused.
 			powered = true;
 			crtAnimating = true;
 			collapsing = false;
-			// come back frozen (STILL), not 'pause' — power-on isn't a PLAY-pause, so no green flash
+			// Come back frozen (STILL), not 'pause' — no green PLAY-lamp flash.
 			if (transport === 'play') transport = 'still';
 			if (videoEl) videoEl.pause();
 			powerTimer = setTimeout(() => {
@@ -273,6 +269,10 @@
 		transport === 'play' || transport === 'pause' || transport === 'still' || transport === 'stop'
 	);
 	let showBars = $derived(transport === 'cued');
+
+	// FF/REW/STILL/SLOW are live only for a playing native tape — not while cued,
+	// and not for the iframe fallback.
+	let canShuttle = $derived(powered && showVideo && !!videoUrl && !useIframe);
 
 	// LED counter: elapsed time M:SS for native playback, else placeholder.
 	// Blank while the unit is powered off.
@@ -307,36 +307,32 @@
 		clearShuttle();
 		clearSlow();
 		if (useIframe) {
-			// A cross-origin iframe can't be paused from script, so the only way to
-			// actually silence it is to unmount it. Drop back to the unresolved
-			// state; the next PLAY re-resolves and reloads from the start.
+			// Unmount the iframe — a cross-origin player can't be paused from script.
 			useIframe = false;
 			videoUrl = null;
 		} else if (videoEl) {
 			videoEl.pause();
 		}
-		// STOP halts the transport and blacks out the screen (mechanics stopped),
-		// keeping the tape loaded at its current position. PLAY resumes from there.
+		// Black out but keep the tape loaded at its position; PLAY resumes there.
 		if (transport !== 'idle') transport = 'stop';
 	}
 
 	function pressStill() {
 		// STILL (▶◀) → freeze the picture. Only meaningful once a tape is actually
-		// playing (videoUrl resolved); gated on videoUrl like FF/REW so it can't be
-		// pressed from the cued state, where it would blank the bars and light the
-		// lamp with nothing to freeze.
-		if (!powered || !videoUrl || useIframe) return;
+		// playing; gated like FF/REW so it can't be pressed from the cued state,
+		// where it would blank the bars and light the lamp with nothing to freeze.
+		if (!canShuttle) return;
 		clearShuttle();
 		clearSlow();
-		// STILL is its own state — set it BEFORE pausing so onpause won't downgrade to 'pause'.
+		// Set the state before pausing so onpause won't downgrade it to 'pause'.
 		transport = 'still';
 		if (videoEl) videoEl.pause();
 	}
 
 	function pressSlow() {
-		// SLOW (▮▶) → half-speed playback. Same gating as STILL/FF/REW — needs a
-		// resolved videoUrl, so there's no cued-state or iframe path to handle.
-		if (!powered || !videoUrl || useIframe) return;
+		// SLOW (▮▶) → half-speed playback. Same gating as STILL/FF/REW — needs an
+		// actively-playing native tape, so there's no cued-state or iframe path.
+		if (!canShuttle) return;
 		clearShuttle();
 		clearSlow();
 		slowActive = true;
@@ -357,23 +353,20 @@
 
 	// ── Cassette eject pop animation (cosmetic flag; real unload = pressEject) ──
 	let ejected = $state(false);
-	// Remember which tape was ejected — and where it was — so pushing it back in
-	// re-inserts the same tape at the same spot, the way a real deck holds position.
+	// Remember the ejected tape and its position so re-inserting resumes there.
 	let ejectedEpisode = $state<VCREpisode | null>(null);
 	let ejectedTime = $state(0);
 
 	function ejectTape() {
 		ejectedEpisode = currentEpisode;
-		ejectedTime = curTime; // grab the position before pressEject zeroes it
+		ejectedTime = curTime; // before pressEject zeroes it
 		ejected = true;
 		pressEject();
 	}
 
 	function pushTapeBack() {
-		// Pushing the popped-out tape back in re-inserts the same tape, cued at the
-		// position it was ejected from. cueEpisode no-ops when powered off, so bail
-		// early here too — otherwise we'd clear the eject state and the cassette
-		// would vanish with nothing re-inserted.
+		// Re-insert the same tape, cued at its ejected position. Guard on power so
+		// the cue no-op doesn't leave the bay empty (matches cueEpisode).
 		if (!powered || !ejected) return;
 		const ep = ejectedEpisode;
 		const at = ejectedTime;
@@ -381,10 +374,8 @@
 		ejectedEpisode = null;
 		if (ep) {
 			cueEpisode(ep);
-			// cueEpisode clears pendingSeek; set it after so the next PLAY resolves
-			// the URL, mounts the <video>, and seeks to `at` once metadata loads.
-			// (Native video only — a cross-origin iframe can't be seeked, so those
-			// resume from the start.)
+			// Set after cueEpisode (which clears it); the mounted <video> seeks here.
+			// Native only — the iframe fallback can't seek, so it resumes from 0.
 			if (at > 0) pendingSeek = at;
 		}
 	}
@@ -466,34 +457,38 @@
 						</div>
 
 						<!--
-							The native <video> element must STAY MOUNTED across power
-							toggles so its currentTime is preserved. It's rendered here —
-							OUTSIDE the `!powered` branch — whenever the tape has a
-							resolved video URL. When powered off it sits underneath the
-							.power-off black-out overlay (added at the end of .screen),
-							paused, holding its position. Power-on just reveals it.
+							The <video> mounts whenever the tape's URL is resolved — including
+							while cued (hidden behind the bars) so PLAY can start it inside the
+							tap gesture, as iOS requires. It stays mounted across power toggles
+							to preserve currentTime. No `autoplay`: playback is always an
+							explicit play() call.
 						-->
-						{#if showVideo && currentEpisode && videoUrl && !useIframe}
+						{#if currentEpisode && videoUrl && !useIframe}
 							<!-- svelte-ignore a11y_media_has_caption -->
 							<video
 								bind:this={videoEl}
 								src={videoUrl}
-								autoplay
 								playsinline
 								class="video"
+								class:hidden={!showVideo}
 								onloadedmetadata={() => {
-									// Resume at the ejected position once the freshly-mounted element
-									// knows its duration. Seek once, then clear the pending request.
+									// Seek to a pending resume position (eject/re-insert).
 									if (pendingSeek != null && videoEl) {
 										videoEl.currentTime = Math.min(pendingSeek, videoEl.duration || pendingSeek);
 										pendingSeek = null;
 									}
 								}}
+								oncanplay={() => {
+									// Honor a PLAY pressed before the element was ready.
+									if (pendingPlay && videoEl) {
+										videoEl.play();
+										pendingPlay = false;
+									}
+								}}
 								onplay={() => (transport = 'play')}
 								onpause={() => {
-									// REW pauses the element and walks currentTime backwards on a timer
-									// while transport stays 'play'. Don't let that async pause downgrade
-									// us to 'pause' (it would flash the PLAY lamp mid-rewind).
+									// Don't downgrade to 'pause' mid-rewind — REW pauses the element
+									// while transport stays 'play'.
 									if (
 										shuttle === null &&
 										transport !== 'idle' &&
@@ -689,7 +684,7 @@
 							<div>
 								<button
 									class="bli-key style-cassette tint-beige key-med"
-									disabled={!videoUrl || useIframe || !powered}
+									disabled={!canShuttle}
 									onclick={pressRew}
 									title="Rewind (shuttle)"
 								>
@@ -699,7 +694,7 @@
 							<div>
 								<button
 									class="bli-key style-cassette tint-beige key-med"
-									disabled={!videoUrl || useIframe || !powered}
+									disabled={!canShuttle}
 									onclick={pressFf}
 									title="Fast-forward (shuttle)"
 								>
@@ -792,7 +787,7 @@
 							<div style="display:flex;flex-direction:column;gap:2px;align-items:center">
 								<button
 									class="bli-key style-cassette tint-beige key-med"
-									disabled={!videoUrl || useIframe || !powered}
+									disabled={!canShuttle}
 									onclick={pressStill}
 									title="Still (freeze)"
 								>
@@ -813,7 +808,7 @@
 							<div style="display:flex;flex-direction:column;gap:2px;align-items:center">
 								<button
 									class="bli-key style-cassette tint-beige key-med"
-									disabled={!videoUrl || useIframe || !powered}
+									disabled={!canShuttle}
 									onclick={pressSlow}
 									title="Slow (half speed)"
 								>
@@ -1188,6 +1183,12 @@
 		border: none;
 		display: block;
 		z-index: 4;
+	}
+	/* Cued: video mounted but transparent so the bars show. opacity, not
+	   display:none — iOS won't play a display:none video. */
+	.video.hidden {
+		opacity: 0;
+		pointer-events: none;
 	}
 
 	/* Loading splash while we resolve the media URL */
