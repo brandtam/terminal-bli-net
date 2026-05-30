@@ -27,14 +27,16 @@ export type AppAboutWindowSpec = {
 
 /**
  * The app's Preferences dialog. OS chrome with its own window-def. Each prefs
- * UI is a distinct component; Phase 1 only carries the window metadata so
- * getWindowDef synthesizes identically. The component is wired in Phase 3.
+ * UI is a distinct component, lazily loaded so it is paid only when the dialog
+ * opens (the window metadata feeds getWindowDef; the component feeds Desktop).
  */
 export type AppPrefsWindowSpec = {
 	id: string;
 	title: string;
 	w: number;
 	h: number;
+	/** Lazily-loaded prefs UI ({ default: SvelteComponent }). */
+	component?: () => Promise<unknown>;
 };
 
 /**

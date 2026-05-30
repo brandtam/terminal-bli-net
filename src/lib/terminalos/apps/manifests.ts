@@ -1,4 +1,5 @@
 import { defineApp, type TerminalAppManifest } from './app-manifest';
+import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
 /**
  * One manifest per app — the single source of truth for app identity. The
@@ -25,6 +26,7 @@ export const MANIFESTS = [
 		iconKind: 'hd',
 		window: { id: 'finder', title: 'Terminal HD', w: 480, h: 420 },
 		about: { id: 'about' },
+		component: () => import('$lib/apps/finder/FinderWindow.svelte'),
 		aboutSpec: {
 			title: 'Terminal',
 			version: 'Version 1.0 "Pilot"',
@@ -151,6 +153,8 @@ export const MANIFESTS = [
 		isSystem: true,
 		iconKind: 'hd',
 		window: { id: 'terminal-prefs', title: 'System Preferences', w: 380, h: 360 },
+		// terminal-prefs renders the System Preferences UI (TerminalPrefs).
+		component: () => import('$lib/components/TerminalPrefs.svelte'),
 		// No APPS entry today: no menus, about content, or status. Kept minimal.
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
@@ -168,6 +172,8 @@ export const MANIFESTS = [
 		isSystem: true,
 		iconKind: 'doc',
 		window: { id: 'about', title: 'About This Terminal', w: 380, h: 380 },
+		// The 'about' window renders the system About dialog (AboutTerminal).
+		component: () => import('$lib/apps/finder/AboutTerminal.svelte'),
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -185,6 +191,7 @@ export const MANIFESTS = [
 		iconKind: 'floppy',
 		window: { id: 'software-shop', title: 'My Shelf', w: 420, h: 520 },
 		about: { id: 'about-software-shop' },
+		component: () => import('$lib/apps/software-shop/SoftwareShopWindow.svelte'),
 		aboutSpec: {
 			title: 'My Shelf',
 			version: 'v1.0',
@@ -235,6 +242,7 @@ export const MANIFESTS = [
 		iconKind: 'floppy',
 		window: { id: 'computer-store', title: 'Computer Store', w: 740, h: 620 },
 		about: { id: 'about-computer-store' },
+		component: () => import('$lib/apps/computer-store/ComputerStoreWindow.svelte'),
 		aboutSpec: {
 			title: 'Computer Store',
 			version: 'v1.0',
@@ -284,6 +292,8 @@ export const MANIFESTS = [
 		isSystem: true,
 		iconKind: 'doc',
 		window: { id: 'trash', title: 'Trash', w: 380, h: 320 },
+		// Trash renders the shared FinderWindow scoped to the Trash folder.
+		component: () => import('$lib/apps/finder/FinderWindow.svelte'),
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -302,6 +312,7 @@ export const MANIFESTS = [
 		iconKind: 'doc',
 		window: { idPrefix: 'textedit-', title: 'Untitled.txt', w: 420, h: 400 },
 		about: { id: 'about-textedit' },
+		component: () => import('$lib/apps/textedit/TextEditWindow.svelte'),
 		aboutSpec: {
 			title: 'TextEdit',
 			version: 'v1.0',
@@ -387,6 +398,7 @@ export const MANIFESTS = [
 		iconKind: 'stickies',
 		window: { idPrefix: 'sticky-', title: 'Stickies', w: 240, h: 220 },
 		about: { id: 'about-stickies' },
+		component: () => import('$lib/apps/stickies/StickiesNote.svelte'),
 		aboutSpec: {
 			title: 'Stickies',
 			version: 'v1.0',
@@ -472,7 +484,14 @@ export const MANIFESTS = [
 		iconKind: 'tvguide',
 		window: { id: 'tv-guide', title: 'TV Guide.app', w: 660, h: 700 },
 		about: { id: 'about-tvguide' },
-		prefs: { id: 'tvguide-prefs', title: 'TV Guide Preferences', w: 360, h: 360 },
+		prefs: {
+			id: 'tvguide-prefs',
+			title: 'TV Guide Preferences',
+			w: 360,
+			h: 360,
+			component: () => import('$lib/components/TVGuidePrefs.svelte')
+		},
+		component: () => import('$lib/components/TVGuide.svelte'),
 		aboutSpec: {
 			title: 'TV Guide',
 			version: 'v1.0',
@@ -574,7 +593,14 @@ export const MANIFESTS = [
 		iconKind: 'doc',
 		window: { idPrefix: 'chat-', title: 'Chat', w: 440, h: 560 },
 		about: { id: 'about-chatrbot' },
-		prefs: { id: 'chatrbot-prefs', title: 'chatrbot Preferences', w: 360, h: 280 },
+		prefs: {
+			id: 'chatrbot-prefs',
+			title: 'chatrbot Preferences',
+			w: 360,
+			h: 280,
+			component: () => import('$lib/components/ChatrbotPrefs.svelte')
+		},
+		component: () => import('$lib/components/ChatWindow.svelte'),
 		aboutSpec: {
 			title: 'chatrbot',
 			version: 'v1.0',
@@ -682,6 +708,10 @@ export const MANIFESTS = [
 		// from the file node, so the prefix carries the fallback def).
 		window: { id: 'recorder', idPrefix: 'recorder-', title: 'Camera.app', w: 360, h: 480 },
 		about: { id: 'about-recorder' },
+		// Only the fixed 'recorder' window has a component. The 'recorder-' prefix
+		// mints clip-playback windows rendered inline in Desktop (a <video>
+		// element), so it has no component loader of its own.
+		component: () => import('$lib/apps/recorder/RecorderWindow.svelte'),
 		aboutSpec: {
 			title: 'Camera',
 			version: 'v1.0',
@@ -735,6 +765,7 @@ export const MANIFESTS = [
 		iconKind: 'calc',
 		window: { id: 'stats', title: 'Stats.app', w: 360, h: 360 },
 		about: { id: 'about-stats' },
+		component: () => import('$lib/apps/stats/StatsWindow.svelte'),
 		aboutSpec: {
 			title: 'Stats',
 			version: 'v0.1',
@@ -783,6 +814,7 @@ export const MANIFESTS = [
 		status: 'released',
 		iconKind: 'floppy',
 		window: { id: 'error', title: 'System Error', w: 420, h: 260 },
+		component: () => import('$lib/apps/finder/ErrorDialog.svelte'),
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -900,7 +932,20 @@ export const MANIFESTS = [
 		// generic variant is special-cased in synthWindowDefs/getWindowDef.
 		window: { id: 'vcr', title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 },
 		about: { id: 'about-vcr' },
-		prefs: { id: 'vcr-prefs', title: 'VCR Preferences', w: 360, h: 300 },
+		prefs: {
+			id: 'vcr-prefs',
+			title: 'VCR Preferences',
+			w: 360,
+			h: 300,
+			component: () => import('$lib/components/VCRPrefs.svelte')
+		},
+		// The VCR ships two decks. Load ONLY the selected variant — picking the
+		// import at call time means the unselected deck never enters the bundle
+		// for a visitor who never switches to it (the big single-app win in #28).
+		component: () =>
+			vcrPrefs.device === 'ag500r'
+				? import('$lib/apps/vcr/VCRWindowAG500R.svelte')
+				: import('$lib/apps/vcr/VCRWindow.svelte'),
 		aboutSpec: {
 			title: 'VCR',
 			version: 'v1.0',

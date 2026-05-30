@@ -16,37 +16,27 @@
 	} from '$lib/terminalos';
 	import type { FsFile, FsNode, FsAlias } from '$lib/terminalos';
 	import { createFolderView } from '$lib/terminalos';
-	import { APPS } from '$lib/os/app-registry';
+	import { APPS, getWindowComponent } from '$lib/os/app-registry';
 	import Window from './Window.svelte';
 	import MenuBar from './MenuBar.svelte';
 	import DesktopIcon from './DesktopIcon.svelte';
 	import PixelIcon from './PixelIcon.svelte';
 	import Dock from './Dock.svelte';
 	import BootScreen from './BootScreen.svelte';
-	import ChatWindow from './ChatWindow.svelte';
-	import TVGuide from './TVGuide.svelte';
 	import WelcomeWindow from '$lib/apps/welcome/WelcomeWindow.svelte';
-	import TextEditWindow from '$lib/apps/textedit/TextEditWindow.svelte';
-	import StatsWindow from '$lib/apps/stats/StatsWindow.svelte';
-	import ErrorDialog from '$lib/apps/finder/ErrorDialog.svelte';
 	import AboutAppWindow from '$lib/apps/finder/AboutAppWindow.svelte';
-	import AboutTerminal from '$lib/apps/finder/AboutTerminal.svelte';
-	import RecorderWindow from '$lib/apps/recorder/RecorderWindow.svelte';
-	import StickiesNote from '$lib/apps/stickies/StickiesNote.svelte';
 	import { createStickiesManager } from '$lib/apps/stickies/stickies-manager.svelte';
-	import FinderWindow from '$lib/apps/finder/FinderWindow.svelte';
-	import TerminalPrefs from './TerminalPrefs.svelte';
 	import DesktopContextMenu from './DesktopContextMenu.svelte';
 	import { SYS7_PATTERNS } from './wallpaper-patterns';
-	import TVGuidePrefs from './TVGuidePrefs.svelte';
-	import ChatrbotPrefs from './ChatrbotPrefs.svelte';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
-	import SoftwareShopWindow from '$lib/apps/software-shop/SoftwareShopWindow.svelte';
-	import ComputerStoreWindow from '$lib/apps/computer-store/ComputerStoreWindow.svelte';
-	import VCRWindow from '$lib/apps/vcr/VCRWindow.svelte';
-	import VCRWindowAG500R from '$lib/apps/vcr/VCRWindowAG500R.svelte';
-	import VCRPrefs from './VCRPrefs.svelte';
 	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
+
+	// App windows are loaded lazily via getWindowComponent(w.id), so each app's
+	// chunk is fetched only when its window opens (see manifests.ts). Cheap shared
+	// chrome stays statically imported: WelcomeWindow (first-visit greeter) and
+	// AboutAppWindow (renders every about-* dialog) — lazy-loading these would add
+	// a round-trip with no bundle win.
+	type LazyModule = { default: unknown };
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
@@ -489,52 +479,76 @@
 					{#if w.id === 'welcome'}
 						<WelcomeWindow />
 					{:else if w.id === 'tv-guide'}
-						<TVGuide
-							groups={os.groups}
-							bots={os.bots}
-							channels={os.channels}
-							timezone={os.timezone}
-							now={os.now}
-							slotNow={os.slotNow}
-							activeChatGroupSlug={os.activeChatGroupSlug}
-							gridLoop={os.tweaks.tvGridLoop}
-							marqueeLoop={os.tweaks.marqueeLoop}
-							pauseOnHover={os.tweaks.tvPauseOnHover}
-							onOpenChat={(group) => os.openChat(group)}
-							onFocusChat={(slug) => os.focusWindow(`chat-${slug}`)}
-						/>
+						{#await getWindowComponent('tv-guide')!() then mod}
+							{@const TVGuide = (mod as LazyModule).default}
+							<TVGuide
+								groups={os.groups}
+								bots={os.bots}
+								channels={os.channels}
+								timezone={os.timezone}
+								now={os.now}
+								slotNow={os.slotNow}
+								activeChatGroupSlug={os.activeChatGroupSlug}
+								gridLoop={os.tweaks.tvGridLoop}
+								marqueeLoop={os.tweaks.marqueeLoop}
+								pauseOnHover={os.tweaks.tvPauseOnHover}
+								onOpenChat={(group) => os.openChat(group)}
+								onFocusChat={(slug) => os.focusWindow(`chat-${slug}`)}
+							/>
+						{/await}
 					{:else if w.id.startsWith('chat-')}
 						{@const showSlug = w.id.replace('chat-', '')}
 						{@const group = os.groups.find((g) => g.slug === showSlug)}
 						{@const showBots = os.bots.filter((b) => b.group === showSlug)}
 						{#if group && showBots.length > 0}
-							<ChatWindow
-								{showSlug}
-								showName={group.name}
-								castBots={showBots}
-								minutesLeft={isShowOnAir(group.slug, os.channels, os.now, os.timezone)
-									? 30 - (os.now.getMinutes() % 30)
-									: null}
-								offAir={!isShowOnAir(group.slug, os.channels, os.now, os.timezone)}
-							/>
+							{#await getWindowComponent(w.id)!() then mod}
+								{@const ChatWindow = (mod as LazyModule).default}
+								<ChatWindow
+									{showSlug}
+									showName={group.name}
+									castBots={showBots}
+									minutesLeft={isShowOnAir(group.slug, os.channels, os.now, os.timezone)
+										? 30 - (os.now.getMinutes() % 30)
+										: null}
+									offAir={!isShowOnAir(group.slug, os.channels, os.now, os.timezone)}
+								/>
+							{/await}
 						{/if}
 					{:else if w.id === 'terminal-prefs'}
-						<TerminalPrefs
-							tweaks={os.tweaks}
-							{SYS7_PATTERNS}
-							onSetTweak={(k, v) => os.setTweak(k, v)}
-						/>
+						{#await getWindowComponent('terminal-prefs')!() then mod}
+							{@const TerminalPrefs = (mod as LazyModule).default}
+							<TerminalPrefs
+								tweaks={os.tweaks}
+								{SYS7_PATTERNS}
+								onSetTweak={(k, v) => os.setTweak(k, v)}
+							/>
+						{/await}
 					{:else if w.id === 'tvguide-prefs'}
-						<TVGuidePrefs tweaks={os.tweaks} onSetTweak={(k, v) => os.setTweak(k, v)} />
+						{#await getWindowComponent('tvguide-prefs')!() then mod}
+							{@const TVGuidePrefs = (mod as LazyModule).default}
+							<TVGuidePrefs tweaks={os.tweaks} onSetTweak={(k, v) => os.setTweak(k, v)} />
+						{/await}
 					{:else if w.id === 'chatrbot-prefs'}
-						<ChatrbotPrefs />
+						{#await getWindowComponent('chatrbot-prefs')!() then mod}
+							{@const ChatrbotPrefs = (mod as LazyModule).default}
+							<ChatrbotPrefs />
+						{/await}
 					{:else if w.id === 'vcr-prefs'}
-						<VCRPrefs />
+						{#await getWindowComponent('vcr-prefs')!() then mod}
+							{@const VCRPrefs = (mod as LazyModule).default}
+							<VCRPrefs />
+						{/await}
 					{:else if w.id.startsWith('textedit-')}
 						{@const fileId = w.id.replace('textedit-', '')}
-						<TextEditWindow docId={fileId} fs={terminalFs} />
+						{#await getWindowComponent(w.id)!() then mod}
+							{@const TextEditWindow = (mod as LazyModule).default}
+							<TextEditWindow docId={fileId} fs={terminalFs} />
+						{/await}
 					{:else if w.id === 'about'}
-						<AboutTerminal {os} fs={terminalFs} />
+						{#await getWindowComponent('about')!() then mod}
+							{@const AboutTerminal = (mod as LazyModule).default}
+							<AboutTerminal {os} fs={terminalFs} />
+						{/await}
 					{:else if w.id.startsWith('about-')}
 						{@const aboutAppId = w.id.replace('about-', '')}
 						{@const aboutApp = APPS[aboutAppId]}
@@ -542,26 +556,43 @@
 							<AboutAppWindow about={aboutApp.about} />
 						{/if}
 					{:else if w.id === 'software-shop'}
-						<SoftwareShopWindow {os} fs={terminalFs} />
+						{#await getWindowComponent('software-shop')!() then mod}
+							{@const SoftwareShopWindow = (mod as LazyModule).default}
+							<SoftwareShopWindow {os} fs={terminalFs} />
+						{/await}
 					{:else if w.id === 'computer-store'}
-						<ComputerStoreWindow {os} fs={terminalFs} />
+						{#await getWindowComponent('computer-store')!() then mod}
+							{@const ComputerStoreWindow = (mod as LazyModule).default}
+							<ComputerStoreWindow {os} fs={terminalFs} />
+						{/await}
 					{:else if w.id === 'stats'}
-						<StatsWindow
-							showCount={os.groups.filter((g) => g.active).length}
-							botCount={os.bots.length}
-						/>
+						{#await getWindowComponent('stats')!() then mod}
+							{@const StatsWindow = (mod as LazyModule).default}
+							<StatsWindow
+								showCount={os.groups.filter((g) => g.active).length}
+								botCount={os.bots.length}
+							/>
+						{/await}
 					{:else if w.id === 'error'}
-						<ErrorDialog onclose={() => os.closeWindow('error')} />
+						{#await getWindowComponent('error')!() then mod}
+							{@const ErrorDialog = (mod as LazyModule).default}
+							<ErrorDialog onclose={() => os.closeWindow('error')} />
+						{/await}
 					{:else if w.id === 'trash'}
-						<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
+						{#await getWindowComponent('trash')!() then mod}
+							{@const FinderWindow = (mod as LazyModule).default}
+							<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
+						{/await}
 					{:else if w.id === 'vcr'}
-						{#if vcrPrefs.device === 'ag500r'}
-							<VCRWindowAG500R />
-						{:else}
+						{#await getWindowComponent('vcr')!() then mod}
+							{@const VCRWindow = (mod as LazyModule).default}
 							<VCRWindow />
-						{/if}
+						{/await}
 					{:else if w.id === 'recorder'}
-						<RecorderWindow bind:recording={cameraRecording} fs={terminalFs} />
+						{#await getWindowComponent('recorder')!() then mod}
+							{@const RecorderWindow = (mod as LazyModule).default}
+							<RecorderWindow bind:recording={cameraRecording} fs={terminalFs} />
+						{/await}
 					{:else if w.id.startsWith('recorder-')}
 						{@const recFileId = w.id.replace('recorder-', '')}
 						{@const recText = terminalFs.readText(recFileId)}
@@ -580,17 +611,23 @@
 						{@const noteId = w.id.replace('sticky-', '')}
 						{@const note = stickies.notes.find((n) => n.id === noteId)}
 						{#if note}
-							<StickiesNote
-								{note}
-								ondelete={async (id) => {
-									await stickies.remove(id);
-									os.closeWindow(`sticky-${id}`);
-								}}
-								onupdate={(n) => stickies.update(n)}
-							/>
+							{#await getWindowComponent(w.id)!() then mod}
+								{@const StickiesNote = (mod as LazyModule).default}
+								<StickiesNote
+									{note}
+									ondelete={async (id) => {
+										await stickies.remove(id);
+										os.closeWindow(`sticky-${id}`);
+									}}
+									onupdate={(n) => stickies.update(n)}
+								/>
+							{/await}
 						{/if}
 					{:else if w.id === 'finder'}
-						<FinderWindow {os} fs={terminalFs} />
+						{#await getWindowComponent('finder')!() then mod}
+							{@const FinderWindow = (mod as LazyModule).default}
+							<FinderWindow {os} fs={terminalFs} />
+						{/await}
 					{:else}
 						<div class="window-content">
 							<p>Coming soon...</p>
