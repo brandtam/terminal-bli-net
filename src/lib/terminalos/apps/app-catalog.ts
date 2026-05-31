@@ -14,30 +14,16 @@ import { MANIFESTS } from './manifests';
  */
 
 /**
- * Window-ids that WINDOW_APP_MAP routes to a different app than the one whose
- * manifest declares them — OS chrome the Finder shell owns even though the
- * window-id matches another app (e.g. `error` is its own store app, but its
- * dialog reads as Finder chrome). This map is checked before matchWindow in
- * synthWindowAppId, so an entry here wins over a flat-model owner.
- *
- * `welcome`, `about` and `terminal-prefs` are NOT here anymore: the new `system`
- * app owns them via its flat windows[], so matchWindow resolves them to `system`
- * and the menu bar reads "Terminal". `trash` now also resolves to `finder` via
- * matchWindow (its flat window lives on the finder manifest, #35), so this entry
- * is redundant — kept additively only until the collapse removes it; `error` is
- * the one override matchWindow can't supply (its flat window has appId `error`).
+ * The one window-id whose menu-bar identity matchWindow can't supply. `error`'s
+ * flat window has appId `error`, but the System Error dialog reads as Finder
+ * chrome, so synthWindowAppId checks this override before matchWindow. Everything
+ * else — including `trash` (its flat window lives on the finder manifest) and the
+ * `about:`/`welcome`/`terminal-prefs` system windows — gets its identity straight
+ * from matchWindow.
  */
 const WINDOW_APP_OVERRIDES: Record<string, AppId> = {
-	error: 'finder',
-	trash: 'finder'
+	error: 'finder'
 };
-
-/** The prefix routing from the original windowAppId(). */
-type PrefixRoute = { prefix: string; appId: AppId };
-const PREFIX_ROUTES: PrefixRoute[] = MANIFESTS.filter((m) => m.window?.idPrefix).map((m) => ({
-	prefix: m.window!.idPrefix!,
-	appId: m.id
-}));
 
 // ── Flat-model window resolution ─────────────────────────────────────────────
 
@@ -105,6 +91,16 @@ function hasRegistryEntry(m: (typeof MANIFESTS)[number]): boolean {
 	return m.aboutSpec.title !== '';
 }
 
+/**
+ * An app's Preferences window-id, read off its flat `windows[]` as the exact
+ * `role: 'prefs'` entry (e.g. vcr → 'vcr-prefs'), or null if it has no prefs
+ * dialog. The single source the registry + os routing both read.
+ */
+function flatPrefsId(m: (typeof MANIFESTS)[number]): string | null {
+	const prefs = m.windows?.find((w) => w.role === 'prefs' && w.match.kind === 'exact');
+	return prefs && prefs.match.kind === 'exact' ? prefs.match.id : null;
+}
+
 export function synthApps(): Record<string, AppDef> {
 	const out: Record<string, AppDef> = {};
 	for (const m of MANIFESTS) {
@@ -114,7 +110,7 @@ export function synthApps(): Record<string, AppDef> {
 			name: m.name,
 			filename: m.fileName,
 			about: m.aboutSpec,
-			preferences: m.prefs ? m.prefs.id : null,
+			preferences: flatPrefsId(m),
 			menus: m.menus,
 			statusExtra: m.statusExtra
 		};
@@ -124,99 +120,46 @@ export function synthApps(): Record<string, AppDef> {
 
 // ── Window → app map (WINDOW_APP_MAP) ────────────────────────────────────────
 
+/**
+ * Window → owning app. Now that every window resolves through matchWindow, this
+ * map holds ONLY the overrides matchWindow can't supply (just `error`). Every
+ * other id falls through to matchWindow in synthWindowAppId.
+ */
 export function synthWindowAppMap(): Record<string, AppId> {
-	const out: Record<string, AppId> = {};
-	for (const m of MANIFESTS) {
-		if (m.window?.id) out[m.window.id] = m.id;
-		if (m.about?.id) out[m.about.id] = m.id;
-		if (m.prefs?.id) out[m.prefs.id] = m.id;
-	}
-	// Chrome windows the Finder shell owns, plus `welcome` (no app window).
-	Object.assign(out, WINDOW_APP_OVERRIDES);
-	return out;
+	return { ...WINDOW_APP_OVERRIDES };
 }
 
 /**
- * Memoized once at module load. The map is a pure function of MANIFESTS (a
- * module constant) and the static overrides, so it never changes within a
- * session. synthWindowAppId reads this on every lookup instead of rebuilding —
- * the lookup is on the hot path (os.activeAppId re-runs it on each reactive
- * read). synthWindowAppMap() stays a fresh-object builder for its own callers.
+ * The `error` override, memoized at module load. synthWindowAppId reads it before
+ * matchWindow on every lookup (the lookup is on the hot path — os.activeAppId
+ * re-runs it on each reactive read), so an entry here wins over the flat owner.
  */
 const WINDOW_APP_MAP = synthWindowAppMap();
 
 export function synthWindowAppId(windowId: string): AppId {
-	for (const route of PREFIX_ROUTES) {
-		if (windowId.startsWith(route.prefix)) return route.appId;
-	}
 	const mapped = WINDOW_APP_MAP[windowId];
 	if (mapped) return mapped;
-	// Flat-model windows (e.g. player:) report their owning app here, so the menu
-	// bar and app routing follow them without a hardcoded prefix list.
+	// Every window reports its owning app through matchWindow — fixed, prefix, and
+	// the system chrome (about:, welcome, terminal-prefs) alike. Unknown → finder.
 	const matched = matchWindow(windowId);
 	if (matched) return matched.appId;
 	return 'finder';
 }
 
-// ── Known window ids (KNOWN_WINDOW_IDS) ──────────────────────────────────────
-
-/**
- * The original KNOWN_WINDOW_IDS static set: every fixed window-id, plus the
- * about/prefs dialog ids, plus `welcome`. Minted-prefix windows (chat-,
- * sticky-, textedit-, recorder-) are excluded here — isKnownWindowId() matches
- * those by prefix. Derived from the manifests; matches the original exactly.
- */
-export function synthKnownWindowIds(): Set<string> {
-	// `welcome` is no longer seeded here — the `system` app declares it as a flat
-	// window, so matchWindow covers it (and `about` / `terminal-prefs`) in
-	// isKnownWindowId. This static set holds only the legacy fixed/about/prefs ids.
-	const out = new Set<string>();
-	for (const m of MANIFESTS) {
-		if (m.window?.id) out.add(m.window.id);
-		if (m.about?.id) out.add(m.about.id);
-		if (m.prefs?.id) out.add(m.prefs.id);
-	}
-	return out;
-}
-
 // ── App → window id (getAppWindowId) ─────────────────────────────────────────
 
 /**
- * The original getAppWindowId returned a fixed window-id only for a subset of
- * apps (those launched by "open window X"). Apps with no fixed window (stickies,
- * chatrbot, textedit) returned undefined. The folded-away system-prefs /
- * about-terminal apps used to live here for their 'terminal-prefs' / 'about'
- * windows; those windows belong to the `system` app now and are never launched
- * as an app, so they are gone from this gate.
+ * An app's launch window-id: its exact-match, role:'app' window (e.g. finder →
+ * 'finder', player → 'player', vcr → 'vcr'). Apps launched by a special handler
+ * rather than a fixed window — stickies, chatrbot, textedit (prefix-only), and
+ * the system chrome app (no role:'app' window) — have none, so this returns
+ * undefined and the launcher uses their handler. Takes PersistedAppId because
+ * getAppWindowId is called with ids read off disk; an unknown id → undefined.
  */
-// Gate set of catalog ids that resolve to a fixed window. Typed as the AppId
-// union (each literal is checked against the union at authoring time) but stored
-// as a plain string set so it can be probed with a PersistedAppId off disk.
-const APP_WINDOW_ID_APPS = new Set<string>([
-	'tvguide',
-	'recorder',
-	'stats',
-	'error',
-	'software-shop',
-	'computer-store',
-	'finder',
-	'vcr'
-] satisfies AppId[]);
-
-// Takes PersistedAppId: called via getAppWindowId with ids read off disk, so an
-// unknown id falls through to undefined.
 export function synthAppWindowId(appId: PersistedAppId): string | undefined {
 	const m = MANIFESTS.find((x) => x.id === appId);
-	// Flat model: an app's launch window is its exact-match, role:'app' window
-	// (e.g. player → 'player'). This resolves handler-style apps that carry no
-	// legacy `window` field, so launching them no longer falls through to opening
-	// the app file's own node id (which had no render arm → "Coming soon").
 	const launch = m?.windows?.find((w) => w.match.kind === 'exact' && (w.role ?? 'app') === 'app');
-	if (launch && launch.match.kind === 'exact') return launch.match.id;
-	// Legacy fixed window, gated to the original subset so unmigrated apps with no
-	// window (stickies, chatrbot, textedit) still return undefined.
-	if (!APP_WINDOW_ID_APPS.has(appId)) return undefined;
-	return m?.window?.id;
+	return launch && launch.match.kind === 'exact' ? launch.match.id : undefined;
 }
 
 // ── App → icon kind (getAppIconKind) ─────────────────────────────────────────
@@ -245,11 +188,10 @@ export function synthAboutWindowId(appId: string | null): string {
 }
 
 /**
- * The Preferences-dialog window-id for an app, or null if it has none. Mirrors
- * the original APPS[appId].preferences lookup (prefs.id when the manifest
- * declares a `prefs` block, else null). Replaces openPreferences()'s APPS read.
+ * The Preferences-dialog window-id for an app (its flat exact role:'prefs'
+ * window), or null if it has none. Drives openPreferences()'s routing.
  */
 export function synthPrefsWindowId(appId: string): string | null {
 	const m = MANIFESTS.find((x) => x.id === appId);
-	return m?.prefs?.id ?? null;
+	return m ? flatPrefsId(m) : null;
 }

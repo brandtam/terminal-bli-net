@@ -466,32 +466,40 @@ describe('isKnownWindowId', () => {
 		expect(os.isKnownWindowId('random-junk')).toBe(false);
 	});
 
-	it('returns true for all static known IDs', () => {
+	it('returns true for every flat-resolvable window id', () => {
 		const { os } = createOs();
+		// Every live id resolves through matchWindow: system chrome, fixed app
+		// windows, prefs dialogs, and a per-app About minted as about:<id>.
 		const knownIds = [
 			'welcome',
-			'tv-guide',
+			'about',
 			'terminal-prefs',
+			'tv-guide',
 			'tvguide-prefs',
 			'chatrbot-prefs',
-			'about',
-			'about-chatrbot',
-			'about-tvguide',
-			'about-textedit',
-			'about-stats',
-			'about-stickies',
-			'about-recorder',
-			'about-software-shop',
+			'vcr-prefs',
+			'about:vcr',
+			'about:chatrbot',
 			'stats',
 			'error',
 			'trash',
 			'recorder',
 			'finder',
-			'software-shop'
+			'software-shop',
+			'computer-store',
+			'vcr'
 		];
 		for (const id of knownIds) {
-			expect(os.isKnownWindowId(id)).toBe(true);
+			expect(os.isKnownWindowId(id), id).toBe(true);
 		}
+	});
+
+	it('returns false for the dead legacy about-<id> ids (dropped on restore)', () => {
+		// The per-app About boxes are about:<id> now; the old about-<id> form no
+		// longer resolves, so a stale saved layout using it is dropped by init().
+		const { os } = createOs();
+		expect(os.isKnownWindowId('about-vcr')).toBe(false);
+		expect(os.isKnownWindowId('about-chatrbot')).toBe(false);
 	});
 });
 
@@ -824,16 +832,18 @@ describe('windowAppId', () => {
 
 	it('maps prefix-based window IDs', () => {
 		expect(windowAppId('chat:seinfeld')).toBe('chatrbot');
-		expect(windowAppId('sticky-abc')).toBe('stickies');
-		expect(windowAppId('textedit-xyz')).toBe('textedit');
-		// recorder- is intentionally absent: the clip-playback prefix is dead (clips
-		// open in the Player), so the OS never mints a recorder- id anymore.
+		expect(windowAppId('sticky:abc')).toBe('stickies');
+		expect(windowAppId('textedit:xyz')).toBe('textedit');
+		expect(windowAppId('player:clip1')).toBe('player');
 	});
 
-	it('maps about windows to their app', () => {
-		expect(windowAppId('about-vcr')).toBe('vcr');
-		expect(windowAppId('about-chatrbot')).toBe('chatrbot');
-		expect(windowAppId('about-tvguide')).toBe('tvguide');
+	it('maps per-app About windows to the system app (about:<id>)', () => {
+		// About boxes live on the `system` app's flat about: prefix window, so their
+		// menu-bar identity is "Terminal", not the named app. (The old about-<id>
+		// form is dead — see the isKnownWindowId drop test.)
+		expect(windowAppId('about:vcr')).toBe('system');
+		expect(windowAppId('about:chatrbot')).toBe('system');
+		expect(windowAppId('about:tvguide')).toBe('system');
 	});
 
 	it('falls back to finder for unknown IDs', () => {

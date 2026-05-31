@@ -29,13 +29,10 @@ export const MANIFESTS = [
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'hd',
-		window: { id: 'finder', title: 'Terminal HD', w: 480, h: 420 },
-		// No `about` block: the system About box (window id 'about') is owned by the
-		// `system` app now, not Finder. Finder's Help → About Terminal still routes
-		// there via os.openAbout(null). Keeping `about: { id: 'about' }` here would put
-		// 'about' → finder in WINDOW_APP_MAP, which is checked before matchWindow and
-		// would keep the menu bar on "Finder" while the system About is focused.
-		component: () => import('$lib/apps/finder/FinderWindow.svelte'),
+		// No About box of its own: the system About (window id 'about') is owned by
+		// the `system` app. Finder's Help → About Terminal routes there via
+		// os.openAbout(null), and matchWindow resolves 'about' → system, so the menu
+		// bar reads "Terminal" when it's focused (not "Finder").
 		// Finder and Trash are the SAME component pointed at two folders, declared as
 		// exact flat windows carrying a static `folder` arg (the static-arg-on-exact
 		// mechanism, #35). The trash entry lives on the finder manifest so
@@ -263,10 +260,7 @@ export const MANIFESTS = [
 		desktopAliasByDefault: true,
 		isSystem: true,
 		iconKind: 'floppy',
-		window: { id: 'software-shop', title: 'My Shelf', w: 420, h: 520 },
-		// Flat window-host entry (Slice 6): one fixed window. SoftwareShopWindow reads
-		// os/fs off getSystem() now, so it takes no props. Legacy `window`/`component`
-		// stay additively until the final collapse.
+		// One fixed window; SoftwareShopWindow reads os/fs off getSystem(), no props.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'software-shop' },
@@ -276,8 +270,6 @@ export const MANIFESTS = [
 				component: () => import('$lib/apps/software-shop/SoftwareShopWindow.svelte')
 			}
 		],
-		about: { id: 'about-software-shop' },
-		component: () => import('$lib/apps/software-shop/SoftwareShopWindow.svelte'),
 		aboutSpec: {
 			title: 'My Shelf',
 			version: 'v1.0',
@@ -326,9 +318,7 @@ export const MANIFESTS = [
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'floppy',
-		window: { id: 'computer-store', title: 'Computer Store', w: 740, h: 620 },
-		// Flat window-host entry (Slice 6). ComputerStoreWindow reads os/fs off
-		// getSystem(); legacy `window`/`component` stay additively until the collapse.
+		// ComputerStoreWindow reads os/fs off getSystem(), no props.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'computer-store' },
@@ -338,8 +328,6 @@ export const MANIFESTS = [
 				component: () => import('$lib/apps/computer-store/ComputerStoreWindow.svelte')
 			}
 		],
-		about: { id: 'about-computer-store' },
-		component: () => import('$lib/apps/computer-store/ComputerStoreWindow.svelte'),
 		aboutSpec: {
 			title: 'Computer Store',
 			version: 'v1.0',
@@ -388,9 +376,9 @@ export const MANIFESTS = [
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'doc',
-		window: { id: 'trash', title: 'Trash', w: 380, h: 320 },
-		// Trash renders the shared FinderWindow scoped to the Trash folder.
-		component: () => import('$lib/apps/finder/FinderWindow.svelte'),
+		// Trash's window lives on the finder manifest (matchWindow('trash') → finder,
+		// the shared FinderWindow scoped to the Trash folder), so this app declares
+		// no window of its own — it carries only the Trash library/desktop identity.
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -407,14 +395,12 @@ export const MANIFESTS = [
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'doc',
-		window: { idPrefix: 'textedit-', title: 'Untitled.txt', w: 420, h: 400 },
-		// Flat window-host entry (Slice 6): minted per open document, keyed
-		// `textedit:<fileId>`. The `:` separator matches chat:/player:/about: so every
-		// minted window reads the same way (file-ids contain `-`; the tail is sliced
-		// by prefix length, unambiguous either way). NO `opens`: TextEdit is launched
-		// (File ▸ New/Open, Finder double-click), not a content-type doc handler. The
-		// title is the file's name, read purely from the fs node since SpecCtx is
-		// {args, fs}. Legacy `window`/`component` stay additively until the collapse.
+		// One window minted per open document, keyed `textedit:<fileId>`. The `:`
+		// separator matches chat:/player:/about: (file-ids contain `-`; the tail is
+		// sliced by prefix length, unambiguous either way). NO `opens`: TextEdit is
+		// launched (File ▸ New/Open, Finder double-click), not a content-type doc
+		// handler. The title is the file's name, read purely from the fs node since
+		// SpecCtx is {args, fs}.
 		windows: [
 			{
 				match: { kind: 'prefix', prefix: 'textedit:', arg: 'fileId' },
@@ -424,8 +410,6 @@ export const MANIFESTS = [
 				component: () => import('$lib/apps/textedit/TextEditWindow.svelte')
 			}
 		],
-		about: { id: 'about-textedit' },
-		component: () => import('$lib/apps/textedit/TextEditWindow.svelte'),
 		aboutSpec: {
 			title: 'TextEdit',
 			version: 'v1.0',
@@ -509,9 +493,6 @@ export const MANIFESTS = [
 		desktopAliasByDefault: true,
 		isSystem: true,
 		iconKind: 'stickies',
-		window: { idPrefix: 'sticky-', title: 'Stickies', w: 240, h: 220 },
-		about: { id: 'about-stickies' },
-		component: () => import('$lib/apps/stickies/StickiesNote.svelte'),
 		// Each note is a flat prefix window `sticky:<noteId>`. chromeless: true is
 		// spec-driven (Desktop reads it off the resolved spec) — stickies draw their
 		// own chrome, so the title is cosmetic. No `opens`: notes are launched, not
@@ -609,10 +590,8 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tvguide',
-		window: { id: 'tv-guide', title: 'TV Guide.app', w: 660, h: 700 },
-		// Flat window-host entry (Slice 4): a single fixed window. TVGuide reads
-		// everything (channels, clock, tweaks) off getSystem() now, so the OS no
-		// longer threads props through Desktop. Legacy `window` stays until Slice 7.
+		// A fixed main window + a prefs dialog. TVGuide / TVGuidePrefs read
+		// everything (channels, clock, tweaks) off getSystem(), so neither takes props.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'tv-guide' },
@@ -622,9 +601,6 @@ export const MANIFESTS = [
 				component: () => import('$lib/components/TVGuide.svelte')
 			},
 			{
-				// Prefs dialog on the flat path (Slice 5). TVGuidePrefs reads tweaks
-				// off getSystem() now, so it takes no props. The legacy `prefs` block
-				// below stays additively until Slice 7.
 				match: { kind: 'exact', id: 'tvguide-prefs' },
 				role: 'prefs',
 				title: () => 'TV Guide Preferences',
@@ -632,15 +608,6 @@ export const MANIFESTS = [
 				component: () => import('$lib/components/TVGuidePrefs.svelte')
 			}
 		],
-		about: { id: 'about-tvguide' },
-		prefs: {
-			id: 'tvguide-prefs',
-			title: 'TV Guide Preferences',
-			w: 360,
-			h: 360,
-			component: () => import('$lib/components/TVGuidePrefs.svelte')
-		},
-		component: () => import('$lib/components/TVGuide.svelte'),
 		aboutSpec: {
 			title: 'TV Guide',
 			version: 'v1.0',
@@ -740,13 +707,10 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'doc',
-		window: { idPrefix: 'chat-', title: 'Chat', w: 440, h: 560 },
-		// Flat window-host entry (Slice 4): one minted instance per show, keyed
-		// `chat:<slug>`. The `:` separator (not `-`) keeps the arg unambiguous
-		// since show slugs themselves contain `-` (e.g. `breaking-bad`). The
-		// title is derived from the slug alone — SpecCtx is deliberately just
-		// {args, fs}, so the live group name is read inside ChatWindow, not here.
-		// The legacy `window`/`idPrefix` above stays additively until Slice 7.
+		// One minted instance per show, keyed `chat:<slug>`, plus a prefs dialog. The
+		// `:` separator (not `-`) keeps the arg unambiguous since show slugs contain
+		// `-` (e.g. `breaking-bad`). The title is derived from the slug alone —
+		// SpecCtx is just {args, fs}, so the live group name is read inside ChatWindow.
 		windows: [
 			{
 				match: { kind: 'prefix', prefix: 'chat:', arg: 'slug' },
@@ -760,8 +724,6 @@ export const MANIFESTS = [
 				component: () => import('$lib/components/ChatWindow.svelte')
 			},
 			{
-				// Prefs dialog on the flat path (Slice 5). ChatrbotPrefs already takes
-				// no props (it reads its own store). Legacy `prefs` block stays.
 				match: { kind: 'exact', id: 'chatrbot-prefs' },
 				role: 'prefs',
 				title: () => 'chatrbot Preferences',
@@ -769,15 +731,6 @@ export const MANIFESTS = [
 				component: () => import('$lib/components/ChatrbotPrefs.svelte')
 			}
 		],
-		about: { id: 'about-chatrbot' },
-		prefs: {
-			id: 'chatrbot-prefs',
-			title: 'chatrbot Preferences',
-			w: 360,
-			h: 280,
-			component: () => import('$lib/components/ChatrbotPrefs.svelte')
-		},
-		component: () => import('$lib/components/ChatWindow.svelte'),
 		aboutSpec: {
 			title: 'chatrbot',
 			version: 'v1.0',
@@ -879,21 +832,10 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tv',
-		// recorder has BOTH a fixed window and minted instances. The w/h/title
-		// here size the fixed 'recorder' window (Camera.app) only —
-		// synthWindowDefs emits a static def for `id`, never for `idPrefix`. The
-		// 'recorder-' clip windows are sized dynamically in getWindowDef (os-api)
-		// from the recorded file node and do NOT read these dimensions.
-		window: { id: 'recorder', idPrefix: 'recorder-', title: 'Camera.app', w: 360, h: 480 },
-		about: { id: 'about-recorder' },
-		// Only the fixed 'recorder' window has a component. The 'recorder-' prefix
-		// mints clip-playback windows rendered inline in Desktop (a <video>
-		// element), so it has no component loader of its own.
-		component: () => import('$lib/apps/recorder/RecorderWindow.svelte'),
-		// Camera migrates exact-only: the fixed `recorder` window is flat now. The
-		// legacy `recorder-` clip-playback prefix is dead — recorded clips are tagged
-		// opensWith:'player' and open in the system Player (the bug_002 fix), so
-		// there is NO flat `recorder-`/`recorder:` prefix and no `opens` here.
+		// Camera is exact-only: one fixed `recorder` window. There is NO
+		// `recorder-`/`recorder:` prefix — recorded clips are tagged
+		// opensWith:'player' and open in the system Player (the bug_002 fix) — and
+		// no `opens` here (the Camera UI isn't a doc handler).
 		windows: [
 			{
 				match: { kind: 'exact', id: 'recorder' },
@@ -1023,11 +965,7 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'calc',
-		window: { id: 'stats', title: 'Stats.app', w: 360, h: 360 },
-		// Flat-model window (Slice 3 migration): Stats renders through the generic
-		// WindowHost loop via this entry. StatsWindow takes no props — it reads the
-		// counts off getSystem(). The legacy `window` above stays additively until
-		// the wholesale removal in Slice 7; both describe the same id/size.
+		// One fixed window; StatsWindow reads its counts off getSystem(), no props.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'stats' },
@@ -1037,8 +975,6 @@ export const MANIFESTS = [
 				component: () => import('$lib/apps/stats/StatsWindow.svelte')
 			}
 		],
-		about: { id: 'about-stats' },
-		component: () => import('$lib/apps/stats/StatsWindow.svelte'),
 		aboutSpec: {
 			title: 'Stats',
 			version: 'v0.1',
@@ -1086,22 +1022,20 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'floppy',
-		window: { id: 'error', title: 'System Error', w: 420, h: 260 },
-		// The error dialog renders on the flat path (Slice 5) — ErrorDialog reads its
-		// close action off getSystem().win now, so it takes no props. The window-id
-		// 'error' still maps to Finder for menu-bar identity (WINDOW_APP_OVERRIDES),
-		// which is checked before matchWindow; only the rendering is flat. error
-		// stays its own removable store app, so it keeps the legacy `window` too.
+		// ErrorDialog reads its close action off getSystem().win, no props. role:'app'
+		// because this is a launchable window (error has a desktop alias, so
+		// getAppWindowId('error') must resolve to it). Its menu-bar identity reads as
+		// Finder via the one remaining WINDOW_APP_OVERRIDES entry (checked before
+		// matchWindow), even though this manifest's appId is 'error'.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'error' },
-				role: 'chrome',
+				role: 'app',
 				title: () => 'System Error',
 				size: () => ({ w: 420, h: 260 }),
 				component: () => import('$lib/apps/finder/ErrorDialog.svelte')
 			}
 		],
-		component: () => import('$lib/apps/finder/ErrorDialog.svelte'),
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -1214,17 +1148,13 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tv',
-		// The VCR window is sized to the selected device at lookup time
-		// (see app-catalog.ts). The def here is the AG-500R default; the
-		// generic variant is special-cased in synthWindowDefs/getWindowDef.
-		window: { id: 'vcr', title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 },
-		// Both the main VCR window and its prefs dialog are now flat. The main
-		// window's title/size/component are device-aware: SpecCtx bans the reactive
-		// `os` but NOT module stores, so these read `vcrPrefs.device` directly — the
-		// same source the legacy `component()` ternary + synthWindowDefs used, kept
-		// byte-identical (generic carries minW 480 / minH 470). A device switch
-		// while a vcr window is open calls invalidateWindow('vcr') (see
-		// vcr-prefs.svelte) so the next resolve picks the new deck + size.
+		// The main VCR window + its prefs dialog. The main window's
+		// title/size/component are device-aware: SpecCtx bans the reactive `os` but
+		// NOT module stores, so these read `vcrPrefs.device` directly (generic carries
+		// minW 480 / minH 470). The two decks are separate imports so only the
+		// selected one enters the bundle (#28). A device switch while a vcr window is
+		// open calls invalidateWindow('vcr') (see vcr-prefs.svelte) so the next
+		// resolve picks the new deck + size.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'vcr' },
@@ -1247,21 +1177,6 @@ export const MANIFESTS = [
 				component: () => import('$lib/components/VCRPrefs.svelte')
 			}
 		],
-		about: { id: 'about-vcr' },
-		prefs: {
-			id: 'vcr-prefs',
-			title: 'VCR Preferences',
-			w: 360,
-			h: 300,
-			component: () => import('$lib/components/VCRPrefs.svelte')
-		},
-		// The VCR ships two decks. Load ONLY the selected variant — picking the
-		// import at call time means the unselected deck never enters the bundle
-		// for a visitor who never switches to it (the big single-app win in #28).
-		component: () =>
-			vcrPrefs.device === 'ag500r'
-				? import('$lib/apps/vcr/VCRWindowAG500R.svelte')
-				: import('$lib/apps/vcr/VCRWindow.svelte'),
 		aboutSpec: {
 			title: 'VCR',
 			version: 'v1.0',

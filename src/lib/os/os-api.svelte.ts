@@ -18,7 +18,6 @@ import {
 import { getAppWindowId } from '$lib/terminalos/apps/app-install';
 import { getAppDef } from '$lib/terminalos/apps/app-library';
 import {
-	synthKnownWindowIds,
 	synthAboutWindowId,
 	synthPrefsWindowId,
 	matchWindow
@@ -58,11 +57,6 @@ export class OsApiClass implements OsApi {
 
 	// ── Dock alias map ────────────────────────────────────────────────────
 	private DOCK_ALIASES: Record<string, () => void> = {};
-
-	// ── Known window IDs ──────────────────────────────────────────────────
-	// Synthesized from the per-app manifests (see manifests.ts /
-	// app-catalog.ts). Byte-identical to the hand-authored set this replaced.
-	private static KNOWN_WINDOW_IDS = synthKnownWindowIds();
 
 	constructor(fs: TerminalFS) {
 		this.fs = fs;
@@ -298,13 +292,14 @@ export class OsApiClass implements OsApi {
 	}
 
 	isKnownWindowId(id: string): boolean {
-		// Minted windows (chat:, textedit:, sticky:, player:) and fixed ones all
-		// resolve through matchWindow now — no app-specific prefix branches remain.
-		// A stale `-`-separated id (chat-<slug>, textedit-<id>, sticky-<id>) or a
-		// `recorder-<id>` clip-playback id from before the flat cutover is therefore
-		// *unknown* and gets dropped on restore (see the init() saved-window filter);
-		// those clips reopen in the Player by content-type anyway.
-		return OsApiClass.KNOWN_WINDOW_IDS.has(id) || matchWindow(id) !== null;
+		// A window-id is known iff a manifest claims it via windows[] — matchWindow
+		// is the single gate. Fixed, prefix (chat:, textedit:, sticky:, player:,
+		// about:) and the system chrome (welcome, about, terminal-prefs) all resolve
+		// here. A stale `-`-separated id (chat-<slug>, sticky-<id>) or a legacy
+		// about-<id> / recorder-<id> from before the flat cutover is *unknown* and
+		// drops on restore (see init()'s saved-window filter); those clips reopen in
+		// the Player by content-type anyway.
+		return matchWindow(id) !== null;
 	}
 
 	/**

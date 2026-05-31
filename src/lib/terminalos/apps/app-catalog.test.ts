@@ -4,7 +4,6 @@ import {
 	synthApps,
 	synthWindowAppMap,
 	synthWindowAppId,
-	synthKnownWindowIds,
 	synthAppWindowId,
 	synthAppIconKind
 } from './app-catalog';
@@ -91,43 +90,28 @@ describe('synthApps', () => {
 });
 
 describe('synthWindowAppMap', () => {
-	it('matches the original WINDOW_APP_MAP exactly', () => {
-		expect(synthWindowAppMap()).toEqual({
-			finder: 'finder',
-			'tv-guide': 'tvguide',
-			'tvguide-prefs': 'tvguide',
-			'chatrbot-prefs': 'chatrbot',
-			stats: 'stats',
-			'about-chatrbot': 'chatrbot',
-			'about-tvguide': 'tvguide',
-			'about-textedit': 'textedit',
-			'about-stats': 'stats',
-			'about-stickies': 'stickies',
-			error: 'finder',
-			trash: 'finder',
-			recorder: 'recorder',
-			'about-recorder': 'recorder',
-			'software-shop': 'software-shop',
-			'about-software-shop': 'software-shop',
-			'computer-store': 'computer-store',
-			'about-computer-store': 'computer-store',
-			vcr: 'vcr',
-			'vcr-prefs': 'vcr',
-			'about-vcr': 'vcr'
-		});
+	it('holds only the error override now that matchWindow owns identity', () => {
+		// Every other window reports its app through matchWindow; `error` is the one
+		// id whose flat window (appId 'error') must read as Finder chrome.
+		expect(synthWindowAppMap()).toEqual({ error: 'finder' });
 	});
 });
 
 describe('synthWindowAppId', () => {
-	it('routes prefixes to their app', () => {
+	it('routes flat windows to their app via matchWindow', () => {
 		expect(synthWindowAppId('chat:seinfeld')).toBe('chatrbot');
-		expect(synthWindowAppId('sticky-123')).toBe('stickies');
-		expect(synthWindowAppId('textedit-readme')).toBe('textedit');
-		expect(synthWindowAppId('recorder-clip1')).toBe('recorder');
+		expect(synthWindowAppId('sticky:123')).toBe('stickies');
+		expect(synthWindowAppId('textedit:readme')).toBe('textedit');
+		expect(synthWindowAppId('recorder')).toBe('recorder');
+		expect(synthWindowAppId('vcr')).toBe('vcr');
 	});
 
 	it('falls back to finder for unknown windows', () => {
 		expect(synthWindowAppId('nope')).toBe('finder');
+		// Stale `-`-separated ids no longer resolve, so they read as the finder
+		// fallback (they get dropped on restore before this is ever reached live).
+		expect(synthWindowAppId('sticky-123')).toBe('finder');
+		expect(synthWindowAppId('recorder-clip1')).toBe('finder');
 	});
 
 	it('routes the OS chrome dialogs to the system app', () => {
@@ -143,41 +127,10 @@ describe('synthWindowAppId', () => {
 	});
 
 	it('keeps error and trash as Finder chrome', () => {
+		// error via the override (its appId is 'error'); trash via matchWindow (its
+		// flat window lives on the finder manifest).
 		expect(synthWindowAppId('error')).toBe('finder');
 		expect(synthWindowAppId('trash')).toBe('finder');
-	});
-});
-
-describe('synthKnownWindowIds', () => {
-	it('matches the original KNOWN_WINDOW_IDS set', () => {
-		// welcome / terminal-prefs / about dropped from the static set — the system
-		// app declares them as flat windows, so isKnownWindowId resolves them via
-		// matchWindow instead (see window-host.test.ts).
-		expect([...synthKnownWindowIds()].sort()).toEqual(
-			[
-				'tv-guide',
-				'tvguide-prefs',
-				'chatrbot-prefs',
-				'about-chatrbot',
-				'about-tvguide',
-				'about-textedit',
-				'about-stats',
-				'about-stickies',
-				'about-recorder',
-				'about-software-shop',
-				'stats',
-				'error',
-				'trash',
-				'recorder',
-				'finder',
-				'software-shop',
-				'computer-store',
-				'about-computer-store',
-				'vcr',
-				'vcr-prefs',
-				'about-vcr'
-			].sort()
-		);
 	});
 });
 
