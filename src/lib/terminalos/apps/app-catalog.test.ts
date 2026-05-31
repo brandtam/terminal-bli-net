@@ -5,7 +5,6 @@ import {
 	synthWindowAppMap,
 	synthWindowAppId,
 	synthKnownWindowIds,
-	synthWindowDefs,
 	synthAppWindowId,
 	synthAppIconKind
 } from './app-catalog';
@@ -179,38 +178,6 @@ describe('synthKnownWindowIds', () => {
 				'about-vcr'
 			].sort()
 		);
-	});
-});
-
-describe('synthWindowDefs', () => {
-	it('reproduces representative window defs verbatim', () => {
-		const defs = synthWindowDefs();
-		expect(defs['tv-guide']).toEqual({ title: 'TV Guide.app', w: 660, h: 700 });
-		expect(defs.finder).toEqual({ title: 'Terminal HD', w: 480, h: 420 });
-		expect(defs.welcome).toEqual({ title: 'Welcome.app', w: 460, h: 540 });
-		expect(defs['about-vcr']).toEqual({ title: 'About VCR', w: 420, h: 460 });
-		expect(defs['vcr-prefs']).toEqual({ title: 'VCR Preferences', w: 360, h: 300 });
-		expect(defs.recorder).toEqual({ title: 'Camera.app', w: 360, h: 480 });
-		expect(defs['computer-store']).toEqual({ title: 'Computer Store', w: 740, h: 620 });
-	});
-
-	it('sizes the vcr window to the AG-500R by default', () => {
-		// vcrPrefs.device defaults to the AG-500R variant (not 'generic').
-		expect(synthWindowDefs().vcr).toEqual({
-			title: 'VCR.app',
-			w: 900,
-			h: 560,
-			minW: 620,
-			minH: 420
-		});
-	});
-
-	it('does not add static defs for minted-prefix windows', () => {
-		const defs = synthWindowDefs();
-		// chat-/sticky-/textedit- have no fixed window.id, so no static entry.
-		expect(defs['chat-']).toBeUndefined();
-		expect(defs['sticky-']).toBeUndefined();
-		expect(defs['textedit-']).toBeUndefined();
 	});
 });
 

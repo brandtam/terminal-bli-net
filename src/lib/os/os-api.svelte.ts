@@ -19,7 +19,6 @@ import { getAppWindowId } from '$lib/terminalos/apps/app-install';
 import { getAppDef } from '$lib/terminalos/apps/app-library';
 import {
 	synthKnownWindowIds,
-	synthWindowDefs,
 	synthAboutWindowId,
 	synthPrefsWindowId,
 	matchWindow
@@ -286,25 +285,16 @@ export class OsApiClass implements OsApi {
 	// ── Window definition lookup ──────────────────────────────────────────
 
 	getWindowDef(id: string): { title: string; w: number; h: number; minW?: number; minH?: number } {
-		// Static window defs are synthesized from the per-app manifests (see
-		// manifests.ts / app-catalog.ts), including the vcr device-sizing.
-		// The minted-prefix windows below stay dynamic.
-		const defs = synthWindowDefs();
-
-		if (id.startsWith('chat-')) {
-			const showSlug = id.replace('chat-', '');
-			const group = this.groups.find((g) => g.slug === showSlug);
-			return { title: group ? `chatrbot - ${group.name}` : 'Chat', w: 440, h: 560 };
-		}
-		// Flat-model windows (e.g. player:) size themselves from their manifest
-		// WindowSpec — title/size are pure functions of (args, fs). As apps migrate,
-		// the hardcoded prefix branches above collapse into this one lookup.
+		// Every window resolves through matchWindow now — title/size are pure
+		// functions of (parsed args, fs) on the matched WindowSpec (the vcr deck's
+		// device-sizing reads the vcrPrefs module store inside its size()). An id no
+		// manifest claims (a stale/unknown saved id) gets the generic fallback.
 		const matched = matchWindow(id);
 		if (matched) {
 			const ctx = { args: matched.args, fs: this.fs };
 			return { title: matched.spec.title(ctx), ...matched.spec.size(ctx) };
 		}
-		return defs[id] || { title: 'Unknown', w: 380, h: 320 };
+		return { title: 'Unknown', w: 380, h: 320 };
 	}
 
 	isKnownWindowId(id: string): boolean {

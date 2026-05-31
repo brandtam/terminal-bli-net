@@ -3,7 +3,6 @@ import type { AppDef } from '$lib/os/os-api';
 import type { TerminalAppDefinition } from './app-types';
 import type { WindowSpec } from './app-manifest';
 import { MANIFESTS } from './manifests';
-import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
 /**
  * The catalog: synthesizes the legacy app structures from the manifest array.
@@ -13,37 +12,6 @@ import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
  * Phase 1 only synthesizes. Later phases cut over the consumers and delete the
  * old hand-synced files entirely.
  */
-
-type WindowDef = { title: string; w: number; h: number; minW?: number; minH?: number };
-
-/**
- * Non-app OS chrome windows. These have no owning app in the manifest sense.
- *
- * - `welcome` is the first-visit greeter.
- * - The `about-*` / `about` entries carry the About-dialog geometry. The
- *   manifest's `about` key is just `{ id }` (the shared AboutAppWindow renders
- *   them), so the per-dialog title/size — which today vary entry to entry —
- *   live here as chrome, not on each app.
- *
- * As of Slice 5 the `system` app declares `welcome` and `about` as flat windows,
- * so getWindowDef resolves their title/size through matchWindow before this map
- * is consulted — these entries are now a harmless dual source kept until the
- * STATIC_WINDOWS removal in Slice 6. The `about-*` per-app geometry stays here
- * for the legacy about-<id> ids (the live About boxes are minted as about:<id>).
- */
-const STATIC_WINDOWS: Record<string, WindowDef> = {
-	welcome: { title: 'Welcome.app', w: 460, h: 540 },
-	about: { title: 'About This Terminal', w: 380, h: 380 },
-	'about-chatrbot': { title: 'About chatrbot', w: 420, h: 460 },
-	'about-tvguide': { title: 'About TV Guide', w: 420, h: 460 },
-	'about-textedit': { title: 'About TextEdit', w: 420, h: 380 },
-	'about-stats': { title: 'About Stats', w: 420, h: 360 },
-	'about-stickies': { title: 'About Stickies', w: 420, h: 380 },
-	'about-recorder': { title: 'About Recorder', w: 420, h: 360 },
-	'about-software-shop': { title: 'About My Shelf', w: 420, h: 380 },
-	'about-computer-store': { title: 'About Computer Store', w: 420, h: 380 },
-	'about-vcr': { title: 'About VCR', w: 420, h: 460 }
-};
 
 /**
  * Window-ids that WINDOW_APP_MAP routes to a different app than the one whose
@@ -208,52 +176,6 @@ export function synthKnownWindowIds(): Set<string> {
 		if (m.about?.id) out.add(m.about.id);
 		if (m.prefs?.id) out.add(m.prefs.id);
 	}
-	return out;
-}
-
-// ── Window defs (getWindowDef static map) ────────────────────────────────────
-
-/**
- * The static portion of getWindowDef — title/size per fixed window-id. The
- * dynamic branches (chat-/textedit-/sticky-/recorder- prefixes) and the vcr
- * device-sizing stay in getWindowDef itself; this provides everything else.
- *
- * The vcr window's def varies by selected device, so it is computed here from
- * vcrPrefs.device to stay byte-identical with the original ternary.
- */
-export function synthWindowDefs(): Record<string, WindowDef> {
-	const out: Record<string, WindowDef> = { ...STATIC_WINDOWS };
-	for (const m of MANIFESTS) {
-		const w = m.window;
-		// Only fixed windows contribute to the static def map. Minted-prefix
-		// windows (chat-, sticky-, textedit-, recorder-) are sized dynamically
-		// in getWindowDef and must not land here as a static entry.
-		if (w?.id) {
-			out[w.id] = stripUndefined({
-				title: w.title,
-				w: w.w,
-				h: w.h,
-				minW: w.minW,
-				minH: w.minH
-			});
-		}
-		if (m.prefs) {
-			out[m.prefs.id] = { title: m.prefs.title, w: m.prefs.w, h: m.prefs.h };
-		}
-	}
-	// VCR is sized to the selected device — the AG-500R is wide, the Generic
-	// deck near-square. Preserves the original getWindowDef ternary.
-	out.vcr =
-		vcrPrefs.device === 'generic'
-			? { title: 'VCR.app', w: 560, h: 523, minW: 480, minH: 470 }
-			: { title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 };
-	return out;
-}
-
-function stripUndefined(d: WindowDef): WindowDef {
-	const out: WindowDef = { title: d.title, w: d.w, h: d.h };
-	if (d.minW !== undefined) out.minW = d.minW;
-	if (d.minH !== undefined) out.minH = d.minH;
 	return out;
 }
 
