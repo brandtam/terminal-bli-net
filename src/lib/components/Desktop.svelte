@@ -490,11 +490,6 @@
 							{@const FinderWindow = (mod as LazyModule).default}
 							<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
 						{/await}
-					{:else if w.id === 'vcr'}
-						{#await getWindowComponent('vcr')!() then mod}
-							{@const VCRWindow = (mod as LazyModule).default}
-							<VCRWindow />
-						{/await}
 					{:else if w.id === 'recorder'}
 						{#await getWindowComponent('recorder')!() then mod}
 							{@const RecorderWindow = (mod as LazyModule).default}

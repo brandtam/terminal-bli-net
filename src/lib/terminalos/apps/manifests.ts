@@ -1161,10 +1161,27 @@ export const MANIFESTS = [
 		// (see app-catalog.ts). The def here is the AG-500R default; the
 		// generic variant is special-cased in synthWindowDefs/getWindowDef.
 		window: { id: 'vcr', title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 },
-		// Only the prefs dialog is on the flat path this slice — the main VCR window
-		// keeps its legacy device-aware loader (rendered by Desktop's vcr arm) until
-		// Slice 7. VCRPrefs already takes no props (reads the vcrPrefs store).
+		// Both the main VCR window and its prefs dialog are now flat. The main
+		// window's title/size/component are device-aware: SpecCtx bans the reactive
+		// `os` but NOT module stores, so these read `vcrPrefs.device` directly — the
+		// same source the legacy `component()` ternary + synthWindowDefs used, kept
+		// byte-identical (generic carries minW 480 / minH 470). A device switch
+		// while a vcr window is open calls invalidateWindow('vcr') (see
+		// vcr-prefs.svelte) so the next resolve picks the new deck + size.
 		windows: [
+			{
+				match: { kind: 'exact', id: 'vcr' },
+				role: 'app',
+				title: () => 'VCR.app',
+				size: () =>
+					vcrPrefs.device === 'generic'
+						? { w: 560, h: 523, minW: 480, minH: 470 }
+						: { w: 900, h: 560, minW: 620, minH: 420 },
+				component: () =>
+					vcrPrefs.device === 'ag500r'
+						? import('$lib/apps/vcr/VCRWindowAG500R.svelte')
+						: import('$lib/apps/vcr/VCRWindow.svelte')
+			},
 			{
 				match: { kind: 'exact', id: 'vcr-prefs' },
 				role: 'prefs',

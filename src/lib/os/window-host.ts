@@ -4,6 +4,12 @@ import type { WindowSpec } from '$lib/terminalos/apps/app-manifest';
 import { MANIFESTS } from '$lib/terminalos/apps/manifests';
 import { matchWindow } from '$lib/terminalos/apps/app-catalog';
 import { getWindowComponent } from '$lib/os/app-registry';
+import { resolutionCache } from './window-host-cache';
+
+// invalidateWindow lives in the leaf cache module (so app state can invalidate
+// without importing this file's heavy graph); re-export it here for the existing
+// call sites that reach for it via window-host.
+export { invalidateWindow } from './window-host-cache';
 
 /** Window components take no props, so every loader has the same shape. */
 export type WindowComponentLoader = () => Promise<{ default: Component }>;
@@ -17,7 +23,7 @@ export type ResolvedWindow = {
 	load: WindowComponentLoader;
 };
 
-const cache = new Map<string, ResolvedWindow | null>();
+const cache = resolutionCache;
 
 /**
  * Resolve a window-id to { args, spec, load }, memoized by id so a window's
@@ -51,11 +57,6 @@ export function resolveWindow(id: string): ResolvedWindow | null {
 	}
 	cache.set(id, resolved);
 	return resolved;
-}
-
-/** Drop the memoized resolution for one window (e.g. a VCR device switch). */
-export function invalidateWindow(id: string): void {
-	cache.delete(id);
 }
 
 // ── Document open routing (LaunchServices) ───────────────────────────────────

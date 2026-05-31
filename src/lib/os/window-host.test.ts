@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import type { FsFile } from '$lib/terminalos';
 import { resolveOpenTarget } from './window-host';
 import { matchWindow } from '$lib/terminalos/apps/app-catalog';
+import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
+import VCRWindowGeneric from '$lib/apps/vcr/VCRWindow.svelte';
+import VCRWindowAG500R from '$lib/apps/vcr/VCRWindowAG500R.svelte';
 
 function mkFile(partial: Partial<FsFile>): FsFile {
 	return {
@@ -69,6 +72,37 @@ describe('matchWindow', () => {
 		// matcher now, not the legacy Desktop arms.
 		expect(matchWindow('software-shop')?.appId).toBe('software-shop');
 		expect(matchWindow('computer-store')?.appId).toBe('computer-store');
+	});
+
+	it('claims the main vcr window for the vcr app (Slice 6)', () => {
+		// The main VCR window is an exact-id flat window now (its prefs dialog was
+		// already flat). The deck + size are device-aware, but the appId is fixed.
+		expect(matchWindow('vcr')?.appId).toBe('vcr');
+	});
+
+	it('resolves the vcr window device-aware through the flat spec', async () => {
+		// SpecCtx bans the reactive os but allows module stores, so the flat vcr
+		// spec reads vcrPrefs.device for both size and component — the deck swap +
+		// resize that used to live in synthWindowDefs + the Desktop arm. Exercise
+		// both decks (matchWindow recomputes per call, so it sees the live device)
+		// and restore the prior setting.
+		const ctx = { args: {}, fs: undefined as never };
+		const prev = vcrPrefs.device;
+		try {
+			vcrPrefs.setDevice('ag500r');
+			const ag = matchWindow('vcr')?.spec;
+			expect(ag).toBeTruthy();
+			expect(ag!.size(ctx)).toEqual({ w: 900, h: 560, minW: 620, minH: 420 });
+			expect((await ag!.component()).default).toBe(VCRWindowAG500R);
+
+			vcrPrefs.setDevice('generic');
+			const gen = matchWindow('vcr')?.spec;
+			expect(gen).toBeTruthy();
+			expect(gen!.size(ctx)).toEqual({ w: 560, h: 523, minW: 480, minH: 470 });
+			expect((await gen!.component()).default).toBe(VCRWindowGeneric);
+		} finally {
+			vcrPrefs.setDevice(prev);
+		}
 	});
 
 	it('parses a per-app About id into the system app + its appId arg', () => {
