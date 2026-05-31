@@ -296,11 +296,6 @@ export class OsApiClass implements OsApi {
 			const group = this.groups.find((g) => g.slug === showSlug);
 			return { title: group ? `chatrbot - ${group.name}` : 'Chat', w: 440, h: 560 };
 		}
-		if (id.startsWith('recorder-')) {
-			const fileId = id.replace('recorder-', '');
-			const node = this.fs.peekNode(fileId);
-			return { title: node?.name || 'Recording', w: 360, h: 340 };
-		}
 		// Flat-model windows (e.g. player:) size themselves from their manifest
 		// WindowSpec — title/size are pure functions of (args, fs). As apps migrate,
 		// the hardcoded prefix branches above collapse into this one lookup.
@@ -313,15 +308,13 @@ export class OsApiClass implements OsApi {
 	}
 
 	isKnownWindowId(id: string): boolean {
-		// `chat:`/`textedit:`/`sticky:` are intentionally absent — those are flat
-		// window-host apps now, so `matchWindow` resolves them below. The only
-		// remaining `-` prefix is `recorder-` (the legacy clip-playback id, not yet
-		// migrated). This is also why a stale `chat-<slug>`/`textedit-<id>`/
-		// `sticky-<id>` from before the separator cutover is now *unknown* and gets
-		// dropped on restore (see the init() saved-window filter).
-		return (
-			OsApiClass.KNOWN_WINDOW_IDS.has(id) || id.startsWith('recorder-') || matchWindow(id) !== null
-		);
+		// Minted windows (chat:, textedit:, sticky:, player:) and fixed ones all
+		// resolve through matchWindow now — no app-specific prefix branches remain.
+		// A stale `-`-separated id (chat-<slug>, textedit-<id>, sticky-<id>) or a
+		// `recorder-<id>` clip-playback id from before the flat cutover is therefore
+		// *unknown* and gets dropped on restore (see the init() saved-window filter);
+		// those clips reopen in the Player by content-type anyway.
+		return OsApiClass.KNOWN_WINDOW_IDS.has(id) || matchWindow(id) !== null;
 	}
 
 	/**

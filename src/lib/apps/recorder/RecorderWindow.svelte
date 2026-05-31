@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import type { TerminalFS, FsFile } from '$lib/terminalos';
+	import type { FsFile } from '$lib/terminalos';
 	import { RECORDINGS_ID } from '$lib/terminalos';
+	import { getSystem } from '$lib/os/os-context';
+	import { recorderState } from './recorder-state.svelte';
 
-	let {
-		recording = $bindable(false),
-		fs
-	}: {
-		recording?: boolean;
-		fs: TerminalFS;
-	} = $props();
+	// Zero-prop: fs comes from the host context. The global "● REC" menu-bar badge
+	// is driven by recorderState (read through this app's statusExtra), set on
+	// start/stop/cleanup below — no bindable prop threaded through Desktop.
+	const { fs } = getSystem();
 
 	const MAX_DURATION = 60;
 
@@ -47,10 +46,6 @@
 		playbackUrl = null;
 		playingId = null;
 	}
-
-	$effect(() => {
-		recording = isRecording;
-	});
 
 	function refreshRecordings() {
 		recordings = fs.findByApp('recorder', RECORDINGS_ID);
@@ -133,6 +128,7 @@
 
 		recorder.start(100);
 		isRecording = true;
+		recorderState.recording = true;
 		elapsed = 0;
 		clearPlayback();
 
@@ -149,6 +145,9 @@
 			recorder.stop();
 		}
 		isRecording = false;
+		// Clear the menu-bar badge. cleanup() calls stopRecording(), so closing the
+		// window mid-record clears REC too — no separate effect needed.
+		recorderState.recording = false;
 		if (timerInterval) {
 			clearInterval(timerInterval);
 			timerInterval = null;

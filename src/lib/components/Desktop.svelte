@@ -178,8 +178,6 @@
 		if (file) os.openWindow(`textedit:${file.id}`);
 	}
 
-	let cameraRecording = $state(false);
-
 	onMount(async () => {
 		const bootStart = Date.now();
 
@@ -396,7 +394,6 @@
 				app={os.activeApp}
 				{os}
 				openWindows={os.windows.length}
-				isRecording={cameraRecording}
 				contextInfo={chatContextInfo}
 				now={os.now}
 				timezone={os.timezone}
@@ -490,25 +487,6 @@
 							{@const FinderWindow = (mod as LazyModule).default}
 							<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
 						{/await}
-					{:else if w.id === 'recorder'}
-						{#await getWindowComponent('recorder')!() then mod}
-							{@const RecorderWindow = (mod as LazyModule).default}
-							<RecorderWindow bind:recording={cameraRecording} fs={terminalFs} />
-						{/await}
-					{:else if w.id.startsWith('recorder-')}
-						{@const recFileId = w.id.replace('recorder-', '')}
-						{@const recText = terminalFs.readText(recFileId)}
-						{#if recText}
-							<div class="recording-playback">
-								<video src={recText} controls autoplay class="recording-video">
-									<track kind="captions" />
-								</video>
-							</div>
-						{:else}
-							<div class="window-content">
-								<p>Recording not found.</p>
-							</div>
-						{/if}
 					{:else if w.id === 'finder'}
 						{#await getWindowComponent('finder')!() then mod}
 							{@const FinderWindow = (mod as LazyModule).default}
@@ -759,20 +737,6 @@
 		to {
 			transform: scaleX(1);
 		}
-	}
-
-	/* Recording playback */
-	.recording-playback {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		background: var(--brand-color-ink, #000);
-	}
-	.recording-video {
-		width: 100%;
-		height: 100%;
-		object-fit: contain;
 	}
 
 	@media (max-width: 767px) {

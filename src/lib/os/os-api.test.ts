@@ -449,9 +449,16 @@ describe('isKnownWindowId', () => {
 		expect(os.isKnownWindowId('textedit:xyz')).toBe(true);
 	});
 
-	it('returns true for recorder- prefix match', () => {
+	it('returns true for the exact recorder window', () => {
 		const { os } = createOs();
-		expect(os.isKnownWindowId('recorder-123')).toBe(true);
+		expect(os.isKnownWindowId('recorder')).toBe(true);
+	});
+
+	it('returns false for the dead recorder- clip prefix (dropped on restore)', () => {
+		// Recorder migrated exact-only; the `recorder-` clip-playback prefix is dead
+		// (clips open in the Player). A stale recorder- id no longer resolves.
+		const { os } = createOs();
+		expect(os.isKnownWindowId('recorder-123')).toBe(false);
 	});
 
 	it('returns false for random-junk', () => {
@@ -819,7 +826,8 @@ describe('windowAppId', () => {
 		expect(windowAppId('chat:seinfeld')).toBe('chatrbot');
 		expect(windowAppId('sticky-abc')).toBe('stickies');
 		expect(windowAppId('textedit-xyz')).toBe('textedit');
-		expect(windowAppId('recorder-123')).toBe('recorder');
+		// recorder- is intentionally absent: the clip-playback prefix is dead (clips
+		// open in the Player), so the OS never mints a recorder- id anymore.
 	});
 
 	it('maps about windows to their app', () => {

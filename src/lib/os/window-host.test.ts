@@ -5,6 +5,8 @@ import { matchWindow } from '$lib/terminalos/apps/app-catalog';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 import VCRWindowGeneric from '$lib/apps/vcr/VCRWindow.svelte';
 import VCRWindowAG500R from '$lib/apps/vcr/VCRWindowAG500R.svelte';
+import { MANIFESTS } from '$lib/terminalos/apps/manifests';
+import { recorderState } from '$lib/apps/recorder/recorder-state.svelte';
 
 function mkFile(partial: Partial<FsFile>): FsFile {
 	return {
@@ -80,6 +82,13 @@ describe('matchWindow', () => {
 		expect(matchWindow('computer-store')?.appId).toBe('computer-store');
 	});
 
+	it('claims the exact recorder window for the recorder app (Slice 6)', () => {
+		// Camera migrates exact-only. There is no recorder- / recorder: prefix —
+		// clips open in the Player, so the matcher must NOT claim a recorder- id.
+		expect(matchWindow('recorder')?.appId).toBe('recorder');
+		expect(matchWindow('recorder-clip1')).toBeNull();
+	});
+
 	it('claims the main vcr window for the vcr app (Slice 6)', () => {
 		// The main VCR window is an exact-id flat window now (its prefs dialog was
 		// already flat). The deck + size are device-aware, but the appId is fixed.
@@ -118,6 +127,26 @@ describe('matchWindow', () => {
 		const m = matchWindow('about:vcr');
 		expect(m?.appId).toBe('system');
 		expect(m?.args.appId).toBe('vcr');
+	});
+});
+
+describe('recorder statusExtra (REC badge)', () => {
+	const recorderManifest = MANIFESTS.find((m) => m.id === 'recorder');
+
+	it('shows REC only while recording, via the active-app status channel', () => {
+		// The menu-bar "● REC" badge rides statusExtra (MenuBar reads
+		// app.statusExtra?.(os)); recorderState flips it. statusExtra ignores os here.
+		const statusExtra = recorderManifest?.statusExtra;
+		expect(typeof statusExtra).toBe('function');
+		const prev = recorderState.recording;
+		try {
+			recorderState.recording = false;
+			expect(statusExtra!(undefined as never)).toBeNull();
+			recorderState.recording = true;
+			expect(statusExtra!(undefined as never)).toEqual({ label: 'REC', kind: 'rec' });
+		} finally {
+			recorderState.recording = prev;
+		}
 	});
 });
 

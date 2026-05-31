@@ -1,5 +1,6 @@
 import { defineApp } from './app-manifest';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
+import { recorderState } from '$lib/apps/recorder/recorder-state.svelte';
 
 /**
  * One manifest per app — the single source of truth for app identity. The
@@ -863,6 +864,19 @@ export const MANIFESTS = [
 		// mints clip-playback windows rendered inline in Desktop (a <video>
 		// element), so it has no component loader of its own.
 		component: () => import('$lib/apps/recorder/RecorderWindow.svelte'),
+		// Camera migrates exact-only: the fixed `recorder` window is flat now. The
+		// legacy `recorder-` clip-playback prefix is dead — recorded clips are tagged
+		// opensWith:'player' and open in the system Player (the bug_002 fix), so
+		// there is NO flat `recorder-`/`recorder:` prefix and no `opens` here.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'recorder' },
+				role: 'app',
+				title: () => 'Camera.app',
+				size: () => ({ w: 360, h: 480 }),
+				component: () => import('$lib/apps/recorder/RecorderWindow.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'Camera',
 			version: 'v1.0',
@@ -899,7 +913,10 @@ export const MANIFESTS = [
 				items: [{ type: 'action', label: 'About Camera', action: () => os.openAbout('recorder') }]
 			}
 		],
-		statusExtra: () => null
+		// The "● REC" menu-bar badge rides the active-app status channel: it shows
+		// only while Camera is focused and recording. recorderState flips on
+		// start/stop, and MenuBar's $derived(app.statusExtra?.(os)) re-runs on the flip.
+		statusExtra: () => (recorderState.recording ? { label: 'REC', kind: 'rec' } : null)
 	}),
 
 	defineApp({
