@@ -1483,10 +1483,12 @@ export class TerminalFS {
 			this.volume = { ...this.volume, ownedApps: backup.disk.ownedApps ?? [] };
 		}
 
-		// Restore blob bodies. Restore is a full disk replacement, so clear the
-		// body store first, then write each blob back from its base64.
+		// Restore is a full disk replacement, so clear the body store first —
+		// for ANY format. Otherwise blobs written since (e.g. recordings) would
+		// orphan in IndexedDB after restoring an older v1/v2 backup, whose nodes
+		// reference none of them. v3 then writes its own blobs back from base64.
+		await this.bodies.clear();
 		if (backup.version === 3) {
-			await this.bodies.clear();
 			for (const [bodyId, b64] of Object.entries(backup.bodies)) {
 				const res = await this.writeBody(bodyId, base64ToArrayBuffer(b64));
 				if (!res.ok) return res as FsResult<BackupRestoreResult>;

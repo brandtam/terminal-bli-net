@@ -190,6 +190,29 @@ describe('blob body round-trip', () => {
 			expect(result.error.code).toBe('invalid_backup');
 		}
 	});
+
+	it('restoring an older v1/v2 backup clears pre-existing blob bodies', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		// A blob written under the current (v3) world.
+		const bodyId = 'body_stale';
+		await fs.writeBody(bodyId, new TextEncoder().encode('stale clip').buffer as ArrayBuffer);
+		expect((await fs.readBody(bodyId)).ok).toBe(true);
+
+		// Restore a v2 backup — predates blobs, references none. Restore is a full
+		// disk replacement, so the stale blob must not survive.
+		const v2Backup = {
+			format: 'terminal-hd' as const,
+			version: 2 as const,
+			exportedAt: new Date().toISOString(),
+			disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
+			nodes: Array.from(fs.getAllNodes().values()).filter((n) => !n.flags?.hidden),
+			bodies: {} as Record<string, string>
+		};
+
+		const result = await fs.restoreBackup(v2Backup);
+		expect(result.ok).toBe(true);
+		expect((await fs.readBody(bodyId)).ok).toBe(false);
+	});
 });
 
 describe('validateBackup', () => {
