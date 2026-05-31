@@ -25,8 +25,11 @@ type WindowDef = { title: string; w: number; h: number; minW?: number; minH?: nu
  *   them), so the per-dialog title/size — which today vary entry to entry —
  *   live here as chrome, not on each app.
  *
- * windowAppId() maps welcome → finder; about dialogs map to their owning app
- * (handled by synthWindowAppMap from each manifest's `about.id`).
+ * As of Slice 5 the `system` app declares `welcome` and `about` as flat windows,
+ * so getWindowDef resolves their title/size through matchWindow before this map
+ * is consulted — these entries are now a harmless dual source kept until the
+ * STATIC_WINDOWS removal in Slice 6. The `about-*` per-app geometry stays here
+ * for the legacy about-<id> ids (the live About boxes are minted as about:<id>).
  */
 const STATIC_WINDOWS: Record<string, WindowDef> = {
 	welcome: { title: 'Welcome.app', w: 460, h: 540 },
@@ -44,15 +47,17 @@ const STATIC_WINDOWS: Record<string, WindowDef> = {
 
 /**
  * Window-ids that WINDOW_APP_MAP routes to a different app than the one whose
- * manifest declares them. These are OS chrome the Finder shell owns even though
- * the window-id matches another app (e.g. `terminal-prefs` is system-prefs'
- * window, but the menu-bar/app routing treats it as Finder chrome). Preserved
- * verbatim from the original WINDOW_APP_MAP.
+ * manifest declares them — OS chrome the Finder shell owns even though the
+ * window-id matches another app (e.g. `error` is its own store app, but its
+ * dialog reads as Finder chrome). This map is checked before matchWindow in
+ * synthWindowAppId, so an entry here wins over a flat-model owner.
+ *
+ * `welcome`, `about` and `terminal-prefs` are NOT here anymore: the new `system`
+ * app owns them via its flat windows[], so matchWindow resolves them to `system`
+ * and the menu bar reads "Terminal". `trash` stays Finder until its migration
+ * (#35).
  */
 const WINDOW_APP_OVERRIDES: Record<string, AppId> = {
-	'terminal-prefs': 'finder',
-	welcome: 'finder',
-	about: 'finder',
 	error: 'finder',
 	trash: 'finder'
 };
@@ -120,8 +125,10 @@ export function synthAppLibrary(): TerminalAppDefinition[] {
 
 /**
  * The original APPS only held entries for apps with menus/about/preferences UI.
- * Apps with no APPS entry (system-prefs, about-terminal, trash, error, games)
- * must not appear here, or lookups like `APPS[id]` would change shape.
+ * Apps with no APPS entry (trash, error, the coming-soon games) must not appear
+ * here, or lookups like `APPS[id]` would change shape. The `system` app DOES
+ * appear — its non-empty aboutSpec.title is what registers it, so the menu bar
+ * can read its name + menus when an OS chrome dialog is focused.
  */
 function hasRegistryEntry(m: (typeof MANIFESTS)[number]): boolean {
 	return m.aboutSpec.title !== '';
@@ -189,7 +196,10 @@ export function synthWindowAppId(windowId: string): AppId {
  * those by prefix. Derived from the manifests; matches the original exactly.
  */
 export function synthKnownWindowIds(): Set<string> {
-	const out = new Set<string>(['welcome']);
+	// `welcome` is no longer seeded here — the `system` app declares it as a flat
+	// window, so matchWindow covers it (and `about` / `terminal-prefs`) in
+	// isKnownWindowId. This static set holds only the legacy fixed/about/prefs ids.
+	const out = new Set<string>();
 	for (const m of MANIFESTS) {
 		if (m.window?.id) out.add(m.window.id);
 		if (m.about?.id) out.add(m.about.id);
@@ -249,10 +259,10 @@ function stripUndefined(d: WindowDef): WindowDef {
 /**
  * The original getAppWindowId returned a fixed window-id only for a subset of
  * apps (those launched by "open window X"). Apps with no fixed window (stickies,
- * chatrbot, textedit) returned undefined. The original also returned the
- * Finder-shell window-ids for system-prefs ('terminal-prefs') and
- * about-terminal ('about'), which here come straight from their manifest
- * `window.id`.
+ * chatrbot, textedit) returned undefined. The folded-away system-prefs /
+ * about-terminal apps used to live here for their 'terminal-prefs' / 'about'
+ * windows; those windows belong to the `system` app now and are never launched
+ * as an app, so they are gone from this gate.
  */
 // Gate set of catalog ids that resolve to a fixed window. Typed as the AppId
 // union (each literal is checked against the union at authoring time) but stored
@@ -262,8 +272,6 @@ const APP_WINDOW_ID_APPS = new Set<string>([
 	'recorder',
 	'stats',
 	'error',
-	'system-prefs',
-	'about-terminal',
 	'software-shop',
 	'computer-store',
 	'finder',
@@ -297,15 +305,18 @@ export function synthAppIconKind(appId: PersistedAppId): string {
 // ── App → about / prefs window id (os-api routing) ───────────────────────────
 
 /**
- * The About-dialog window-id for an app. Each manifest carries its own
- * `about.id` (e.g. vcr → 'about-vcr', finder → 'about'); apps with no About
- * dialog (trash, error, system-prefs, the games, or a null/unknown id) fall
- * back to the shared system 'about'. Replaces openAbout()'s hardcoded chain.
+ * The About-dialog window-id for an app. The `system` app owns a single flat
+ * `about:` prefix window, so every per-app About box is minted as `about:<id>`
+ * (e.g. vcr → 'about:vcr'); the shared AboutAppWindow reads the id's `appId`
+ * arg and renders that app's spec. A null appId is the system About box —
+ * window id 'about' (system's exact entry, rendered by AboutTerminal).
+ *
+ * Note: because the about: window lives on the `system` app, its menu-bar
+ * identity is `system` ("Terminal"), not the named app — opening About-an-app
+ * is system chrome, not the app coming forward.
  */
 export function synthAboutWindowId(appId: string | null): string {
-	if (!appId) return 'about';
-	const m = MANIFESTS.find((x) => x.id === appId);
-	return m?.about?.id ?? 'about';
+	return appId ? `about:${appId}` : 'about';
 }
 
 /**

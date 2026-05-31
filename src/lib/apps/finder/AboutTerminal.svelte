@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { OsApi } from '$lib/os/os-api';
-	import type { TerminalFS } from '$lib/terminalos';
 	import type { DiskUsage } from '$lib/terminalos';
+	import { getSystem } from '$lib/os/os-context';
 
-	let { os, fs }: { os: OsApi; fs: TerminalFS } = $props();
+	// Window components take no props — they read the shared context. This dialog
+	// only needs the filesystem (disk-usage bars); it never touched `os`.
+	const { fs } = getSystem();
 
 	const version = __APP_VERSION__;
 
@@ -86,7 +87,7 @@
 				></div>
 			</div>
 		</div>
-		{#each appUsage as app}
+		{#each appUsage as app (app.name)}
 			<div class="about-bar-row">
 				<span class="about-bar-name">{app.name}</span>
 				<span class="about-bar-size">{formatK(app.bytes)}</span>

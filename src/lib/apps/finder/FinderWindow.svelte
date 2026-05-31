@@ -171,14 +171,6 @@
 			}
 		}
 
-		if (appId === 'system-prefs') {
-			os.openSystemPreferences();
-			return;
-		}
-		if (appId === 'about-terminal') {
-			os.openAbout(null);
-			return;
-		}
 		// Generic: look up window ID from AppLibrary
 		const windowId = getAppWindowId(appId);
 		if (windowId) {

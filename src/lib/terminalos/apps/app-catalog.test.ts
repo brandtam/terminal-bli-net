@@ -17,12 +17,11 @@ import {
  */
 
 describe('synthAppLibrary', () => {
-	it('produces all 21 apps in original order', () => {
+	it('produces all 20 apps in original order', () => {
 		const ids = synthAppLibrary().map((a) => a.id);
 		expect(ids).toEqual([
 			'finder',
-			'system-prefs',
-			'about-terminal',
+			'system',
 			'software-shop',
 			'computer-store',
 			'trash',
@@ -61,6 +60,7 @@ describe('synthApps', () => {
 		expect(keys).toEqual(
 			[
 				'finder',
+				'system',
 				'tvguide',
 				'chatrbot',
 				'stats',
@@ -77,7 +77,7 @@ describe('synthApps', () => {
 
 	it('does not register chrome-only / game apps', () => {
 		const apps = synthApps();
-		for (const id of ['system-prefs', 'about-terminal', 'trash', 'error', 'tetra']) {
+		for (const id of ['trash', 'error', 'tetra']) {
 			expect(apps[id]).toBeUndefined();
 		}
 	});
@@ -94,14 +94,11 @@ describe('synthApps', () => {
 describe('synthWindowAppMap', () => {
 	it('matches the original WINDOW_APP_MAP exactly', () => {
 		expect(synthWindowAppMap()).toEqual({
-			'terminal-prefs': 'finder',
-			welcome: 'finder',
 			finder: 'finder',
 			'tv-guide': 'tvguide',
 			'tvguide-prefs': 'tvguide',
 			'chatrbot-prefs': 'chatrbot',
 			stats: 'stats',
-			about: 'finder',
 			'about-chatrbot': 'chatrbot',
 			'about-tvguide': 'tvguide',
 			'about-textedit': 'textedit',
@@ -133,18 +130,35 @@ describe('synthWindowAppId', () => {
 	it('falls back to finder for unknown windows', () => {
 		expect(synthWindowAppId('nope')).toBe('finder');
 	});
+
+	it('routes the OS chrome dialogs to the system app', () => {
+		// welcome / about / terminal-prefs are owned by the `system` app via its
+		// flat windows[], so the menu bar reads "Terminal" while one is focused.
+		expect(synthWindowAppId('welcome')).toBe('system');
+		expect(synthWindowAppId('about')).toBe('system');
+		expect(synthWindowAppId('terminal-prefs')).toBe('system');
+		// Per-app About boxes are minted as about:<id>; the about: prefix is the
+		// system app's too, so they resolve to system (not the named app).
+		expect(synthWindowAppId('about:vcr')).toBe('system');
+		expect(synthWindowAppId('about:chatrbot')).toBe('system');
+	});
+
+	it('keeps error and trash as Finder chrome', () => {
+		expect(synthWindowAppId('error')).toBe('finder');
+		expect(synthWindowAppId('trash')).toBe('finder');
+	});
 });
 
 describe('synthKnownWindowIds', () => {
 	it('matches the original KNOWN_WINDOW_IDS set', () => {
+		// welcome / terminal-prefs / about dropped from the static set — the system
+		// app declares them as flat windows, so isKnownWindowId resolves them via
+		// matchWindow instead (see window-host.test.ts).
 		expect([...synthKnownWindowIds()].sort()).toEqual(
 			[
-				'welcome',
 				'tv-guide',
-				'terminal-prefs',
 				'tvguide-prefs',
 				'chatrbot-prefs',
-				'about',
 				'about-chatrbot',
 				'about-tvguide',
 				'about-textedit',
@@ -206,8 +220,6 @@ describe('synthAppWindowId', () => {
 		expect(synthAppWindowId('recorder')).toBe('recorder');
 		expect(synthAppWindowId('stats')).toBe('stats');
 		expect(synthAppWindowId('vcr')).toBe('vcr');
-		expect(synthAppWindowId('system-prefs')).toBe('terminal-prefs');
-		expect(synthAppWindowId('about-terminal')).toBe('about');
 		expect(synthAppWindowId('error')).toBe('error');
 		expect(synthAppWindowId('software-shop')).toBe('software-shop');
 		expect(synthAppWindowId('computer-store')).toBe('computer-store');
@@ -235,7 +247,6 @@ describe('synthAppIconKind', () => {
 		expect(synthAppIconKind('recorder')).toBe('tv');
 		expect(synthAppIconKind('stats')).toBe('calc');
 		expect(synthAppIconKind('error')).toBe('floppy');
-		expect(synthAppIconKind('system-prefs')).toBe('hd');
 		expect(synthAppIconKind('finder')).toBe('hd');
 		expect(synthAppIconKind('vcr')).toBe('tv');
 	});

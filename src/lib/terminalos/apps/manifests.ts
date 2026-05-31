@@ -25,7 +25,11 @@ export const MANIFESTS = [
 		isSystem: true,
 		iconKind: 'hd',
 		window: { id: 'finder', title: 'Terminal HD', w: 480, h: 420 },
-		about: { id: 'about' },
+		// No `about` block: the system About box (window id 'about') is owned by the
+		// `system` app now, not Finder. Finder's Help → About Terminal still routes
+		// there via os.openAbout(null). Keeping `about: { id: 'about' }` here would put
+		// 'about' → finder in WINDOW_APP_MAP, which is checked before matchWindow and
+		// would keep the menu bar on "Finder" while the system About is focused.
 		component: () => import('$lib/apps/finder/FinderWindow.svelte'),
 		aboutSpec: {
 			title: 'Terminal',
@@ -141,41 +145,84 @@ export const MANIFESTS = [
 		statusExtra: () => null
 	}),
 
+	// The system app owns the OS chrome dialogs — Welcome, About This Terminal,
+	// the per-app About boxes (about:<id>), and System Preferences. They render
+	// through the flat Window Host like any other window, and the menu bar reads
+	// this app's name ("Terminal") whenever one of them is focused. It folds away
+	// the old `system-prefs` + `about-terminal` pseudo-manifests. None of its
+	// windows declare `opens`, so the system app is not a document handler.
 	defineApp({
-		id: 'system-prefs',
-		name: 'System Preferences',
-		fileName: 'System Preferences',
+		id: 'system',
+		name: 'Terminal',
+		fileName: 'Terminal',
 		category: 'system',
-		description: 'Terminal OS settings',
-		icon: '⚙',
-		removable: false,
-		desktopAliasByDefault: false,
-		isSystem: true,
-		iconKind: 'hd',
-		window: { id: 'terminal-prefs', title: 'System Preferences', w: 380, h: 360 },
-		// terminal-prefs renders the System Preferences UI (TerminalPrefs).
-		component: () => import('$lib/components/TerminalPrefs.svelte'),
-		// No APPS entry today: no menus, about content, or status. Kept minimal.
-		menus: () => [],
-		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
-	}),
-
-	defineApp({
-		id: 'about-terminal',
-		name: 'About This Terminal',
-		fileName: 'About This Terminal',
-		category: 'system',
-		description: 'System information',
+		description: 'System chrome — About, Welcome, System Preferences',
 		icon: ':)',
 		removable: false,
 		desktopAliasByDefault: false,
 		isSystem: true,
-		iconKind: 'doc',
-		window: { id: 'about', title: 'About This Terminal', w: 380, h: 380 },
-		// The 'about' window renders the system About dialog (AboutTerminal).
-		component: () => import('$lib/apps/finder/AboutTerminal.svelte'),
-		menus: () => [],
-		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
+		iconKind: 'hd',
+		windows: [
+			{
+				match: { kind: 'exact', id: 'welcome' },
+				role: 'chrome',
+				title: () => 'Welcome.app',
+				size: () => ({ w: 460, h: 540 }),
+				component: () => import('$lib/apps/welcome/WelcomeWindow.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'about' },
+				role: 'about',
+				title: () => 'About This Terminal',
+				size: () => ({ w: 380, h: 380 }),
+				component: () => import('$lib/apps/finder/AboutTerminal.svelte')
+			},
+			{
+				// Per-app About box. The id names which app (about:vcr → vcr); the
+				// shared AboutAppWindow reads args.appId and renders that app's spec.
+				// The title resolves the app's display name from the static manifest
+				// registry — SpecCtx has no `os`, so it must look the name up purely
+				// over MANIFESTS (see manifestName below). Listed AFTER the exact
+				// 'about' entry so the bare 'about' id never falls into this prefix.
+				match: { kind: 'prefix', prefix: 'about:', arg: 'appId' },
+				role: 'about',
+				title: ({ args }) => `About ${manifestName(args.appId)}`,
+				size: () => ({ w: 420, h: 460 }),
+				component: () => import('$lib/apps/finder/AboutAppWindow.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'terminal-prefs' },
+				role: 'prefs',
+				title: () => 'System Preferences',
+				size: () => ({ w: 380, h: 360 }),
+				component: () => import('$lib/components/TerminalPrefs.svelte')
+			}
+		],
+		// A non-empty aboutSpec.title is what puts an app in APPS (the hasRegistryEntry
+		// gate), and the menu bar reads APPS[activeAppId] for the name + menus. The
+		// system app never shows its own About box, so the rest stays empty.
+		aboutSpec: {
+			title: 'Terminal',
+			version: '',
+			tagline: '',
+			glyph: '',
+			glyphBg: '',
+			sections: []
+		},
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }]
+			},
+			{
+				label: 'Help',
+				items: [
+					{ type: 'action', label: 'About Terminal', action: () => os.openAbout(null) },
+					{ type: 'action', label: 'Welcome', action: () => os.openWindow('welcome') }
+				]
+			}
+		],
+		statusExtra: () => null
 	}),
 
 	defineApp({
@@ -493,6 +540,16 @@ export const MANIFESTS = [
 				title: () => 'TV Guide.app',
 				size: () => ({ w: 660, h: 700 }),
 				component: () => import('$lib/components/TVGuide.svelte')
+			},
+			{
+				// Prefs dialog on the flat path (Slice 5). TVGuidePrefs reads tweaks
+				// off getSystem() now, so it takes no props. The legacy `prefs` block
+				// below stays additively until Slice 7.
+				match: { kind: 'exact', id: 'tvguide-prefs' },
+				role: 'prefs',
+				title: () => 'TV Guide Preferences',
+				size: () => ({ w: 360, h: 360 }),
+				component: () => import('$lib/components/TVGuidePrefs.svelte')
 			}
 		],
 		about: { id: 'about-tvguide' },
@@ -621,6 +678,15 @@ export const MANIFESTS = [
 						.join(' ') || 'Chat',
 				size: () => ({ w: 440, h: 560 }),
 				component: () => import('$lib/components/ChatWindow.svelte')
+			},
+			{
+				// Prefs dialog on the flat path (Slice 5). ChatrbotPrefs already takes
+				// no props (it reads its own store). Legacy `prefs` block stays.
+				match: { kind: 'exact', id: 'chatrbot-prefs' },
+				role: 'prefs',
+				title: () => 'chatrbot Preferences',
+				size: () => ({ w: 360, h: 280 }),
+				component: () => import('$lib/components/ChatrbotPrefs.svelte')
 			}
 		],
 		about: { id: 'about-chatrbot' },
@@ -925,6 +991,20 @@ export const MANIFESTS = [
 		status: 'released',
 		iconKind: 'floppy',
 		window: { id: 'error', title: 'System Error', w: 420, h: 260 },
+		// The error dialog renders on the flat path (Slice 5) — ErrorDialog reads its
+		// close action off getSystem().win now, so it takes no props. The window-id
+		// 'error' still maps to Finder for menu-bar identity (WINDOW_APP_OVERRIDES),
+		// which is checked before matchWindow; only the rendering is flat. error
+		// stays its own removable store app, so it keeps the legacy `window` too.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'error' },
+				role: 'chrome',
+				title: () => 'System Error',
+				size: () => ({ w: 420, h: 260 }),
+				component: () => import('$lib/apps/finder/ErrorDialog.svelte')
+			}
+		],
 		component: () => import('$lib/apps/finder/ErrorDialog.svelte'),
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
@@ -1042,6 +1122,18 @@ export const MANIFESTS = [
 		// (see app-catalog.ts). The def here is the AG-500R default; the
 		// generic variant is special-cased in synthWindowDefs/getWindowDef.
 		window: { id: 'vcr', title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 },
+		// Only the prefs dialog is on the flat path this slice — the main VCR window
+		// keeps its legacy device-aware loader (rendered by Desktop's vcr arm) until
+		// Slice 7. VCRPrefs already takes no props (reads the vcrPrefs store).
+		windows: [
+			{
+				match: { kind: 'exact', id: 'vcr-prefs' },
+				role: 'prefs',
+				title: () => 'VCR Preferences',
+				size: () => ({ w: 360, h: 300 }),
+				component: () => import('$lib/components/VCRPrefs.svelte')
+			}
+		],
 		about: { id: 'about-vcr' },
 		prefs: {
 			id: 'vcr-prefs',
@@ -1113,3 +1205,15 @@ export const MANIFESTS = [
 		statusExtra: () => null
 	})
 ];
+
+/**
+ * App display name from the static manifest registry. The system app's per-app
+ * About title (`about:<id>`) needs it, and that title runs inside getWindowDef
+ * with no `os` (SpecCtx is { args, fs }) — so it resolves the name purely over
+ * MANIFESTS, which is a fully-initialized module constant by the time any window
+ * opens. Declared after MANIFESTS; the title closure above is only invoked at
+ * window-open time, long after this module finishes loading.
+ */
+function manifestName(appId: string): string {
+	return MANIFESTS.find((m) => m.id === appId)?.name ?? '';
+}

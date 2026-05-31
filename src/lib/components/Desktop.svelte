@@ -16,9 +16,8 @@
 	} from '$lib/terminalos';
 	import type { FsFile, FsNode, FsAlias } from '$lib/terminalos';
 	import { createFolderView } from '$lib/terminalos';
-	import type { TweaksState } from '$lib/types';
 	import type { StickyNote } from '$lib/apps/stickies/types';
-	import { APPS, getWindowComponent } from '$lib/os/app-registry';
+	import { getWindowComponent } from '$lib/os/app-registry';
 	import Window from './Window.svelte';
 	import WindowHost from './WindowHost.svelte';
 	import MenuBar from './MenuBar.svelte';
@@ -26,11 +25,8 @@
 	import PixelIcon from './PixelIcon.svelte';
 	import Dock from './Dock.svelte';
 	import BootScreen from './BootScreen.svelte';
-	import WelcomeWindow from '$lib/apps/welcome/WelcomeWindow.svelte';
-	import AboutAppWindow from '$lib/apps/finder/AboutAppWindow.svelte';
 	import { createStickiesManager } from '$lib/apps/stickies/stickies-manager.svelte';
 	import DesktopContextMenu from './DesktopContextMenu.svelte';
-	import { SYS7_PATTERNS } from './wallpaper-patterns';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import { matchWindow } from '$lib/terminalos/apps/app-catalog';
 	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
@@ -41,10 +37,9 @@
 	const isFlatWindow = (id: string) => matchWindow(id) !== null;
 
 	// App windows are loaded lazily via getWindowComponent(w.id), so each app's
-	// chunk is fetched only when its window opens (see manifests.ts). Cheap shared
-	// chrome stays statically imported: WelcomeWindow (first-visit greeter) and
-	// AboutAppWindow (renders every about-* dialog) — lazy-loading these would add
-	// a round-trip with no bundle win.
+	// chunk is fetched only when its window opens (see manifests.ts). The OS chrome
+	// dialogs (welcome, about, about:<id>, terminal-prefs, error) now render through
+	// the flat WindowHost path above, so Desktop no longer imports them directly.
 	// A lazily-imported Svelte component module. `default` is typed as the Svelte
 	// 5 `Component` constructor (props left open) so `<Comp ...>` renders without a
 	// cast — the per-branch markup below still type-checks each component's props.
@@ -88,14 +83,6 @@
 			if (appId === 'stickies') {
 				const id = await stickies.create();
 				if (id) os.openWindow(`sticky-${id}`);
-				return;
-			}
-			if (appId === 'system-prefs') {
-				os.openSystemPreferences();
-				return;
-			}
-			if (appId === 'about-terminal') {
-				os.openAbout(null);
 				return;
 			}
 			// Generic: look up the window ID
@@ -498,54 +485,12 @@
 						     component and context from the matcher. The legacy arms below
 						     shrink to nothing as the remaining apps migrate (Slices 4–7). -->
 						<WindowHost win={w} {os} fs={terminalFs} />
-					{:else if w.id === 'welcome'}
-						<WelcomeWindow />
-					{:else if w.id === 'terminal-prefs'}
-						{#await getWindowComponent('terminal-prefs')!() then mod}
-							{@const TerminalPrefs = (mod as LazyModule).default}
-							<TerminalPrefs
-								tweaks={os.tweaks}
-								{SYS7_PATTERNS}
-								onSetTweak={(k: keyof TweaksState, v: TweaksState[keyof TweaksState]) =>
-									os.setTweak(k, v)}
-							/>
-						{/await}
-					{:else if w.id === 'tvguide-prefs'}
-						{#await getWindowComponent('tvguide-prefs')!() then mod}
-							{@const TVGuidePrefs = (mod as LazyModule).default}
-							<TVGuidePrefs
-								tweaks={os.tweaks}
-								onSetTweak={(k: keyof TweaksState, v: TweaksState[keyof TweaksState]) =>
-									os.setTweak(k, v)}
-							/>
-						{/await}
-					{:else if w.id === 'chatrbot-prefs'}
-						{#await getWindowComponent('chatrbot-prefs')!() then mod}
-							{@const ChatrbotPrefs = (mod as LazyModule).default}
-							<ChatrbotPrefs />
-						{/await}
-					{:else if w.id === 'vcr-prefs'}
-						{#await getWindowComponent('vcr-prefs')!() then mod}
-							{@const VCRPrefs = (mod as LazyModule).default}
-							<VCRPrefs />
-						{/await}
 					{:else if w.id.startsWith('textedit-')}
 						{@const fileId = w.id.replace('textedit-', '')}
 						{#await getWindowComponent(w.id)!() then mod}
 							{@const TextEditWindow = (mod as LazyModule).default}
 							<TextEditWindow docId={fileId} fs={terminalFs} />
 						{/await}
-					{:else if w.id === 'about'}
-						{#await getWindowComponent('about')!() then mod}
-							{@const AboutTerminal = (mod as LazyModule).default}
-							<AboutTerminal {os} fs={terminalFs} />
-						{/await}
-					{:else if w.id.startsWith('about-')}
-						{@const aboutAppId = w.id.replace('about-', '')}
-						{@const aboutApp = APPS[aboutAppId]}
-						{#if aboutApp?.about}
-							<AboutAppWindow about={aboutApp.about} />
-						{/if}
 					{:else if w.id === 'software-shop'}
 						{#await getWindowComponent('software-shop')!() then mod}
 							{@const SoftwareShopWindow = (mod as LazyModule).default}
@@ -555,11 +500,6 @@
 						{#await getWindowComponent('computer-store')!() then mod}
 							{@const ComputerStoreWindow = (mod as LazyModule).default}
 							<ComputerStoreWindow {os} fs={terminalFs} />
-						{/await}
-					{:else if w.id === 'error'}
-						{#await getWindowComponent('error')!() then mod}
-							{@const ErrorDialog = (mod as LazyModule).default}
-							<ErrorDialog onclose={() => os.closeWindow('error')} />
 						{/await}
 					{:else if w.id === 'trash'}
 						{#await getWindowComponent('trash')!() then mod}

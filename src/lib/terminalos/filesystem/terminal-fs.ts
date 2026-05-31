@@ -103,14 +103,13 @@ SHOWRUNNER — $29/mo
 
 Cancel any time. Pricing in fake dollars. Real dollars also fine.`;
 
-/** Apps that exist as concepts (shell, folder) but not as installable file nodes. */
-const NON_FILE_APPS = new Set(['finder', 'trash']);
-
-/** System apps that go in /System instead of /Applications. */
-const SYSTEM_FOLDER_APPS = new Set(['system-prefs', 'about-terminal']);
-
-/** IDs of system-folder apps that are always seeded into /System. */
-const SYSTEM_FOLDER_APP_IDS = ['system-prefs', 'about-terminal'];
+/**
+ * Apps that exist as concepts (shell, folder, OS chrome) but not as installable
+ * file nodes. `system` is the chrome-dialog owner (About / Welcome / System
+ * Preferences) — it is isSystem like the others but must never get a "Terminal"
+ * icon in /Applications, so it is excluded from seeding here just like finder.
+ */
+const NON_FILE_APPS = new Set(['finder', 'trash', 'system']);
 
 /**
  * Generate a copy name: "Foo" -> "Foo copy", "Foo copy 2", etc.
@@ -379,13 +378,10 @@ export class TerminalFS {
 
 		// 4. Seed app file nodes
 		//    - system apps go into /Applications
-		//    - system-folder apps (system-prefs, about-terminal) always go into /System
 		//    - non-file apps (finder, trash) are never created as files
-		const appsToSeed = [
-			...getSystemApps(),
-			// System-folder apps always get seeded into /System
-			...SYSTEM_FOLDER_APP_IDS.map((id) => getAppDef(id)).filter(Boolean)
-		] as import('../apps/app-types').TerminalAppDefinition[];
+		// System Preferences and About This Terminal have no /System icons — they
+		// are reached from the Apple menu — so nothing seeds into /System here.
+		const appsToSeed = getSystemApps();
 
 		const appFileIds = new Map<string, NodeId>(); // appId -> file nodeId
 		const seenAppIds = new Set<string>();
@@ -395,7 +391,7 @@ export class TerminalFS {
 			if (seenAppIds.has(appDef.id)) continue;
 			seenAppIds.add(appDef.id);
 
-			const parentId = SYSTEM_FOLDER_APPS.has(appDef.id) ? SYSTEM_ID : APPLICATIONS_ID;
+			const parentId = APPLICATIONS_ID;
 			const fileId = generateUniqueId();
 			appFileIds.set(appDef.id, fileId);
 

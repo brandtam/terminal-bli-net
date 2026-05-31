@@ -483,10 +483,12 @@ describe('isKnownWindowId', () => {
 // ── Navigation routing ────────────────────────────────────────────────────
 
 describe('navigation routing', () => {
-	it('openAbout chatrbot opens about-chatrbot window', async () => {
+	// Per-app About boxes are minted as about:<id> (the system app's flat about:
+	// prefix window); openAbout(null) is the system About box, window id 'about'.
+	it('openAbout chatrbot opens about:chatrbot window', async () => {
 		const { os } = await createOsWithApp('chatrbot');
 		os.openAbout('chatrbot');
-		expect(os.windows.some((w) => w.id === 'about-chatrbot')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:chatrbot')).toBe(true);
 	});
 
 	it('openAbout null opens about window', () => {
@@ -495,40 +497,40 @@ describe('navigation routing', () => {
 		expect(os.windows.some((w) => w.id === 'about')).toBe(true);
 	});
 
-	it('openAbout tvguide opens about-tvguide', async () => {
+	it('openAbout tvguide opens about:tvguide', async () => {
 		const { os } = await createOsWithApp('tvguide');
 		os.openAbout('tvguide');
-		expect(os.windows.some((w) => w.id === 'about-tvguide')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:tvguide')).toBe(true);
 	});
 
-	it('openAbout textedit opens about-textedit', () => {
+	it('openAbout textedit opens about:textedit', () => {
 		const { os } = createOs();
 		os.openAbout('textedit');
-		expect(os.windows.some((w) => w.id === 'about-textedit')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:textedit')).toBe(true);
 	});
 
-	it('openAbout stats opens about-stats', async () => {
+	it('openAbout stats opens about:stats', async () => {
 		const { os } = await createOsWithApp('stats');
 		os.openAbout('stats');
-		expect(os.windows.some((w) => w.id === 'about-stats')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:stats')).toBe(true);
 	});
 
-	it('openAbout stickies opens about-stickies', () => {
+	it('openAbout stickies opens about:stickies', () => {
 		const { os } = createOs();
 		os.openAbout('stickies');
-		expect(os.windows.some((w) => w.id === 'about-stickies')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:stickies')).toBe(true);
 	});
 
-	it('openAbout recorder opens about-recorder', async () => {
+	it('openAbout recorder opens about:recorder', async () => {
 		const { os } = await createOsWithApp('recorder');
 		os.openAbout('recorder');
-		expect(os.windows.some((w) => w.id === 'about-recorder')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:recorder')).toBe(true);
 	});
 
-	it('openAbout software-shop opens about-software-shop', () => {
+	it('openAbout software-shop opens about:software-shop', () => {
 		const { os } = createOs();
 		os.openAbout('software-shop');
-		expect(os.windows.some((w) => w.id === 'about-software-shop')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:software-shop')).toBe(true);
 	});
 
 	it('openSystemPreferences opens terminal-prefs window', () => {
@@ -637,6 +639,33 @@ describe('derived state', () => {
 		expect(os.activeAppId).toBe('tvguide');
 	});
 
+	// The OS chrome dialogs are owned by the `system` app, so the menu bar reads
+	// "Terminal" while one is focused (Slice 5, decision 1). These lock that
+	// menu-bar identity at the os-api level, not just synthWindowAppId.
+	it('activeAppId returns system for the system About box (openAbout null)', () => {
+		const { os } = createOs();
+		os.openAbout(null);
+		expect(os.activeAppId).toBe('system');
+	});
+
+	it('activeAppId returns system for a per-app About box (about:<id>)', async () => {
+		const { os } = await createOsWithApp('chatrbot');
+		os.openAbout('chatrbot');
+		expect(os.activeAppId).toBe('system');
+	});
+
+	it('activeAppId returns system for the Welcome window', () => {
+		const { os } = createOs();
+		os.openWindow('welcome');
+		expect(os.activeAppId).toBe('system');
+	});
+
+	it('activeAppId returns system for System Preferences', () => {
+		const { os } = createOs();
+		os.openSystemPreferences();
+		expect(os.activeAppId).toBe('system');
+	});
+
 	it('activeChatGroupSlug returns null when no chat window active', () => {
 		const { os } = createOs();
 		os.openWindow('finder');
@@ -718,12 +747,16 @@ describe('store app install gate', () => {
 		expect(os.alertSpec?.title).toBe('chatrbot is not installed');
 	});
 
-	it('blocks about windows for uninstalled store apps', () => {
+	it('opens about windows even for uninstalled store apps (system chrome)', () => {
+		// About boxes are owned by the `system` app now (window id about:<id>), so
+		// the open path is no longer install-gated through the named store app. In
+		// practice this is only reachable from the app's own Help menu — which needs
+		// the app installed and running — but the routing no longer blocks it.
 		const { os } = createOs();
 		os.openAbout('tvguide');
 
-		expect(os.windows).toHaveLength(0);
-		expect(os.alertSpec?.title).toBe('TV Guide is not installed');
+		expect(os.windows.some((w) => w.id === 'about:tvguide')).toBe(true);
+		expect(os.alertSpec).toBeNull();
 	});
 
 	it('purchase alert Visit Store button opens computer-store', () => {

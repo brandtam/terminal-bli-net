@@ -1,15 +1,15 @@
 <script lang="ts">
 	import type { TweaksState } from '$lib/types';
+	import { getSystem } from '$lib/os/os-context';
+	import { SYS7_PATTERNS } from './wallpaper-patterns';
 
-	let {
-		tweaks,
-		SYS7_PATTERNS,
-		onSetTweak
-	}: {
-		tweaks: TweaksState;
-		SYS7_PATTERNS: string[];
-		onSetTweak: (key: keyof TweaksState, value: TweaksState[keyof TweaksState]) => void;
-	} = $props();
+	// Zero-prop window component: reads tweaks off the live OS context and writes
+	// them back through os.setTweak. SYS7_PATTERNS is the static wallpaper list,
+	// imported directly rather than threaded in as a prop.
+	const { os } = getSystem();
+	const tweaks = $derived(os.tweaks);
+	const onSetTweak = (key: keyof TweaksState, value: TweaksState[keyof TweaksState]) =>
+		os.setTweak(key, value);
 </script>
 
 <div class="window-content prefs-content">
@@ -18,7 +18,7 @@
 		<div class="pref-label">WALLPAPER</div>
 		<div class="pref-sublabel">Classic</div>
 		<div style="display: flex; gap: 6px; flex-wrap: wrap;">
-			{#each [{ value: 'teal', label: 'Teal', color: '#5e8585' }, { value: 'speckle', label: 'Speckle', color: '#c8bda6' }, { value: 'yellow', label: 'Yellow', color: '#f9bd2b' }, { value: 'pink', label: 'Pink', color: '#ee63b3' }, { value: 'navy', label: 'Navy', color: '#16243a' }] as opt}
+			{#each [{ value: 'teal', label: 'Teal', color: '#5e8585' }, { value: 'speckle', label: 'Speckle', color: '#c8bda6' }, { value: 'yellow', label: 'Yellow', color: '#f9bd2b' }, { value: 'pink', label: 'Pink', color: '#ee63b3' }, { value: 'navy', label: 'Navy', color: '#16243a' }] as opt (opt.value)}
 				<button
 					class="btn btn-with-chip {tweaks.wallpaper === opt.value ? 'selected' : ''}"
 					onclick={() => onSetTweak('wallpaper', opt.value)}
@@ -30,7 +30,7 @@
 		</div>
 		<div class="pref-sublabel" style="margin-top: 10px;">System 7 Patterns</div>
 		<div class="pattern-grid">
-			{#each SYS7_PATTERNS as pat}
+			{#each SYS7_PATTERNS as pat (pat)}
 				<button
 					class="pattern-thumb {tweaks.wallpaper === `sys7-${pat}` ? 'selected' : ''}"
 					style="background-image: url(/themes/system7/wallpapers/{pat}.png);"
@@ -44,7 +44,7 @@
 	<div class="pref-row">
 		<div class="pref-label">ACCENT</div>
 		<div style="display: flex; gap: 6px;">
-			{#each ['#f54e00', '#2b6cb0', '#a6f000', '#ff79c6', '#0a0a0a'] as c}
+			{#each ['#f54e00', '#2b6cb0', '#a6f000', '#ff79c6', '#0a0a0a'] as c (c)}
 				<button
 					class="btn btn-swatch {tweaks.accent === c ? 'selected' : ''}"
 					style:background={c}

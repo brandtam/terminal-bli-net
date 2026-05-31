@@ -47,6 +47,23 @@ describe('matchWindow', () => {
 		// via the deprecated idPrefix until Slice 7), so matchWindow ignores it.
 		expect(matchWindow('chat-seinfeld')).toBeNull();
 	});
+
+	it('claims the system chrome dialogs for the system app (Slice 5)', () => {
+		// welcome / about / terminal-prefs are exact-id windows on the system app;
+		// they used to render through bespoke Desktop arms and now resolve here.
+		for (const id of ['welcome', 'about', 'terminal-prefs']) {
+			expect(matchWindow(id)?.appId, id).toBe('system');
+		}
+	});
+
+	it('parses a per-app About id into the system app + its appId arg', () => {
+		// openAbout('vcr') opens about:vcr; AboutAppWindow reads args.appId to pick
+		// which app's spec to render. The bare 'about' id matches the exact entry,
+		// not this prefix.
+		const m = matchWindow('about:vcr');
+		expect(m?.appId).toBe('system');
+		expect(m?.args.appId).toBe('vcr');
+	});
 });
 
 describe('resolveOpenTarget', () => {
