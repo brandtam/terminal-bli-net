@@ -381,6 +381,22 @@ export const MANIFESTS = [
 		isSystem: true,
 		iconKind: 'doc',
 		window: { idPrefix: 'textedit-', title: 'Untitled.txt', w: 420, h: 400 },
+		// Flat window-host entry (Slice 6): minted per open document, keyed
+		// `textedit:<fileId>`. The `:` separator matches chat:/player:/about: so every
+		// minted window reads the same way (file-ids contain `-`; the tail is sliced
+		// by prefix length, unambiguous either way). NO `opens`: TextEdit is launched
+		// (File ▸ New/Open, Finder double-click), not a content-type doc handler. The
+		// title is the file's name, read purely from the fs node since SpecCtx is
+		// {args, fs}. Legacy `window`/`component` stay additively until the collapse.
+		windows: [
+			{
+				match: { kind: 'prefix', prefix: 'textedit:', arg: 'fileId' },
+				role: 'app',
+				title: ({ args, fs }) => fs.peekNode(args.fileId)?.name ?? 'Untitled.txt',
+				size: () => ({ w: 420, h: 400 }),
+				component: () => import('$lib/apps/textedit/TextEditWindow.svelte')
+			}
+		],
 		about: { id: 'about-textedit' },
 		component: () => import('$lib/apps/textedit/TextEditWindow.svelte'),
 		aboutSpec: {

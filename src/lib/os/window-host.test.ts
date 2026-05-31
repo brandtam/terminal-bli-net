@@ -40,11 +40,19 @@ describe('matchWindow', () => {
 		expect(m?.args.slug).toBe('breaking-bad');
 	});
 
+	it('parses a textedit: instance id into its owning app, spec, and fileId arg', () => {
+		const m = matchWindow('textedit:doc-7');
+		expect(m?.appId).toBe('textedit');
+		// File-ids contain '-'; the ':' separator keeps the tail unambiguous.
+		expect(m?.args.fileId).toBe('doc-7');
+	});
+
 	it('returns null for ids no manifest claims via windows[]', () => {
-		expect(matchWindow('textedit-xyz')).toBeNull();
 		expect(matchWindow('definitely-unknown')).toBeNull();
-		// The legacy chat- separator is no longer a flat window (it routes only
-		// via the deprecated idPrefix until Slice 7), so matchWindow ignores it.
+		// Legacy `-` separators (textedit-, chat-) are no longer flat windows — the
+		// live forms are textedit:/chat:. matchWindow ignores the old ids, so a stale
+		// saved layout using them is dropped on restore.
+		expect(matchWindow('textedit-xyz')).toBeNull();
 		expect(matchWindow('chat-seinfeld')).toBeNull();
 	});
 

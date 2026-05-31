@@ -1,23 +1,17 @@
 <script lang="ts">
-	import type { TerminalFS } from '$lib/terminalos';
+	import { getSystem } from '$lib/os/os-context';
 
-	interface Props {
-		docId: string;
-		fs: TerminalFS;
-	}
+	// Zero-prop: fs + this window's handle come from the host context; the document
+	// id is the matcher-parsed arg from textedit:<fileId>. (Slice 6 migration.)
+	const { fs, win } = getSystem();
+	const docId = win.args.fileId;
 
-	let { docId, fs }: Props = $props();
-
-	let content = $state('');
+	// docId is fixed for this window (the matcher-parsed arg never changes), so the
+	// document is read once at init, not in an $effect — there's nothing to react to.
+	// Edits live in `content`; external file changes aren't synced (nothing else
+	// edits an open TextEdit document).
+	let content = $state(fs.readText(docId) ?? '');
 	let dirty = $state(false);
-
-	$effect(() => {
-		const text = fs.readText(docId);
-		if (text !== null) {
-			content = text;
-			dirty = false;
-		}
-	});
 
 	async function flushSave() {
 		await fs.writeText(docId, content);

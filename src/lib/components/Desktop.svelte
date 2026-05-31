@@ -172,7 +172,7 @@
 	function openTextEditFile(name: string) {
 		const files = terminalFs.findByApp('textedit', DOCUMENTS_ID);
 		const file = files.find((f) => f.name === name);
-		if (file) os.openWindow(`textedit-${file.id}`);
+		if (file) os.openWindow(`textedit:${file.id}`);
 	}
 
 	let cameraRecording = $state(false);
@@ -224,7 +224,7 @@
 					name = `${base} ${i}${ext}`;
 				}
 				terminalFs.createTextFile(DOCUMENTS_ID, name, '').then((result) => {
-					if (result.ok) os.openWindow(`textedit-${result.value.id}`);
+					if (result.ok) os.openWindow(`textedit:${result.value.id}`);
 				});
 				return;
 			}
@@ -232,7 +232,7 @@
 				const docs = terminalFs.findByApp('textedit', DOCUMENTS_ID);
 				const buttons = docs.map((d) => ({
 					label: d.name,
-					action: () => os.openWindow(`textedit-${d.id}`)
+					action: () => os.openWindow(`textedit:${d.id}`)
 				}));
 				os.alert({
 					title: 'Open Document',
@@ -327,16 +327,16 @@
 		if (os.windows.some((w) => w.id.startsWith('chat:'))) ids.push('chat');
 		if (
 			os.windows.some((w) => {
-				if (!w.id.startsWith('textedit-')) return false;
-				const fileId = w.id.replace('textedit-', '');
+				if (!w.id.startsWith('textedit:')) return false;
+				const fileId = w.id.replace('textedit:', '');
 				return terminalFs.peekNode(fileId)?.name === 'Pricing.txt';
 			})
 		)
 			ids.push('pricing');
 		if (
 			os.windows.some((w) => {
-				if (!w.id.startsWith('textedit-')) return false;
-				const fileId = w.id.replace('textedit-', '');
+				if (!w.id.startsWith('textedit:')) return false;
+				const fileId = w.id.replace('textedit:', '');
 				return terminalFs.peekNode(fileId)?.name === 'README.TXT';
 			})
 		)
@@ -485,12 +485,6 @@
 						     component and context from the matcher. The legacy arms below
 						     shrink to nothing as the remaining apps migrate (Slices 4–7). -->
 						<WindowHost win={w} {os} fs={terminalFs} />
-					{:else if w.id.startsWith('textedit-')}
-						{@const fileId = w.id.replace('textedit-', '')}
-						{#await getWindowComponent(w.id)!() then mod}
-							{@const TextEditWindow = (mod as LazyModule).default}
-							<TextEditWindow docId={fileId} fs={terminalFs} />
-						{/await}
 					{:else if w.id === 'trash'}
 						{#await getWindowComponent('trash')!() then mod}
 							{@const FinderWindow = (mod as LazyModule).default}

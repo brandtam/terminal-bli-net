@@ -102,7 +102,7 @@
 
 	function openDocFile(file: FsFile) {
 		if (file.appId === 'textedit') {
-			os.openWindow(`textedit-${file.id}`);
+			os.openWindow(`textedit:${file.id}`);
 		} else if (file.appId === 'recorder') {
 			// Route through the single document-open rule: a recording is tagged
 			// opensWith:'player', so it opens in the system Player (which reads the

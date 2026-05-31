@@ -378,7 +378,7 @@ describe('window definition lookup', () => {
 		expect(def.title).toBe('Breaking Bad');
 	});
 
-	it('getWindowDef textedit-someid uses file name for title', () => {
+	it('getWindowDef textedit:<id> uses the file name for title', () => {
 		const { os, fs } = createOs();
 		// Find a text file node in the default disk
 		const allNodes = fs.getAllNodes();
@@ -393,11 +393,12 @@ describe('window definition lookup', () => {
 		}
 
 		if (textFileId && textFileName) {
-			const def = os.getWindowDef(`textedit-${textFileId}`);
+			const def = os.getWindowDef(`textedit:${textFileId}`);
 			expect(def.title).toBe(textFileName);
 		} else {
-			// If no .txt exists, any textedit- prefix with no matching node falls back
-			const def = os.getWindowDef('textedit-nonexistent');
+			// No .txt on disk: a textedit: id with no matching node falls back to the
+			// manifest title.
+			const def = os.getWindowDef('textedit:nonexistent');
 			expect(def.title).toBe('Untitled.txt');
 		}
 	});
@@ -436,9 +437,9 @@ describe('isKnownWindowId', () => {
 		expect(os.isKnownWindowId('sticky-abc')).toBe(true);
 	});
 
-	it('returns true for textedit- prefix match', () => {
+	it('returns true for textedit: prefix match', () => {
 		const { os } = createOs();
-		expect(os.isKnownWindowId('textedit-xyz')).toBe(true);
+		expect(os.isKnownWindowId('textedit:xyz')).toBe(true);
 	});
 
 	it('returns true for recorder- prefix match', () => {
