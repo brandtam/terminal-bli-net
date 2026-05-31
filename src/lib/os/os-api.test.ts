@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TerminalFS } from '$lib/terminalos';
 import { windowAppId } from './os-api';
+import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
 // Mock persistence so nothing touches localStorage
 vi.mock('$lib/persistence', () => ({
@@ -360,6 +361,35 @@ describe('window definition lookup', () => {
 		expect(def.title).toBe('Terminal HD');
 		expect(def.w).toBe(480);
 		expect(def.h).toBe(420);
+	});
+
+	it('getWindowDef vcr is device-aware through the OS entry point (with min bounds)', () => {
+		// getWindowDef threads ctx into the matched spec's size(), and vcr is the one
+		// window whose size varies at runtime (it reads vcrPrefs.device). Lock both
+		// decks including minW/minH at the real os.getWindowDef path — the device
+		// sizing is otherwise only checked at the lower matchWindow level.
+		const { os } = createOs();
+		const prev = vcrPrefs.device;
+		try {
+			vcrPrefs.setDevice('ag500r');
+			expect(os.getWindowDef('vcr')).toEqual({
+				title: 'VCR.app',
+				w: 900,
+				h: 560,
+				minW: 620,
+				minH: 420
+			});
+			vcrPrefs.setDevice('generic');
+			expect(os.getWindowDef('vcr')).toEqual({
+				title: 'VCR.app',
+				w: 560,
+				h: 523,
+				minW: 480,
+				minH: 470
+			});
+		} finally {
+			vcrPrefs.setDevice(prev);
+		}
 	});
 
 	it('getWindowDef chat:seinfeld derives the title from the slug', () => {

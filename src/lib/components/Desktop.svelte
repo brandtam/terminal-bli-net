@@ -458,7 +458,7 @@
 					height={w.h}
 					z={w.z}
 					active={os.activeId === w.id}
-					chromeless={resolveWindow(w.id)?.spec?.chromeless ?? false}
+					chromeless={resolveWindow(w.id)?.spec.chromeless ?? false}
 					minW={def.minW}
 					minH={def.minH}
 					onfocus={(id) => os.focusWindow(id)}

@@ -113,9 +113,11 @@ describe('manifest conformance', () => {
 		expect(duplicates, `duplicate window ids: ${duplicates.join(', ')}`).toEqual([]);
 	});
 
-	it('lets no two windows claim the same opens content-type/fileType', () => {
+	it('lets no two windows claim the same opens content-type/fileType', async () => {
 		// buildOpeners (window-host) throws at module load if two windows claim the
-		// same content-type or fileType, so importing it here is the assertion.
-		expect(async () => await import('$lib/os/window-host')).not.toThrow();
+		// same content-type or fileType, so a collision surfaces as a REJECTED import
+		// — `resolves` is the real assertion (a plain `.not.toThrow()` on the async
+		// thunk would inspect only the synchronous call and never see the rejection).
+		await expect(import('$lib/os/window-host')).resolves.toBeDefined();
 	});
 });
