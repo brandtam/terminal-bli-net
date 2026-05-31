@@ -764,7 +764,7 @@ export class TerminalFS {
 		parentId: NodeId,
 		name: string,
 		data: ArrayBuffer,
-		opts: { appId?: AppId; fileType?: FileType; contentType?: string }
+		opts: { appId?: AppId; opensWith?: PersistedAppId; fileType?: FileType; contentType?: string }
 	): Promise<FsResult<FsFile>> {
 		const parent = this.nodes.get(parentId);
 		if (!parent) return fail('not_found', `Parent "${parentId}" not found`);
@@ -795,7 +795,11 @@ export class TerminalFS {
 			parentId,
 			name,
 			fileType: opts.fileType ?? 'data',
-			opensWith: opts.appId,
+			// appId is the creator; opensWith is the handler that opens it. They
+			// were collapsed before. Defaulting opensWith to appId keeps every
+			// existing caller unchanged; a caller that differs (a recording made by
+			// 'recorder' but opened by the system 'player') passes opensWith.
+			opensWith: opts.opensWith ?? opts.appId,
 			appId: opts.appId,
 			bodyRef,
 			createdAt: now,

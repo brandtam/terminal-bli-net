@@ -1,5 +1,10 @@
+import type { Component } from 'svelte';
 import type { AppCategory, AppStatus } from './app-types';
 import type { AppMenuSpec, AboutSpec, StatusExtra, OsApi } from '$lib/os/os-api';
+// Imported from their source files rather than the $lib/terminalos barrel to
+// avoid a barrel→apps→barrel import cycle (this file lives inside terminalos).
+import type { TerminalFS } from '../filesystem/terminal-fs';
+import type { FileType } from '../filesystem/types';
 
 /**
  * The window an app owns. An app may have a fixed window (`id`), minted
@@ -45,6 +50,59 @@ export type AppPrefsWindowSpec = {
 	component: () => Promise<unknown>;
 };
 
+// ── Flat window model (replaces the window?/about?/prefs? trio) ──────────────
+// Being introduced incrementally: these types exist now, manifests adopt
+// `windows: WindowSpec[]` app-by-app, and the old fields are removed once every
+// app has migrated. The whole point is that the OS learns everything it needs
+// about a window from one of these entries — so adding an app never edits OS code.
+
+/**
+ * How a window-id maps to its spec, and how the id is parsed into named args.
+ * The prefix rule lives ONLY here — `kind: 'prefix'` both matches `player:42`
+ * and names the tail (`arg: 'fileId'` → `args.fileId === '42'`), and is
+ * invertible (build `player:42` from the arg) so document-open needs no second
+ * table. Replaces every hand-written `startsWith('player-')` across the OS.
+ */
+export type WindowMatch =
+	| { kind: 'exact'; id: string }
+	| { kind: 'prefix'; prefix: string; arg: string };
+
+/**
+ * What `title`/`size` are derived from. Deliberately NOT the reactive os: these
+ * are pure functions of (parsed args, filesystem) so they can run inside
+ * openWindow before the window — and its reactive context — exists, and so app
+ * domain logic never leaks into window geometry.
+ */
+export type SpecCtx = { args: Record<string, string>; fs: TerminalFS };
+
+export type Geometry = { w: number; h: number; minW?: number; minH?: number };
+
+/** Routing-only tag (menu bar / active-app), never a render branch. */
+export type WindowRole = 'app' | 'prefs' | 'about' | 'chrome';
+
+/**
+ * One window an app owns. Every entry is uniform — a fixed window, a minted
+ * instance, a prefs dialog and an about dialog differ only in `match`/`role`,
+ * not in shape. Every window has a `component`; there is no "no component" arm.
+ * Window components take ZERO props — they read the shared context (getSystem)
+ * and derive what they need — so the host renders them all identically.
+ */
+export type WindowSpec = {
+	match: WindowMatch;
+	title: (c: SpecCtx) => string;
+	size: (c: SpecCtx) => Geometry;
+	component: () => Promise<{ default: Component }>;
+	role?: WindowRole;
+	/** Sticky-style windows that draw their own chrome. */
+	chromeless?: boolean;
+	/**
+	 * Documents this window opens as a handler (LaunchServices-style). Drives
+	 * `os.openDocument`: a file routes to the window whose `opens` covers its
+	 * content-type (or coarser fileType), with no per-app id switch.
+	 */
+	opens?: { contentTypes?: string[]; fileTypes?: FileType[] };
+};
+
 /**
  * The single source of truth for one app's identity. Replaces the values today
  * spread across APP_LIBRARY, APPS, WINDOW_APP_MAP, getWindowDef, getAppWindowId
@@ -79,6 +137,12 @@ export type TerminalAppManifest = {
 	about?: AppAboutWindowSpec;
 	/** The app's Preferences dialog (OS chrome). */
 	prefs?: AppPrefsWindowSpec;
+	/**
+	 * The app's windows in the flat model — fixed, minted, prefs and about as
+	 * uniform WindowSpec entries. Optional during migration off window?/about?/
+	 * prefs?; populated app-by-app, after which those three fields are removed.
+	 */
+	windows?: WindowSpec[];
 
 	// ── Menus / about content / status (from APPS) ──────────────────────────
 	menus: (os: OsApi) => AppMenuSpec[];

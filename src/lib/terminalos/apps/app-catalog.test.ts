@@ -17,7 +17,7 @@ import {
  */
 
 describe('synthAppLibrary', () => {
-	it('produces all 20 apps in original order', () => {
+	it('produces all 21 apps in original order', () => {
 		const ids = synthAppLibrary().map((a) => a.id);
 		expect(ids).toEqual([
 			'finder',
@@ -31,6 +31,7 @@ describe('synthAppLibrary', () => {
 			'tvguide',
 			'chatrbot',
 			'recorder',
+			'player',
 			'stats',
 			'error',
 			'tetra',
@@ -65,6 +66,7 @@ describe('synthApps', () => {
 				'stats',
 				'stickies',
 				'recorder',
+				'player',
 				'software-shop',
 				'computer-store',
 				'vcr',
@@ -216,6 +218,13 @@ describe('synthAppWindowId', () => {
 		expect(synthAppWindowId('stickies')).toBeUndefined();
 		expect(synthAppWindowId('chatrbot')).toBeUndefined();
 		expect(synthAppWindowId('textedit')).toBeUndefined();
+	});
+
+	it('resolves a flat-model launch window from an exact, role:app entry', () => {
+		// The Player has no legacy `window` field — only flat windows[] entries.
+		// Its bare launch window is the exact-id 'player' entry, so opening
+		// Player.app resolves a real window instead of the app file's node id.
+		expect(synthAppWindowId('player')).toBe('player');
 	});
 });
 

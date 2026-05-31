@@ -131,6 +131,27 @@ describe('createBlobFile', () => {
 		expect(result.value.opensWith).toBe('recorder');
 	});
 
+	it('lets opensWith differ from appId (creator vs handler)', async () => {
+		const fs = createDisk();
+		const result = await fs.createBlobFile(
+			RECORDINGS_ID,
+			'Clip3.webm',
+			new Uint8Array([7]).buffer,
+			{
+				appId: 'recorder',
+				opensWith: 'player',
+				fileType: 'recording'
+			}
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// A recording is created by 'recorder' but opened by the system 'player',
+		// so it stays playable after Recorder (a store app) is uninstalled.
+		expect(result.value.appId).toBe('recorder');
+		expect(result.value.opensWith).toBe('player');
+	});
+
 	it('rejects duplicate name', async () => {
 		const fs = createDisk();
 		await fs.createBlobFile(RECORDINGS_ID, 'Dupe.webm', new Uint8Array([1]).buffer, {});

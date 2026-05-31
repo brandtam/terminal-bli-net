@@ -21,9 +21,11 @@ import {
 	synthKnownWindowIds,
 	synthWindowDefs,
 	synthAboutWindowId,
-	synthPrefsWindowId
+	synthPrefsWindowId,
+	matchWindow
 } from '$lib/terminalos/apps/app-catalog';
-import type { TerminalFS } from '$lib/terminalos';
+import { resolveOpenTarget } from './window-host';
+import type { TerminalFS, FsFile } from '$lib/terminalos';
 
 export class OsApiClass implements OsApi {
 	// ── Reactive state ────────────────────────────────────────────────────
@@ -303,6 +305,14 @@ export class OsApiClass implements OsApi {
 			const node = this.fs.peekNode(fileId);
 			return { title: node?.name || 'Recording', w: 360, h: 340 };
 		}
+		// Flat-model windows (e.g. player:) size themselves from their manifest
+		// WindowSpec — title/size are pure functions of (args, fs). As apps migrate,
+		// the hardcoded prefix branches above collapse into this one lookup.
+		const matched = matchWindow(id);
+		if (matched) {
+			const ctx = { args: matched.args, fs: this.fs };
+			return { title: matched.spec.title(ctx), ...matched.spec.size(ctx) };
+		}
 		return defs[id] || { title: 'Unknown', w: 380, h: 320 };
 	}
 
@@ -312,8 +322,18 @@ export class OsApiClass implements OsApi {
 			id.startsWith('chat-') ||
 			id.startsWith('sticky-') ||
 			id.startsWith('textedit-') ||
-			id.startsWith('recorder-')
+			id.startsWith('recorder-') ||
+			matchWindow(id) !== null
 		);
+	}
+
+	/**
+	 * Open a document in its handler window — the single open rule. Routing lives
+	 * in resolveOpenTarget (opensWith → content-type → fileType), so the OS never
+	 * switches on a specific app. A recording opens in the system Player this way.
+	 */
+	openDocument(file: FsFile): void {
+		this.openWindow(resolveOpenTarget(file));
 	}
 
 	// ── Alert system ──────────────────────────────────────────────────────

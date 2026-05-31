@@ -1,6 +1,7 @@
 import type { AppId, PersistedAppId } from './app-ids';
 import type { AppDef } from '$lib/os/os-api';
 import type { TerminalAppDefinition } from './app-types';
+import type { WindowSpec } from './app-manifest';
 import { MANIFESTS } from './manifests';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
@@ -62,6 +63,38 @@ const PREFIX_ROUTES: PrefixRoute[] = MANIFESTS.filter((m) => m.window?.idPrefix)
 	prefix: m.window!.idPrefix!,
 	appId: m.id
 }));
+
+// ── Flat-model window resolution ─────────────────────────────────────────────
+
+/** A window-id matched to its owning app, WindowSpec, and parsed args. */
+export type MatchedWindow = { appId: AppId; spec: WindowSpec; args: Record<string, string> };
+
+/**
+ * Parse a window-id to its WindowSpec, owning app, and named args, using the
+ * flat `windows` model. This is the ONE place the prefix rule lives — every
+ * `id.startsWith('chat-')` the OS hand-writes today collapses to a call here as
+ * apps migrate. Pure over the static MANIFESTS, so it is safe to call before a
+ * window exists (e.g. to size a window being opened). Returns null for ids no
+ * manifest claims via `windows` (legacy windows, until they migrate). Lives
+ * here, not in window-host, so app-catalog has no import cycle through
+ * app-registry.
+ */
+export function matchWindow(id: string): MatchedWindow | null {
+	for (const m of MANIFESTS) {
+		for (const w of m.windows ?? []) {
+			if (w.match.kind === 'exact') {
+				if (w.match.id === id) return { appId: m.id, spec: w, args: {} };
+			} else if (id.startsWith(w.match.prefix)) {
+				return {
+					appId: m.id,
+					spec: w,
+					args: { [w.match.arg]: id.slice(w.match.prefix.length) }
+				};
+			}
+		}
+	}
+	return null;
+}
 
 // ── Library (APP_LIBRARY) ───────────────────────────────────────────────────
 
@@ -138,7 +171,13 @@ export function synthWindowAppId(windowId: string): AppId {
 	for (const route of PREFIX_ROUTES) {
 		if (windowId.startsWith(route.prefix)) return route.appId;
 	}
-	return WINDOW_APP_MAP[windowId] || 'finder';
+	const mapped = WINDOW_APP_MAP[windowId];
+	if (mapped) return mapped;
+	// Flat-model windows (e.g. player:) report their owning app here, so the menu
+	// bar and app routing follow them without a hardcoded prefix list.
+	const matched = matchWindow(windowId);
+	if (matched) return matched.appId;
+	return 'finder';
 }
 
 // ── Known window ids (KNOWN_WINDOW_IDS) ──────────────────────────────────────
@@ -234,8 +273,16 @@ const APP_WINDOW_ID_APPS = new Set<string>([
 // Takes PersistedAppId: called via getAppWindowId with ids read off disk, so an
 // unknown id falls through to undefined.
 export function synthAppWindowId(appId: PersistedAppId): string | undefined {
-	if (!APP_WINDOW_ID_APPS.has(appId)) return undefined;
 	const m = MANIFESTS.find((x) => x.id === appId);
+	// Flat model: an app's launch window is its exact-match, role:'app' window
+	// (e.g. player → 'player'). This resolves handler-style apps that carry no
+	// legacy `window` field, so launching them no longer falls through to opening
+	// the app file's own node id (which had no render arm → "Coming soon").
+	const launch = m?.windows?.find((w) => w.match.kind === 'exact' && (w.role ?? 'app') === 'app');
+	if (launch && launch.match.kind === 'exact') return launch.match.id;
+	// Legacy fixed window, gated to the original subset so unmigrated apps with no
+	// window (stickies, chatrbot, textedit) still return undefined.
+	if (!APP_WINDOW_ID_APPS.has(appId)) return undefined;
 	return m?.window?.id;
 }
 

@@ -111,7 +111,11 @@
 				name = `Clip ${clipNumber} (${elapsed}s).webm`;
 			}
 			const result = await fs.createBlobFile(RECORDINGS_ID, name, bytes, {
+				// Recorder is the creator; the system Player is the handler that
+				// opens the clip — so it stays playable even if Recorder (a store
+				// app) is uninstalled. The Player itself lands in the next slice.
 				appId: 'recorder',
+				opensWith: 'player',
 				fileType: 'recording',
 				contentType: blob.type
 			});

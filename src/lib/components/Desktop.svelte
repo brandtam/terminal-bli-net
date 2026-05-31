@@ -21,6 +21,7 @@
 	import type { StickyNote } from '$lib/apps/stickies/types';
 	import { APPS, getWindowComponent } from '$lib/os/app-registry';
 	import Window from './Window.svelte';
+	import WindowHost from './WindowHost.svelte';
 	import MenuBar from './MenuBar.svelte';
 	import DesktopIcon from './DesktopIcon.svelte';
 	import PixelIcon from './PixelIcon.svelte';
@@ -32,7 +33,13 @@
 	import DesktopContextMenu from './DesktopContextMenu.svelte';
 	import { SYS7_PATTERNS } from './wallpaper-patterns';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import { matchWindow } from '$lib/terminalos/apps/app-catalog';
 	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
+
+	// A window is "flat-migrated" when a manifest claims it via windows[]: those
+	// render through the single generic WindowHost path. Everything else still
+	// flows through the legacy if-chain below, until the rest migrate (Slices 4–7).
+	const isFlatWindow = (id: string) => matchWindow(id) !== null;
 
 	// App windows are loaded lazily via getWindowComponent(w.id), so each app's
 	// chunk is fetched only when its window opens (see manifests.ts). Cheap shared
@@ -485,7 +492,14 @@
 					onmove={(id, x, y) => os.moveWindow(id, x, y)}
 					onresize={(id, ww, hh) => os.resizeWindow(id, ww, hh)}
 				>
-					{#if w.id === 'welcome'}
+					{#if isFlatWindow(w.id)}
+						<!-- Generic flat-window render path: every window a manifest claims
+						     via windows[] (the Player's launch + player:<id> instances, and
+						     Stats) renders identically through WindowHost, which resolves the
+						     component and context from the matcher. The legacy arms below
+						     shrink to nothing as the remaining apps migrate (Slices 4–7). -->
+						<WindowHost win={w} {os} fs={terminalFs} />
+					{:else if w.id === 'welcome'}
 						<WelcomeWindow />
 					{:else if w.id === 'tv-guide'}
 						{#await getWindowComponent('tv-guide')!() then mod}
@@ -578,14 +592,6 @@
 						{#await getWindowComponent('computer-store')!() then mod}
 							{@const ComputerStoreWindow = (mod as LazyModule).default}
 							<ComputerStoreWindow {os} fs={terminalFs} />
-						{/await}
-					{:else if w.id === 'stats'}
-						{#await getWindowComponent('stats')!() then mod}
-							{@const StatsWindow = (mod as LazyModule).default}
-							<StatsWindow
-								showCount={os.groups.filter((g) => g.active).length}
-								botCount={os.bots.length}
-							/>
 						{/await}
 					{:else if w.id === 'error'}
 						{#await getWindowComponent('error')!() then mod}
@@ -689,7 +695,7 @@
 									</div>
 								{:else}
 									<div style="display: flex; gap: 8px; flex-wrap: wrap;">
-										{#each os.alertSpec.buttons || [{ label: 'OK', primary: true }] as b}
+										{#each os.alertSpec.buttons || [{ label: 'OK', primary: true }] as b (b.label)}
 											<button
 												class="btn {b.primary ? 'primary' : ''}"
 												onclick={() => {

@@ -753,6 +753,72 @@ export const MANIFESTS = [
 	}),
 
 	defineApp({
+		id: 'player',
+		name: 'Player',
+		fileName: 'Player.app',
+		category: 'system',
+		description: 'Plays video files',
+		icon: '▶',
+		removable: false,
+		desktopAliasByDefault: false,
+		isSystem: true,
+		iconKind: 'tv',
+		// Flat window model: the Player has no fixed window, only minted
+		// player:<fileId> instances. It is a GENERAL video document handler —
+		// declaring the content-types it opens is what routes any video file here
+		// via os.openDocument, with no per-app switch. A clip made by the
+		// (removable) Camera app opens here even after Camera is uninstalled,
+		// because the Player is a system app that is always present.
+		windows: [
+			{
+				// The Player's own launch window. Opening Player.app from Applications
+				// (no document) lands here and shows an empty state. It resolves
+				// through the flat matcher — exact id 'player' — so the Player needs
+				// no fixed `window` field; getAppWindowId('player') still returns
+				// 'player'. Distinct from the minted player:<fileId> instances below.
+				match: { kind: 'exact', id: 'player' },
+				role: 'app',
+				title: () => 'Player',
+				size: () => ({ w: 480, h: 380, minW: 320, minH: 240 }),
+				component: () => import('$lib/apps/player/MediaPlayerWindow.svelte')
+			},
+			{
+				match: { kind: 'prefix', prefix: 'player:', arg: 'fileId' },
+				role: 'app',
+				title: ({ args, fs }) => fs.peekNode(args.fileId)?.name ?? 'Player',
+				size: () => ({ w: 480, h: 380, minW: 320, minH: 240 }),
+				component: () => import('$lib/apps/player/MediaPlayerWindow.svelte'),
+				opens: { contentTypes: ['video/webm', 'video/mp4'], fileTypes: ['recording'] }
+			}
+		],
+		aboutSpec: {
+			title: 'Player',
+			version: 'v1.0',
+			tagline: 'play video clips',
+			glyph: '▶',
+			glyphBg: 'var(--accent)',
+			glyphFg: 'var(--paper)',
+			sections: [
+				{
+					h: 'WHAT IT IS',
+					body: 'The system video player. Opens any video file — clips recorded with Camera, or other video saved to disk — and plays it in its own window.'
+				}
+			]
+		},
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }]
+			},
+			{
+				label: 'Help',
+				items: [{ type: 'action', label: 'About Player', action: () => os.openAbout('player') }]
+			}
+		],
+		statusExtra: () => null
+	}),
+
+	defineApp({
 		id: 'stats',
 		name: 'Stats',
 		fileName: 'Stats.app',
@@ -765,6 +831,19 @@ export const MANIFESTS = [
 		status: 'released',
 		iconKind: 'calc',
 		window: { id: 'stats', title: 'Stats.app', w: 360, h: 360 },
+		// Flat-model window (Slice 3 migration): Stats renders through the generic
+		// WindowHost loop via this entry. StatsWindow takes no props — it reads the
+		// counts off getSystem(). The legacy `window` above stays additively until
+		// the wholesale removal in Slice 7; both describe the same id/size.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'stats' },
+				role: 'app',
+				title: () => 'Stats.app',
+				size: () => ({ w: 360, h: 360 }),
+				component: () => import('$lib/apps/stats/StatsWindow.svelte')
+			}
+		],
 		about: { id: 'about-stats' },
 		component: () => import('$lib/apps/stats/StatsWindow.svelte'),
 		aboutSpec: {
