@@ -120,6 +120,19 @@ export class IndexedDBBodyStore implements BodyStore {
 		});
 	}
 
+	async listBodyIds(): Promise<BodyId[]> {
+		const db = await this.getDB();
+		return new Promise((resolve, reject) => {
+			const tx = db.transaction(STORE_NAME, 'readonly');
+			const store = tx.objectStore(STORE_NAME);
+			const request = store.getAllKeys();
+			request.onsuccess = () => {
+				resolve(request.result.filter((key): key is BodyId => typeof key === 'string'));
+			};
+			request.onerror = () => reject(request.error);
+		});
+	}
+
 	async clear(): Promise<void> {
 		const db = await this.getDB();
 		return new Promise((resolve, reject) => {

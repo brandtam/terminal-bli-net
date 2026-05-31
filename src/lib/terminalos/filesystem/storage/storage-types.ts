@@ -15,6 +15,7 @@ export interface BodyStore {
 	read(bodyId: BodyId): Promise<ArrayBuffer | null>;
 	write(bodyId: BodyId, data: ArrayBuffer): Promise<FsResult<void>>;
 	delete(bodyId: BodyId): Promise<void>;
+	listBodyIds(): Promise<BodyId[]>;
 	clear(): Promise<void>;
 	replaceAll(entries: AsyncIterable<BodyEntry>): Promise<FsResult<void>>;
 	getUsedBytes(): Promise<number>;
@@ -48,6 +49,9 @@ export class InMemoryBodyStore implements BodyStore {
 	}
 	async delete(bodyId: BodyId) {
 		this.bodies.delete(bodyId);
+	}
+	async listBodyIds() {
+		return Array.from(this.bodies.keys());
 	}
 	async clear() {
 		this.bodies.clear();

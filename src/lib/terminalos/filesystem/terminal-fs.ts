@@ -1,6 +1,7 @@
 import type {
 	NodeId,
 	BodyId,
+	BodyGcReport,
 	BodyRef,
 	AppId,
 	PersistedAppId,
@@ -256,6 +257,65 @@ export class TerminalFS {
 	private async persist(): Promise<FsResult<void>> {
 		const nodes = Array.from(this.nodes.values());
 		return this.manifest.save(this.volume, nodes);
+	}
+
+	private setLastUndo(record: UndoRecord): boolean {
+		const shouldCollectGarbage = this.undoRecordRetainsBlobBodies(this.lastUndo);
+		this.lastUndo = record;
+		return shouldCollectGarbage;
+	}
+
+	private clearLastUndo(): boolean {
+		const shouldCollectGarbage = this.undoRecordRetainsBlobBodies(this.lastUndo);
+		this.lastUndo = null;
+		return shouldCollectGarbage;
+	}
+
+	private nodeReferencesBlobBody(node: FsNode): boolean {
+		return node.kind === 'file' && node.bodyRef?.kind === 'indexeddb-blob';
+	}
+
+	private undoRecordRetainsBlobBodies(undo: UndoRecord | null): boolean {
+		if (!undo) return false;
+
+		switch (undo.undoData.type) {
+			case 'restore_nodes':
+				return undo.undoData.nodes.some((node) => this.nodeReferencesBlobBody(node));
+			case 'delete_node':
+			case 'delete_nodes':
+			case 'move_back':
+			case 'rename_back':
+				return false;
+		}
+	}
+
+	private addReachableBodyIds(nodes: Iterable<FsNode>, reachable: Set<BodyId>): void {
+		for (const node of nodes) {
+			if (node.kind !== 'file' || node.bodyRef?.kind !== 'indexeddb-blob') continue;
+			reachable.add(node.bodyRef.bodyId);
+		}
+	}
+
+	private reachableBodyIds(): Set<BodyId> {
+		const reachable = new Set<BodyId>();
+		this.addReachableBodyIds(this.nodes.values(), reachable);
+
+		const undo = this.lastUndo;
+		if (undo?.undoData.type === 'restore_nodes') {
+			this.addReachableBodyIds(undo.undoData.nodes, reachable);
+		}
+
+		return reachable;
+	}
+
+	private async collectGarbageAfterCommit(shouldCollectGarbage: boolean): Promise<void> {
+		if (!shouldCollectGarbage) return;
+		try {
+			await this.collectGarbage();
+		} catch {
+			// Automatic cleanup is retryable maintenance; the committed manifest
+			// remains the source of truth for the next full GC scan.
+		}
 	}
 
 	private debouncedPersist(): Promise<FsResult<void>> {
@@ -632,14 +692,15 @@ export class TerminalFS {
 		};
 		this.nodes.set(nodeId, folder);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'create_folder',
 			label: `Create folder "${name}"`,
 			undoData: { type: 'delete_node', nodeId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFolder>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [parentId], 'create_folder');
 		return ok(folder);
@@ -735,14 +796,15 @@ export class TerminalFS {
 		};
 		this.nodes.set(nodeId, file);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'create_file',
 			label: `Create file "${name}"`,
 			undoData: { type: 'delete_node', nodeId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [parentId], 'create_file');
 		return ok(file);
@@ -778,14 +840,15 @@ export class TerminalFS {
 		};
 		this.nodes.set(nodeId, file);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'create_file',
 			label: `Create file "${name}"`,
 			undoData: { type: 'delete_node', nodeId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [parentId], 'create_file');
 		return ok(file);
@@ -838,14 +901,15 @@ export class TerminalFS {
 		};
 		this.nodes.set(nodeId, file);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'create_file',
 			label: `Create file "${name}"`,
 			undoData: { type: 'delete_node', nodeId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [parentId], 'create_file');
 		return ok(file);
@@ -856,6 +920,7 @@ export class TerminalFS {
 		if (!node) return fail('not_found', `Node "${fileId}" not found`);
 		if (node.kind !== 'file') return fail('not_found', `Node "${fileId}" is not a file`);
 
+		const shouldCollectGarbage = node.bodyRef?.kind === 'indexeddb-blob';
 		const updated: FsFile = {
 			...node,
 			bodyRef: { kind: 'inline-text', text },
@@ -866,6 +931,7 @@ export class TerminalFS {
 		// No undo for writes — text editors handle their own undo
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([fileId], [node.parentId], 'write');
 		return ok(updated);
@@ -896,14 +962,15 @@ export class TerminalFS {
 		const updated: FsNode = { ...node, name: newName, updatedAt: Date.now() };
 		this.nodes.set(nodeId, updated);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'rename',
 			label: `Rename "${previousName}" to "${newName}"`,
 			undoData: { type: 'rename_back', nodeId, previousName }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], node.parentId ? [node.parentId] : [], 'rename');
 		return ok(updated);
@@ -948,14 +1015,15 @@ export class TerminalFS {
 		} as FsNode;
 		this.nodes.set(nodeId, updated);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'move',
 			label: `Move "${node.name}"`,
 			undoData: { type: 'move_back', nodeId, previousParentId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [previousParentId, targetFolderId], 'move');
 		return ok(updated);
@@ -988,14 +1056,15 @@ export class TerminalFS {
 			newIds.push(n.id);
 		}
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'duplicate',
 			label: `Duplicate "${node.name}"`,
 			undoData: { type: 'delete_nodes', nodeIds: newIds }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange(newIds, [parentId], 'duplicate');
 		return ok(topNode);
@@ -1025,14 +1094,15 @@ export class TerminalFS {
 		} as FsNode;
 		this.nodes.set(nodeId, updated);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'trash',
 			label: `Trash "${node.name}"`,
 			undoData: { type: 'move_back', nodeId, previousParentId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [previousParentId, TRASH_ID], 'trash');
 		return ok(updated);
@@ -1051,12 +1121,15 @@ export class TerminalFS {
 			this.nodes.delete(id);
 		}
 
-		// Clear undo — emptyTrash is destructive and irreversible
+		// Clear undo — emptyTrash is destructive and irreversible.
+		const shouldCollectGarbage =
+			trashChildren.length > 0 || this.undoRecordRetainsBlobBodies(this.lastUndo);
 		this.lastUndo = null;
 
 		await this.flushPersist();
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<{ deletedCount: number }>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange(trashChildren, [TRASH_ID], 'empty_trash');
 		return ok({ deletedCount: trashChildren.length });
@@ -1107,14 +1180,15 @@ export class TerminalFS {
 		};
 		this.nodes.set(aliasId, alias);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'create_alias',
 			label: `Create alias "${aliasName}"`,
 			undoData: { type: 'delete_node', nodeId: aliasId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsAlias>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([aliasId], [parentId], 'create_alias');
 		return ok(alias);
@@ -1213,6 +1287,7 @@ export class TerminalFS {
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<string>;
+		await this.collectGarbageAfterCommit(true);
 
 		this.notifyChange(affectedNodeIds, affectedFolderIds, 'undo');
 		return ok(label);
@@ -1322,17 +1397,18 @@ export class TerminalFS {
 			this.nodes.delete(id);
 		}
 
+		// Clear undo since uninstall involves multiple nodes.
+		const shouldCollectGarbage = this.clearLastUndo() || this.nodeReferencesBlobBody(appFile);
+
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<{ removedFiles: number }>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange(
 			[appFile.id, ...removedAliasIds],
 			[APPLICATIONS_ID, DESKTOP_ID],
 			'uninstall_app'
 		);
-
-		// Clear undo since uninstall involves multiple nodes
-		this.lastUndo = null;
 
 		return ok({ removedFiles: 1 + removedAliasIds.length });
 	}
@@ -1411,6 +1487,47 @@ export class TerminalFS {
 
 	// --- Body storage ---
 
+	async collectGarbage(): Promise<FsResult<BodyGcReport>> {
+		let storedBodyIds: BodyId[];
+		try {
+			storedBodyIds = await this.bodies.listBodyIds();
+		} catch (e) {
+			return fail('corrupt_disk', 'Failed to list blob bodies for garbage collection', e);
+		}
+
+		const stored = new Set(storedBodyIds);
+		const reachable = this.reachableBodyIds();
+		const reachableStored = new Set<BodyId>();
+		for (const bodyId of stored) {
+			if (reachable.has(bodyId)) {
+				reachableStored.add(bodyId);
+			}
+		}
+
+		const failedBodyIds: BodyId[] = [];
+		let deleted = 0;
+
+		for (const bodyId of stored) {
+			if (reachable.has(bodyId)) continue;
+
+			try {
+				await this.bodies.delete(bodyId);
+				deleted++;
+			} catch {
+				failedBodyIds.push(bodyId);
+			}
+		}
+
+		return ok({
+			stored: stored.size,
+			reachable: reachableStored.size,
+			unreachable: stored.size - reachableStored.size,
+			deleted,
+			failed: failedBodyIds.length,
+			failedBodyIds
+		});
+	}
+
 	async readBody(bodyId: BodyId): Promise<FsResult<ArrayBuffer>> {
 		const data = await this.bodies.read(bodyId);
 		if (!data) return fail('not_found', `Body "${bodyId}" not found`);
@@ -1419,11 +1536,6 @@ export class TerminalFS {
 
 	async writeBody(bodyId: BodyId, data: ArrayBuffer): Promise<FsResult<void>> {
 		return this.bodies.write(bodyId, data);
-	}
-
-	async deleteBody(bodyId: BodyId): Promise<FsResult<void>> {
-		await this.bodies.delete(bodyId);
-		return ok(undefined);
 	}
 
 	// --- Disk usage ---
@@ -1571,6 +1683,7 @@ export class TerminalFS {
 		this.lastUndo = null;
 		this.volume = nextVolume;
 		this.nodes = nextNodes;
+		await this.collectGarbageAfterCommit(true);
 
 		// Notify watchers
 		const allNodeIds = Array.from(this.nodes.keys());
@@ -1588,7 +1701,6 @@ export class TerminalFS {
 	async reinstallOS(): Promise<FsResult<void>> {
 		await this.flushPersist();
 		this.nodes.clear();
-		await this.bodies.clear();
 
 		// Rebuild factory defaults by creating a fresh disk and copying its state
 		const fresh = TerminalFS.createCleanDisk(this.manifest, this.bodies);
@@ -1598,12 +1710,13 @@ export class TerminalFS {
 		}
 		this.volume = fresh.getVolume();
 
-		// Persist
+		// Clear undo before the manifest commit. Blob bodies from the previous
+		// disk are reclaimed only after this save succeeds.
+		this.lastUndo = null;
+
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult;
-
-		// Clear undo
-		this.lastUndo = null;
+		await this.collectGarbageAfterCommit(true);
 
 		// Notify watchers
 		const allNodeIds = Array.from(this.nodes.keys());
@@ -1639,6 +1752,7 @@ export class TerminalFS {
 		await this.flushPersist();
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<void>;
+		await this.collectGarbageAfterCommit(true);
 
 		this.notifyChange(toDelete, parentId ? [parentId] : [], 'delete');
 		return ok(undefined);

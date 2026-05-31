@@ -155,13 +155,6 @@
 	}
 
 	async function removeRecording(id: string) {
-		// deleteNode only removes the node, not its body — clean up blob bytes
-		// ourselves so they don't orphan in IndexedDB. Legacy inline-text clips
-		// have no body to free.
-		const rec = recordings.find((r) => r.id === id);
-		if (rec?.bodyRef?.kind === 'indexeddb-blob') {
-			await fs.deleteBody(rec.bodyRef.bodyId);
-		}
 		await fs.deleteNode(id);
 		refreshRecordings();
 		if (playingId === id) {

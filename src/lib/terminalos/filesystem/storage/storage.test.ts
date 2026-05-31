@@ -116,6 +116,15 @@ describe('body store', () => {
 		}
 	});
 
+	it('lists body ids without reading body data', async () => {
+		const bodies = new InMemoryBodyStore();
+		await bodies.write('body-a', new Uint8Array([1]).buffer as ArrayBuffer);
+		await bodies.write('body-b', new Uint8Array([2]).buffer as ArrayBuffer);
+
+		const ids = await bodies.listBodyIds();
+		expect(ids.sort()).toEqual(['body-a', 'body-b']);
+	});
+
 	it('returns not_found for missing body', async () => {
 		const fs = TerminalFS.createCleanDisk();
 		const result = await fs.readBody('nonexistent');

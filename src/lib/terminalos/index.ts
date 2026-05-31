@@ -20,6 +20,7 @@ export type {
 	NodeId,
 	VolumeId,
 	BodyId,
+	BodyGcReport,
 	AppId,
 	TerminalVolume,
 	FileType,
