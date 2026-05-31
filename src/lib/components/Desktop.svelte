@@ -34,11 +34,10 @@
 	import { matchWindow } from '$lib/terminalos/apps/app-catalog';
 	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
-	// A window is "flat-migrated" when a manifest claims it via windows[]: those
-	// render through the single generic WindowHost path. With Finder and Trash
-	// migrated, every live window is flat — WindowHost lazy-loads each app's chunk
-	// when its window opens (see manifests.ts). Brief 05 collapses the remaining
-	// {:else} arm and matchWindow becomes the sole render gate.
+	// matchWindow is the sole render gate: a window-id renders iff a manifest claims
+	// it via windows[]. Every window goes through the one WindowHost path, which
+	// lazy-loads the app's chunk when the window opens (see manifests.ts). The OS
+	// has no app-specific render branch — adding an app is a manifest entry only.
 	const isFlatWindow = (id: string) => matchWindow(id) !== null;
 
 	let booted = $state(false);
@@ -468,11 +467,12 @@
 					onresize={(id, ww, hh) => os.resizeWindow(id, ww, hh)}
 				>
 					{#if isFlatWindow(w.id)}
-						<!-- Generic flat-window render path: every window a manifest claims
-						     via windows[] renders identically through WindowHost, which
-						     resolves the component and context from the matcher. With Finder
-						     and Trash migrated, every live window is flat; the {:else} arm is
-						     only reachable by a stale/unknown id (Brief 05 finalizes this). -->
+						<!-- The single render path. Every window a manifest claims via
+						     windows[] renders through WindowHost, which resolves the component
+						     and context from matchWindow — the OS holds zero app-specific
+						     render branches. The {:else} arm is unreachable for any live id
+						     (matchWindow gates isFlatWindow); it only catches a stale/unknown
+						     saved id that slipped past the restore filter. -->
 						<WindowHost win={w} {os} fs={terminalFs} />
 					{:else}
 						<div class="window-content">
