@@ -491,16 +491,6 @@
 							{@const TextEditWindow = (mod as LazyModule).default}
 							<TextEditWindow docId={fileId} fs={terminalFs} />
 						{/await}
-					{:else if w.id === 'software-shop'}
-						{#await getWindowComponent('software-shop')!() then mod}
-							{@const SoftwareShopWindow = (mod as LazyModule).default}
-							<SoftwareShopWindow {os} fs={terminalFs} />
-						{/await}
-					{:else if w.id === 'computer-store'}
-						{#await getWindowComponent('computer-store')!() then mod}
-							{@const ComputerStoreWindow = (mod as LazyModule).default}
-							<ComputerStoreWindow {os} fs={terminalFs} />
-						{/await}
 					{:else if w.id === 'trash'}
 						{#await getWindowComponent('trash')!() then mod}
 							{@const FinderWindow = (mod as LazyModule).default}

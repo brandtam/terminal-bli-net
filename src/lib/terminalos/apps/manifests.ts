@@ -237,6 +237,18 @@ export const MANIFESTS = [
 		isSystem: true,
 		iconKind: 'floppy',
 		window: { id: 'software-shop', title: 'My Shelf', w: 420, h: 520 },
+		// Flat window-host entry (Slice 6): one fixed window. SoftwareShopWindow reads
+		// os/fs off getSystem() now, so it takes no props. Legacy `window`/`component`
+		// stay additively until the final collapse.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'software-shop' },
+				role: 'app',
+				title: () => 'My Shelf',
+				size: () => ({ w: 420, h: 520 }),
+				component: () => import('$lib/apps/software-shop/SoftwareShopWindow.svelte')
+			}
+		],
 		about: { id: 'about-software-shop' },
 		component: () => import('$lib/apps/software-shop/SoftwareShopWindow.svelte'),
 		aboutSpec: {
@@ -288,6 +300,17 @@ export const MANIFESTS = [
 		isSystem: true,
 		iconKind: 'floppy',
 		window: { id: 'computer-store', title: 'Computer Store', w: 740, h: 620 },
+		// Flat window-host entry (Slice 6). ComputerStoreWindow reads os/fs off
+		// getSystem(); legacy `window`/`component` stay additively until the collapse.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'computer-store' },
+				role: 'app',
+				title: () => 'Computer Store',
+				size: () => ({ w: 740, h: 620 }),
+				component: () => import('$lib/apps/computer-store/ComputerStoreWindow.svelte')
+			}
+		],
 		about: { id: 'about-computer-store' },
 		component: () => import('$lib/apps/computer-store/ComputerStoreWindow.svelte'),
 		aboutSpec: {

@@ -56,6 +56,13 @@ describe('matchWindow', () => {
 		}
 	});
 
+	it('claims the fixed store-shell windows once migrated (Slice 6)', () => {
+		// software-shop and computer-store are exact-id windows resolved through the
+		// matcher now, not the legacy Desktop arms.
+		expect(matchWindow('software-shop')?.appId).toBe('software-shop');
+		expect(matchWindow('computer-store')?.appId).toBe('computer-store');
+	});
+
 	it('parses a per-app About id into the system app + its appId arg', () => {
 		// openAbout('vcr') opens about:vcr; AboutAppWindow reads args.appId to pick
 		// which app's spec to render. The bare 'about' id matches the exact entry,
