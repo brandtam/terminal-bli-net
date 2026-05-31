@@ -107,9 +107,11 @@ function mintWindowId(spec: WindowSpec, fileId: string): string {
 /** The handler app's document window-id for a file, or null if it has none. */
 function handlerWindowId(appId: string, fileId: string): string | null {
 	const m = MANIFESTS.find((x) => x.id === appId);
-	const w =
-		m?.windows?.find((win) => win.opens && win.match.kind === 'prefix') ??
-		m?.windows?.find((win) => win.match.kind === 'prefix');
+	// Only a window that explicitly declares `opens` handles documents. An app
+	// with a prefix window but no `opens` (e.g. chatrbot's `chat:` launch window)
+	// is NOT a document handler, so there is no fallback to "any prefix window" —
+	// returning null lets resolveOpenTarget fall through to content-type/fileType.
+	const w = m?.windows?.find((win) => win.opens && win.match.kind === 'prefix');
 	return w ? mintWindowId(w, fileId) : null;
 }
 

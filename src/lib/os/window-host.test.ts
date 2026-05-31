@@ -26,9 +26,26 @@ describe('matchWindow', () => {
 		expect(m?.args.fileId).toBe('abc-123');
 	});
 
+	it('parses a chat: instance id into its owning app, spec, and args', () => {
+		const m = matchWindow('chat:seinfeld');
+		expect(m?.appId).toBe('chatrbot');
+		expect(m?.args.slug).toBe('seinfeld');
+	});
+
+	it('keeps a multi-word slug intact — the : separator survives dashes', () => {
+		// Show slugs contain '-' (breaking-bad); the chat:<slug> separator is ':'
+		// precisely so the tail parses unambiguously.
+		const m = matchWindow('chat:breaking-bad');
+		expect(m?.appId).toBe('chatrbot');
+		expect(m?.args.slug).toBe('breaking-bad');
+	});
+
 	it('returns null for ids no manifest claims via windows[]', () => {
 		expect(matchWindow('textedit-xyz')).toBeNull();
 		expect(matchWindow('definitely-unknown')).toBeNull();
+		// The legacy chat- separator is no longer a flat window (it routes only
+		// via the deprecated idPrefix until Slice 7), so matchWindow ignores it.
+		expect(matchWindow('chat-seinfeld')).toBeNull();
 	});
 });
 

@@ -1,4 +1,4 @@
-import { defineApp, type TerminalAppManifest } from './app-manifest';
+import { defineApp } from './app-manifest';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
 /**
@@ -483,6 +483,18 @@ export const MANIFESTS = [
 		status: 'released',
 		iconKind: 'tvguide',
 		window: { id: 'tv-guide', title: 'TV Guide.app', w: 660, h: 700 },
+		// Flat window-host entry (Slice 4): a single fixed window. TVGuide reads
+		// everything (channels, clock, tweaks) off getSystem() now, so the OS no
+		// longer threads props through Desktop. Legacy `window` stays until Slice 7.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'tv-guide' },
+				role: 'app',
+				title: () => 'TV Guide.app',
+				size: () => ({ w: 660, h: 700 }),
+				component: () => import('$lib/components/TVGuide.svelte')
+			}
+		],
 		about: { id: 'about-tvguide' },
 		prefs: {
 			id: 'tvguide-prefs',
@@ -592,6 +604,25 @@ export const MANIFESTS = [
 		status: 'released',
 		iconKind: 'doc',
 		window: { idPrefix: 'chat-', title: 'Chat', w: 440, h: 560 },
+		// Flat window-host entry (Slice 4): one minted instance per show, keyed
+		// `chat:<slug>`. The `:` separator (not `-`) keeps the arg unambiguous
+		// since show slugs themselves contain `-` (e.g. `breaking-bad`). The
+		// title is derived from the slug alone — SpecCtx is deliberately just
+		// {args, fs}, so the live group name is read inside ChatWindow, not here.
+		// The legacy `window`/`idPrefix` above stays additively until Slice 7.
+		windows: [
+			{
+				match: { kind: 'prefix', prefix: 'chat:', arg: 'slug' },
+				role: 'app',
+				title: ({ args }) =>
+					(args.slug ?? '')
+						.split('-')
+						.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+						.join(' ') || 'Chat',
+				size: () => ({ w: 440, h: 560 }),
+				component: () => import('$lib/components/ChatWindow.svelte')
+			}
+		],
 		about: { id: 'about-chatrbot' },
 		prefs: {
 			id: 'chatrbot-prefs',

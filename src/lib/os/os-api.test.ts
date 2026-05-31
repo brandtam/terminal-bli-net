@@ -362,27 +362,20 @@ describe('window definition lookup', () => {
 		expect(def.h).toBe(420);
 	});
 
-	it('getWindowDef chat-seinfeld uses group name for title', () => {
+	it('getWindowDef chat:seinfeld derives the title from the slug', () => {
+		// Window-host flat app: SpecCtx is {args, fs} only, so the title comes
+		// from the slug (the live group name is read inside ChatWindow instead).
 		const { os } = createOs();
-		os.groups = [
-			{
-				slug: 'seinfeld',
-				name: 'Seinfeld',
-				description: '',
-				setting: '',
-				era: '',
-				image: '',
-				active: true
-			}
-		];
-		const def = os.getWindowDef('chat-seinfeld');
-		expect(def.title).toBe('chatrbot - Seinfeld');
+		const def = os.getWindowDef('chat:seinfeld');
+		expect(def.title).toBe('Seinfeld');
+		expect(def.w).toBe(440);
+		expect(def.h).toBe(560);
 	});
 
-	it('getWindowDef chat-unknown returns fallback Chat title', () => {
+	it('getWindowDef chat: title-cases a multi-word slug', () => {
 		const { os } = createOs();
-		const def = os.getWindowDef('chat-unknown');
-		expect(def.title).toBe('Chat');
+		const def = os.getWindowDef('chat:breaking-bad');
+		expect(def.title).toBe('Breaking Bad');
 	});
 
 	it('getWindowDef textedit-someid uses file name for title', () => {
@@ -426,9 +419,16 @@ describe('isKnownWindowId', () => {
 		expect(os.isKnownWindowId('finder')).toBe(true);
 	});
 
-	it('returns true for chat- prefix match', () => {
+	it('returns true for chat: prefix match', () => {
 		const { os } = createOs();
-		expect(os.isKnownWindowId('chat-anything')).toBe(true);
+		expect(os.isKnownWindowId('chat:anything')).toBe(true);
+	});
+
+	it('returns false for the legacy chat- separator (dropped on restore)', () => {
+		// After the chat: cutover, a window-id saved with the old `-` separator no
+		// longer resolves to any app, so the init() restore filter drops it.
+		const { os } = createOs();
+		expect(os.isKnownWindowId('chat-anything')).toBe(false);
 	});
 
 	it('returns true for sticky- prefix match', () => {
@@ -625,9 +625,9 @@ describe('derived state', () => {
 		expect(os.activeAppId).toBe('finder');
 	});
 
-	it('activeAppId returns chatrbot for chat- windows', async () => {
+	it('activeAppId returns chatrbot for chat: windows', async () => {
 		const { os } = await createOsWithApp('chatrbot');
-		os.openWindow('chat-seinfeld');
+		os.openWindow('chat:seinfeld');
 		expect(os.activeAppId).toBe('chatrbot');
 	});
 
@@ -645,7 +645,7 @@ describe('derived state', () => {
 
 	it('activeChatGroupSlug returns slug for active chat window', async () => {
 		const { os } = await createOsWithApp('chatrbot');
-		os.openWindow('chat-seinfeld');
+		os.openWindow('chat:seinfeld');
 		expect(os.activeChatGroupSlug).toBe('seinfeld');
 	});
 });
@@ -712,7 +712,7 @@ describe('store app install gate', () => {
 
 	it('blocks chat windows when chatrbot is not installed', () => {
 		const { os } = createOs();
-		os.openWindow('chat-seinfeld');
+		os.openWindow('chat:seinfeld');
 
 		expect(os.windows).toHaveLength(0);
 		expect(os.alertSpec?.title).toBe('chatrbot is not installed');
@@ -775,7 +775,7 @@ describe('windowAppId', () => {
 	});
 
 	it('maps prefix-based window IDs', () => {
-		expect(windowAppId('chat-seinfeld')).toBe('chatrbot');
+		expect(windowAppId('chat:seinfeld')).toBe('chatrbot');
 		expect(windowAppId('sticky-abc')).toBe('stickies');
 		expect(windowAppId('textedit-xyz')).toBe('textedit');
 		expect(windowAppId('recorder-123')).toBe('recorder');

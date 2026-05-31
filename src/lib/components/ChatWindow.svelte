@@ -1,25 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { Bot, ChatMessage, TextChunk } from '$lib/types';
+	import type { ChatMessage, TextChunk } from '$lib/types';
 	import { loadConversations, saveConversation, getSessionId } from '$lib/persistence';
-	import { formatTimeUntil } from '$lib/schedule';
+	import { formatTimeUntil, isShowOnAir, minutesUntilSlotEnd } from '$lib/schedule';
+	import { getSystem } from '$lib/os/os-context';
 	import Dropdown from './Dropdown.svelte';
 
 	type ChatMode = 'group' | string; // 'group' or a botId
 
-	let {
-		showSlug,
-		showName,
-		castBots,
-		minutesLeft = null,
-		offAir = false
-	}: {
-		showSlug: string;
-		showName: string;
-		castBots: Bot[];
-		minutesLeft: number | null;
-		offAir?: boolean;
-	} = $props();
+	// Zero-prop window-host app (Slice 4). The show identity comes from the
+	// window-id (`chat:<slug>` → win.args.slug). Everything else — the cast and
+	// the ticking on-air state — is derived off the live OS, so a window left
+	// open keeps counting down as os.now advances. No props bag ever freezes it.
+	const { os, win } = getSystem();
+	const showSlug = win.args.slug ?? '';
+
+	const group = $derived(os.groups.find((g) => g.slug === showSlug));
+	const showName = $derived(group?.name ?? 'Chat');
+	const castBots = $derived(os.bots.filter((b) => b.group === showSlug));
+	const onAir = $derived(isShowOnAir(showSlug, os.channels, os.now, os.timezone));
+	const minutesLeft = $derived(onAir ? minutesUntilSlotEnd(os.now, os.timezone) : null);
+	const offAir = $derived(!onAir);
 
 	let chatMode = $state<ChatMode>('group');
 
@@ -300,77 +301,83 @@
 	}
 </script>
 
-<div class="chat-container">
-	<div class="chat-header">
-		<div class="chat-avatar">
-			{showInitials}
+{#if group && castBots.length > 0}
+	<div class="chat-container">
+		<div class="chat-header">
+			<div class="chat-avatar">
+				{showInitials}
+			</div>
+			<div class="who">
+				<span class="name">{showName.toUpperCase()}</span>
+				<small>{castNames}</small>
+			</div>
+			<div class="chat-header-right">
+				{#if minutesLeft !== null}
+					<span class="countdown">{formatTimeUntil(minutesLeft)} left</span>
+				{/if}
+				<Dropdown options={modeOptions} bind:value={chatMode} separatorAfter={['group']} />
+			</div>
 		</div>
-		<div class="who">
-			<span class="name">{showName.toUpperCase()}</span>
-			<small>{castNames}</small>
-		</div>
-		<div class="chat-header-right">
-			{#if minutesLeft !== null}
-				<span class="countdown">{formatTimeUntil(minutesLeft)} left</span>
-			{/if}
-			<Dropdown options={modeOptions} bind:value={chatMode} separatorAfter={['group']} />
-		</div>
-	</div>
 
-	<div class="chat-log" bind:this={logEl}>
-		<div class="bubble system">
-			— Switched to {showName}. {castBots.map((b) => b.name.split(' ')[0]).join(', ')} are now in the
-			room. —
-		</div>
-		{#each messages as m}
-			{#if m.role === 'user'}
-				<div class="bubble user">
-					<span class="who-label">YOU</span>
-					{m.content}
-				</div>
-			{:else}
-				{@const parsed = parseResponder(m.content)}
-				<div class="bubble bot">
-					<span class="who-label">{parsed.name?.toUpperCase() ?? showName.toUpperCase()}</span>
+		<div class="chat-log" bind:this={logEl}>
+			<div class="bubble system">
+				— Switched to {showName}. {castBots.map((b) => b.name.split(' ')[0]).join(', ')} are now in the
+				room. —
+			</div>
+			{#each messages as m, i (i)}
+				{#if m.role === 'user'}
+					<div class="bubble user">
+						<span class="who-label">YOU</span>
+						{m.content}
+					</div>
+				{:else}
+					{@const parsed = parseResponder(m.content)}
+					<div class="bubble bot">
+						<span class="who-label">{parsed.name?.toUpperCase() ?? showName.toUpperCase()}</span>
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						{@html renderMarkdown(parsed.text)}
+					</div>
+				{/if}
+			{/each}
+			{#if streamingText}
+				<div class="bubble bot streaming">
+					<span class="who-label">{streamingBotName.toUpperCase()}</span>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-					{@html renderMarkdown(parsed.text)}
+					{@html renderMarkdown(streamingText)}
 				</div>
 			{/if}
-		{/each}
-		{#if streamingText}
-			<div class="bubble bot streaming">
-				<span class="who-label">{streamingBotName.toUpperCase()}</span>
-				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-				{@html renderMarkdown(streamingText)}
-			</div>
-		{/if}
-		{#if busy && !streamingText}
-			<div class="bubble bot typing">
-				<span class="who-label">{streamingBotName.toUpperCase()} is typing</span>
-				<span class="dot">●</span><span class="dot">●</span><span class="dot">●</span>
-			</div>
-		{/if}
-	</div>
-
-	{#if offAir}
-		<div class="off-air-banner">
-			{showName.toUpperCase()} has gone off air. Check the TV Guide for what's on now.
+			{#if busy && !streamingText}
+				<div class="bubble bot typing">
+					<span class="who-label">{streamingBotName.toUpperCase()} is typing</span>
+					<span class="dot">●</span><span class="dot">●</span><span class="dot">●</span>
+				</div>
+			{/if}
 		</div>
-	{/if}
 
-	<form
-		class="chat-input"
-		onsubmit={(e) => {
-			e.preventDefault();
-			send();
-		}}
-	>
-		<input bind:value={input} placeholder={inputPlaceholder} disabled={busy || offAir} />
-		<button type="submit" disabled={busy || offAir}
-			>{offAir ? 'OFF AIR' : busy ? '...' : 'SEND'}</button
+		{#if offAir}
+			<div class="off-air-banner">
+				{showName.toUpperCase()} has gone off air. Check the TV Guide for what's on now.
+			</div>
+		{/if}
+
+		<form
+			class="chat-input"
+			onsubmit={(e) => {
+				e.preventDefault();
+				send();
+			}}
 		>
-	</form>
-</div>
+			<input bind:value={input} placeholder={inputPlaceholder} disabled={busy || offAir} />
+			<button type="submit" disabled={busy || offAir}
+				>{offAir ? 'OFF AIR' : busy ? '...' : 'SEND'}</button
+			>
+		</form>
+	</div>
+{:else}
+	<div class="window-content">
+		<p>This show is no longer available.</p>
+	</div>
+{/if}
 
 <style>
 	.chat-container {

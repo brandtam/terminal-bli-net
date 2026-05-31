@@ -124,7 +124,7 @@ describe('synthWindowAppMap', () => {
 
 describe('synthWindowAppId', () => {
 	it('routes prefixes to their app', () => {
-		expect(synthWindowAppId('chat-seinfeld')).toBe('chatrbot');
+		expect(synthWindowAppId('chat:seinfeld')).toBe('chatrbot');
 		expect(synthWindowAppId('sticky-123')).toBe('stickies');
 		expect(synthWindowAppId('textedit-readme')).toBe('textedit');
 		expect(synthWindowAppId('recorder-clip1')).toBe('recorder');

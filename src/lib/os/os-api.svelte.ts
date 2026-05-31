@@ -94,8 +94,12 @@ export class OsApiClass implements OsApi {
 			// API failure is non-fatal — the OS runs without guide data
 		}
 
-		// Restore windows or show welcome (filter out uninstalled store apps)
+		// Restore windows or show welcome. Two filters: drop ids that no longer
+		// resolve to any window (e.g. a `chat-<slug>` layout saved before the
+		// `chat:` separator cutover — now unknown, so it would otherwise restore
+		// into a dead "Coming soon" window), then drop uninstalled store apps.
 		const saved = loadWindows().filter((w) => {
+			if (!this.isKnownWindowId(w.id)) return false;
 			const wAppId = windowAppId(w.id);
 			const def = getAppDef(wAppId);
 			return !def || def.isSystem || this.fs.isAppInstalledSync(wAppId);
@@ -317,9 +321,13 @@ export class OsApiClass implements OsApi {
 	}
 
 	isKnownWindowId(id: string): boolean {
+		// `chat:` is intentionally absent — chatrbot is now a flat window-host app,
+		// so `matchWindow` resolves `chat:<slug>` below. The remaining `-` prefixes
+		// are legacy apps not yet migrated. This is also why a stale `chat-<slug>`
+		// from before the separator cutover is now *unknown* and gets dropped on
+		// restore (see the init() saved-window filter).
 		return (
 			OsApiClass.KNOWN_WINDOW_IDS.has(id) ||
-			id.startsWith('chat-') ||
 			id.startsWith('sticky-') ||
 			id.startsWith('textedit-') ||
 			id.startsWith('recorder-') ||
@@ -464,7 +472,7 @@ export class OsApiClass implements OsApi {
 			});
 			return;
 		}
-		this.openWindow(`chat-${group.slug}`);
+		this.openWindow(`chat:${group.slug}`);
 	}
 
 	// ── System actions ────────────────────────────────────────────────────
@@ -635,7 +643,7 @@ export class OsApiClass implements OsApi {
 	}
 
 	get activeChatGroupSlug(): string | null {
-		if (!this.activeId?.startsWith('chat-')) return null;
-		return this.activeId.replace('chat-', '');
+		if (!this.activeId?.startsWith('chat:')) return null;
+		return this.activeId.replace('chat:', '');
 	}
 }

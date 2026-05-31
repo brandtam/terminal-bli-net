@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount, onDestroy, type Component } from 'svelte';
-	import { isShowOnAir } from '$lib/schedule';
 	import { saveWindows } from '$lib/persistence';
 	import { OsApiClass } from '$lib/os/os-api.svelte';
 	import {
@@ -17,7 +16,7 @@
 	} from '$lib/terminalos';
 	import type { FsFile, FsNode, FsAlias } from '$lib/terminalos';
 	import { createFolderView } from '$lib/terminalos';
-	import type { GroupMeta, TweaksState } from '$lib/types';
+	import type { TweaksState } from '$lib/types';
 	import type { StickyNote } from '$lib/apps/stickies/types';
 	import { APPS, getWindowComponent } from '$lib/os/app-registry';
 	import Window from './Window.svelte';
@@ -326,8 +325,8 @@
 
 	const chatContextInfo = $derived.by((): string | undefined => {
 		if (!booted) return undefined;
-		if (os.activeApp.id === 'chatrbot' && os.activeId?.startsWith('chat-')) {
-			const showSlug = os.activeId.replace('chat-', '');
+		if (os.activeApp.id === 'chatrbot' && os.activeId?.startsWith('chat:')) {
+			const showSlug = os.activeId.replace('chat:', '');
 			const group = os.groups.find((g) => g.slug === showSlug);
 			return group?.name;
 		}
@@ -338,7 +337,7 @@
 	const dockOpenIds = $derived.by(() => {
 		if (!booted) return [];
 		const ids = os.windows.map((w) => w.id);
-		if (os.windows.some((w) => w.id.startsWith('chat-'))) ids.push('chat');
+		if (os.windows.some((w) => w.id.startsWith('chat:'))) ids.push('chat');
 		if (
 			os.windows.some((w) => {
 				if (!w.id.startsWith('textedit-')) return false;
@@ -501,42 +500,6 @@
 						<WindowHost win={w} {os} fs={terminalFs} />
 					{:else if w.id === 'welcome'}
 						<WelcomeWindow />
-					{:else if w.id === 'tv-guide'}
-						{#await getWindowComponent('tv-guide')!() then mod}
-							{@const TVGuide = (mod as LazyModule).default}
-							<TVGuide
-								groups={os.groups}
-								bots={os.bots}
-								channels={os.channels}
-								timezone={os.timezone}
-								now={os.now}
-								slotNow={os.slotNow}
-								activeChatGroupSlug={os.activeChatGroupSlug}
-								gridLoop={os.tweaks.tvGridLoop}
-								marqueeLoop={os.tweaks.marqueeLoop}
-								pauseOnHover={os.tweaks.tvPauseOnHover}
-								onOpenChat={(group: GroupMeta) => os.openChat(group)}
-								onFocusChat={(slug: string) => os.focusWindow(`chat-${slug}`)}
-							/>
-						{/await}
-					{:else if w.id.startsWith('chat-')}
-						{@const showSlug = w.id.replace('chat-', '')}
-						{@const group = os.groups.find((g) => g.slug === showSlug)}
-						{@const showBots = os.bots.filter((b) => b.group === showSlug)}
-						{#if group && showBots.length > 0}
-							{#await getWindowComponent(w.id)!() then mod}
-								{@const ChatWindow = (mod as LazyModule).default}
-								<ChatWindow
-									{showSlug}
-									showName={group.name}
-									castBots={showBots}
-									minutesLeft={isShowOnAir(group.slug, os.channels, os.now, os.timezone)
-										? 30 - (os.now.getMinutes() % 30)
-										: null}
-									offAir={!isShowOnAir(group.slug, os.channels, os.now, os.timezone)}
-								/>
-							{/await}
-						{/if}
 					{:else if w.id === 'terminal-prefs'}
 						{#await getWindowComponent('terminal-prefs')!() then mod}
 							{@const TerminalPrefs = (mod as LazyModule).default}
