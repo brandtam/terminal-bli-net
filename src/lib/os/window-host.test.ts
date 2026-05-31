@@ -50,6 +50,12 @@ describe('matchWindow', () => {
 		expect(m?.args.fileId).toBe('doc-7');
 	});
 
+	it('parses a sticky: instance id into the stickies app + its noteId arg', () => {
+		const m = matchWindow('sticky:abc');
+		expect(m?.appId).toBe('stickies');
+		expect(m?.args.noteId).toBe('abc');
+	});
+
 	it('returns null for ids no manifest claims via windows[]', () => {
 		expect(matchWindow('definitely-unknown')).toBeNull();
 		// Legacy `-` separators (textedit-, chat-) are no longer flat windows — the

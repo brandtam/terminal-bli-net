@@ -296,9 +296,6 @@ export class OsApiClass implements OsApi {
 			const group = this.groups.find((g) => g.slug === showSlug);
 			return { title: group ? `chatrbot - ${group.name}` : 'Chat', w: 440, h: 560 };
 		}
-		if (id.startsWith('sticky-')) {
-			return { title: 'Stickies', w: 240, h: 220 };
-		}
 		if (id.startsWith('recorder-')) {
 			const fileId = id.replace('recorder-', '');
 			const node = this.fs.peekNode(fileId);
@@ -316,16 +313,14 @@ export class OsApiClass implements OsApi {
 	}
 
 	isKnownWindowId(id: string): boolean {
-		// `chat:`/`textedit:` are intentionally absent — those are flat window-host
-		// apps now, so `matchWindow` resolves them below. The remaining `-` prefixes
-		// (sticky-, recorder-) are legacy apps not yet migrated. This is also why a
-		// stale `chat-<slug>`/`textedit-<id>` from before the separator cutover is now
-		// *unknown* and gets dropped on restore (see the init() saved-window filter).
+		// `chat:`/`textedit:`/`sticky:` are intentionally absent — those are flat
+		// window-host apps now, so `matchWindow` resolves them below. The only
+		// remaining `-` prefix is `recorder-` (the legacy clip-playback id, not yet
+		// migrated). This is also why a stale `chat-<slug>`/`textedit-<id>`/
+		// `sticky-<id>` from before the separator cutover is now *unknown* and gets
+		// dropped on restore (see the init() saved-window filter).
 		return (
-			OsApiClass.KNOWN_WINDOW_IDS.has(id) ||
-			id.startsWith('sticky-') ||
-			id.startsWith('recorder-') ||
-			matchWindow(id) !== null
+			OsApiClass.KNOWN_WINDOW_IDS.has(id) || id.startsWith('recorder-') || matchWindow(id) !== null
 		);
 	}
 

@@ -16,8 +16,8 @@
 	} from '$lib/terminalos';
 	import type { FsFile, FsNode, FsAlias } from '$lib/terminalos';
 	import { createFolderView } from '$lib/terminalos';
-	import type { StickyNote } from '$lib/apps/stickies/types';
 	import { getWindowComponent } from '$lib/os/app-registry';
+	import { resolveWindow } from '$lib/os/window-host';
 	import Window from './Window.svelte';
 	import WindowHost from './WindowHost.svelte';
 	import MenuBar from './MenuBar.svelte';
@@ -25,7 +25,11 @@
 	import PixelIcon from './PixelIcon.svelte';
 	import Dock from './Dock.svelte';
 	import BootScreen from './BootScreen.svelte';
-	import { createStickiesManager } from '$lib/apps/stickies/stickies-manager.svelte';
+	import {
+		createStickyNote,
+		seedDefaultStickies,
+		setStickyColor
+	} from '$lib/apps/stickies/stickies-manager.svelte';
 	import DesktopContextMenu from './DesktopContextMenu.svelte';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import { matchWindow } from '$lib/terminalos/apps/app-catalog';
@@ -51,7 +55,6 @@
 
 	let selectedIconId = $state<string | null>(null);
 
-	let stickies = $state<ReturnType<typeof createStickiesManager>>(undefined!);
 	let desktopView: ReturnType<typeof createFolderView> | null = $state(null);
 
 	function resolveAliasSync(node: FsNode, seen?: Set<string>): FsNode | null {
@@ -81,8 +84,8 @@
 			}
 			// Special apps need their own handling
 			if (appId === 'stickies') {
-				const id = await stickies.create();
-				if (id) os.openWindow(`sticky-${id}`);
+				const id = await createStickyNote(terminalFs);
+				if (id) os.openWindow(`sticky:${id}`);
 				return;
 			}
 			// Generic: look up the window ID
@@ -190,27 +193,27 @@
 		// Create OS API
 		os = new OsApiClass(fs);
 
-		// Initialize stickies manager and desktop folder view
-		stickies = createStickiesManager(fs);
-		stickies.init();
+		// Seed the first-run note (notes live as files; the filesystem is the
+		// source of truth, so there is no manager cache to initialize).
+		seedDefaultStickies(fs);
 		desktopView = createFolderView(fs, DESKTOP_ID);
 
 		// Register app launch handlers
 		os.registerLaunchHandler('stickies', async (payload) => {
 			if (payload?.action === 'new') {
-				const id = await stickies.create();
-				if (id) os.openWindow(`sticky-${id}`);
+				const id = await createStickyNote(terminalFs);
+				if (id) os.openWindow(`sticky:${id}`);
 				return;
 			}
 			if (payload?.action === 'color' && payload?.color) {
-				if (os.activeId?.startsWith('sticky-')) {
-					const noteId = os.activeId.replace('sticky-', '');
-					stickies.setColor(noteId, payload.color as string);
+				if (os.activeId?.startsWith('sticky:')) {
+					const noteId = os.activeId.replace('sticky:', '');
+					setStickyColor(terminalFs, noteId, payload.color as string);
 				}
 				return;
 			}
-			const id = await stickies.create();
-			if (id) os.openWindow(`sticky-${id}`);
+			const id = await createStickyNote(terminalFs);
+			if (id) os.openWindow(`sticky:${id}`);
 		});
 
 		os.registerLaunchHandler('textedit', (payload) => {
@@ -458,19 +461,16 @@
 
 			{#each os.windows as w (w.id)}
 				{@const def = os.getWindowDef(w.id)}
-				{@const stickyNote = w.id.startsWith('sticky-')
-					? stickies.notes.find((n) => n.id === w.id.replace('sticky-', ''))
-					: null}
 				<Window
 					id={w.id}
-					title={stickyNote?.title || def.title}
+					title={def.title}
 					x={w.x}
 					y={w.y}
 					width={w.w}
 					height={w.h}
 					z={w.z}
 					active={os.activeId === w.id}
-					chromeless={w.id.startsWith('sticky-')}
+					chromeless={resolveWindow(w.id)?.spec?.chromeless ?? false}
 					minW={def.minW}
 					minH={def.minH}
 					onfocus={(id) => os.focusWindow(id)}
@@ -508,22 +508,6 @@
 							<div class="window-content">
 								<p>Recording not found.</p>
 							</div>
-						{/if}
-					{:else if w.id.startsWith('sticky-')}
-						{@const noteId = w.id.replace('sticky-', '')}
-						{@const note = stickies.notes.find((n) => n.id === noteId)}
-						{#if note}
-							{#await getWindowComponent(w.id)!() then mod}
-								{@const StickiesNote = (mod as LazyModule).default}
-								<StickiesNote
-									{note}
-									ondelete={async (id: string) => {
-										await stickies.remove(id);
-										os.closeWindow(`sticky-${id}`);
-									}}
-									onupdate={(n: StickyNote) => stickies.update(n)}
-								/>
-							{/await}
 						{/if}
 					{:else if w.id === 'finder'}
 						{#await getWindowComponent('finder')!() then mod}

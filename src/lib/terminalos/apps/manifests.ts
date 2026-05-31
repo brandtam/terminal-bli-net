@@ -485,6 +485,20 @@ export const MANIFESTS = [
 		window: { idPrefix: 'sticky-', title: 'Stickies', w: 240, h: 220 },
 		about: { id: 'about-stickies' },
 		component: () => import('$lib/apps/stickies/StickiesNote.svelte'),
+		// Each note is a flat prefix window `sticky:<noteId>`. chromeless: true is
+		// spec-driven (Desktop reads it off the resolved spec) — stickies draw their
+		// own chrome, so the title is cosmetic. No `opens`: notes are launched, not
+		// a document handler.
+		windows: [
+			{
+				match: { kind: 'prefix', prefix: 'sticky:', arg: 'noteId' },
+				role: 'app',
+				chromeless: true,
+				title: () => 'Stickies',
+				size: () => ({ w: 240, h: 220 }),
+				component: () => import('$lib/apps/stickies/StickiesNote.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'Stickies',
 			version: 'v1.0',

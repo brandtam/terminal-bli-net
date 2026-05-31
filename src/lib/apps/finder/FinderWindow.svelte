@@ -110,7 +110,9 @@
 			// readText() and showed "Recording not found." for blob bodies.
 			os.openDocument(file);
 		} else if (file.appId === 'stickies') {
-			os.launchApp('stickies', { action: 'new' });
+			// Open THIS note (the file id is the note id), not a new blank one — the
+			// flat sticky:<noteId> window is a live view of its own file.
+			os.openWindow(`sticky:${file.id}`);
 		}
 	}
 

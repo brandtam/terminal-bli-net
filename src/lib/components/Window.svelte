@@ -55,7 +55,11 @@
 	function onTitlePointerDown(e: PointerEvent) {
 		if (
 			(e.target as HTMLElement).closest('.window-btn') ||
-			(e.target as HTMLElement).closest('.window-growbox-ne')
+			(e.target as HTMLElement).closest('.window-growbox-ne') ||
+			// A chromeless window's own controls (e.g. the sticky close button) live
+			// inside the drag handle; pressing one must not start a drag, or pointer
+			// capture swallows the click.
+			(e.target as HTMLElement).closest('.sticky-close')
 		)
 			return;
 		// In chromeless mode, only drag from elements marked as drag handles

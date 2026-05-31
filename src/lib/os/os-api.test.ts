@@ -432,9 +432,16 @@ describe('isKnownWindowId', () => {
 		expect(os.isKnownWindowId('chat-anything')).toBe(false);
 	});
 
-	it('returns true for sticky- prefix match', () => {
+	it('returns true for sticky: prefix match', () => {
 		const { os } = createOs();
-		expect(os.isKnownWindowId('sticky-abc')).toBe(true);
+		expect(os.isKnownWindowId('sticky:abc')).toBe(true);
+	});
+
+	it('returns false for the legacy sticky- id (dropped on restore)', () => {
+		// Stickies migrated to the flat `sticky:` prefix; the old `sticky-` id no
+		// longer resolves, so a stale saved layout using it is dropped by init().
+		const { os } = createOs();
+		expect(os.isKnownWindowId('sticky-abc')).toBe(false);
 	});
 
 	it('returns true for textedit: prefix match', () => {
