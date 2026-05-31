@@ -31,15 +31,29 @@ import type { DiskUsage } from './usage';
 import { WatcherRegistry } from './watchers';
 import type { FsChangeEvent, FsWatchCallback } from './watchers';
 
-// Well-known IDs
-export const ROOT_ID: NodeId = 'root_terminal_hd';
-export const APPLICATIONS_ID: NodeId = 'folder_applications';
-export const DOCUMENTS_ID: NodeId = 'folder_documents';
-export const DESKTOP_ID: NodeId = 'folder_desktop';
-export const SYSTEM_ID: NodeId = 'folder_system';
-export const RECORDINGS_ID: NodeId = 'folder_recordings';
-export const TRASH_ID: NodeId = 'folder_trash';
-export const APPDATA_ID: NodeId = 'folder_appdata';
+// Well-known IDs live in a leaf module (well-known-ids) so early-loaded code like
+// apps/manifests.ts can import them without a load-order cycle back through here.
+// Re-exported unchanged so every existing `$lib/terminalos` import site is intact.
+export {
+	ROOT_ID,
+	APPLICATIONS_ID,
+	DOCUMENTS_ID,
+	DESKTOP_ID,
+	SYSTEM_ID,
+	RECORDINGS_ID,
+	TRASH_ID,
+	APPDATA_ID
+} from './well-known-ids';
+import {
+	ROOT_ID,
+	APPLICATIONS_ID,
+	DOCUMENTS_ID,
+	DESKTOP_ID,
+	SYSTEM_ID,
+	RECORDINGS_ID,
+	TRASH_ID,
+	APPDATA_ID
+} from './well-known-ids';
 
 const VOLUME_ID = 'volume_terminal_hd';
 

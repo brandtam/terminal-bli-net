@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import type { OsApi } from '$lib/os/os-api';
 	import {
-		type TerminalFS,
 		ROOT_ID,
 		TRASH_ID,
 		SYSTEM_ID,
@@ -12,25 +10,20 @@
 		createFolderView
 	} from '$lib/terminalos';
 	import type { FsNode, FsFile, FsAlias } from '$lib/terminalos';
+	import { getSystem } from '$lib/os/os-context';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import { getAppDef } from '$lib/terminalos/apps/app-library';
 	import { isInstalled } from '$lib/terminalos/apps/software-shop';
 
-	let {
-		folderId = ROOT_ID,
-		os,
-		fs
-	}: {
-		folderId?: string;
-		os: OsApi;
-		fs: TerminalFS;
-	} = $props();
+	// Zero-prop: os/fs come from the host context. The starting folder is an
+	// explicit static arg on the matched window (finder → ROOT_ID, trash → TRASH_ID)
+	// — no default and no per-id branch. ROOT_ID/TRASH_ID stay imported for the
+	// navigation comparisons below (e.g. inTrash), just not as a prop fallback.
+	const { os, fs, win } = getSystem();
+	const folderId = win.args.folder;
 
-	function initialFolder() {
-		return folderId;
-	}
-	let currentFolderId = $state(initialFolder());
+	let currentFolderId = $state(folderId);
 	let selectedId = $state<string | null>(null);
 
 	let folderView = $state<ReturnType<typeof createFolderView> | null>(null);

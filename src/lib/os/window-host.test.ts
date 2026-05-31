@@ -82,6 +82,22 @@ describe('matchWindow', () => {
 		expect(matchWindow('computer-store')?.appId).toBe('computer-store');
 	});
 
+	it('delivers static args on an exact window (finder/trash → folder, #35)', () => {
+		// Finder and Trash are the same component on two folders. The static-arg
+		// mechanism puts the folder on the exact match, flowing into win.args exactly
+		// like a prefix window's parsed args — so FinderWindow stays zero-id-branch.
+		expect(matchWindow('finder')).toMatchObject({
+			appId: 'finder',
+			args: { folder: 'root_terminal_hd' }
+		});
+		// Trash's flat window lives on the finder manifest, so its appId is `finder`
+		// (the menu bar reads "Finder" for both) while its folder arg differs.
+		expect(matchWindow('trash')).toMatchObject({
+			appId: 'finder',
+			args: { folder: 'folder_trash' }
+		});
+	});
+
 	it('claims the exact recorder window for the recorder app (Slice 6)', () => {
 		// Camera migrates exact-only. There is no recorder- / recorder: prefix —
 		// clips open in the Player, so the matcher must NOT claim a recorder- id.

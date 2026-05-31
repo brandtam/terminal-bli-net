@@ -54,8 +54,10 @@ const STATIC_WINDOWS: Record<string, WindowDef> = {
  *
  * `welcome`, `about` and `terminal-prefs` are NOT here anymore: the new `system`
  * app owns them via its flat windows[], so matchWindow resolves them to `system`
- * and the menu bar reads "Terminal". `trash` stays Finder until its migration
- * (#35).
+ * and the menu bar reads "Terminal". `trash` now also resolves to `finder` via
+ * matchWindow (its flat window lives on the finder manifest, #35), so this entry
+ * is redundant — kept additively only until the collapse removes it; `error` is
+ * the one override matchWindow can't supply (its flat window has appId `error`).
  */
 const WINDOW_APP_OVERRIDES: Record<string, AppId> = {
 	error: 'finder',
@@ -88,7 +90,8 @@ export function matchWindow(id: string): MatchedWindow | null {
 	for (const m of MANIFESTS) {
 		for (const w of m.windows ?? []) {
 			if (w.match.kind === 'exact') {
-				if (w.match.id === id) return { appId: m.id, spec: w, args: {} };
+				// Exact windows may declare static args (e.g. finder/trash → folder).
+				if (w.match.id === id) return { appId: m.id, spec: w, args: w.match.args ?? {} };
 			} else if (id.startsWith(w.match.prefix)) {
 				return {
 					appId: m.id,

@@ -1,4 +1,8 @@
 import { defineApp } from './app-manifest';
+// Import folder ids from the leaf module, NOT the $lib/terminalos barrel: this
+// file is read by app-catalog at module load, and the barrel pulls terminal-fs →
+// app-install → app-catalog, which would be a load-order cycle.
+import { ROOT_ID, TRASH_ID } from '../filesystem/well-known-ids';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 import { recorderState } from '$lib/apps/recorder/recorder-state.svelte';
 
@@ -32,6 +36,28 @@ export const MANIFESTS = [
 		// 'about' → finder in WINDOW_APP_MAP, which is checked before matchWindow and
 		// would keep the menu bar on "Finder" while the system About is focused.
 		component: () => import('$lib/apps/finder/FinderWindow.svelte'),
+		// Finder and Trash are the SAME component pointed at two folders, declared as
+		// exact flat windows carrying a static `folder` arg (the static-arg-on-exact
+		// mechanism, #35). The trash entry lives on the finder manifest so
+		// matchWindow('trash') → appId 'finder' and the menu bar reads "Finder" for
+		// both. No `opens`: neither is a document handler. Legacy window/component
+		// stay additively until the collapse.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'finder', args: { folder: ROOT_ID } },
+				role: 'app',
+				title: () => 'Terminal HD',
+				size: () => ({ w: 480, h: 420 }),
+				component: () => import('$lib/apps/finder/FinderWindow.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'trash', args: { folder: TRASH_ID } },
+				role: 'chrome',
+				title: () => 'Trash',
+				size: () => ({ w: 380, h: 320 }),
+				component: () => import('$lib/apps/finder/FinderWindow.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'Terminal',
 			version: 'Version 1.0 "Pilot"',

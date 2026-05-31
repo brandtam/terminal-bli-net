@@ -64,7 +64,11 @@ export type AppPrefsWindowSpec = {
  * table. Replaces every hand-written `startsWith('player-')` across the OS.
  */
 export type WindowMatch =
-	| { kind: 'exact'; id: string }
+	// `args` lets an exact window declare static params (e.g. Finder and Trash are
+	// the same component pointed at different folders: { folder: ROOT_ID } vs
+	// { folder: TRASH_ID }). They flow into win.args exactly like a prefix window's
+	// parsed args, so the component stays zero-id-branch.
+	| { kind: 'exact'; id: string; args?: Record<string, string> }
 	| { kind: 'prefix'; prefix: string; arg: string };
 
 /**

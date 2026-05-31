@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy, type Component } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { saveWindows } from '$lib/persistence';
 	import { OsApiClass } from '$lib/os/os-api.svelte';
 	import {
@@ -16,7 +16,6 @@
 	} from '$lib/terminalos';
 	import type { FsFile, FsNode, FsAlias } from '$lib/terminalos';
 	import { createFolderView } from '$lib/terminalos';
-	import { getWindowComponent } from '$lib/os/app-registry';
 	import { resolveWindow } from '$lib/os/window-host';
 	import Window from './Window.svelte';
 	import WindowHost from './WindowHost.svelte';
@@ -36,18 +35,11 @@
 	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
 	// A window is "flat-migrated" when a manifest claims it via windows[]: those
-	// render through the single generic WindowHost path. Everything else still
-	// flows through the legacy if-chain below, until the rest migrate (Slices 4–7).
+	// render through the single generic WindowHost path. With Finder and Trash
+	// migrated, every live window is flat — WindowHost lazy-loads each app's chunk
+	// when its window opens (see manifests.ts). Brief 05 collapses the remaining
+	// {:else} arm and matchWindow becomes the sole render gate.
 	const isFlatWindow = (id: string) => matchWindow(id) !== null;
-
-	// App windows are loaded lazily via getWindowComponent(w.id), so each app's
-	// chunk is fetched only when its window opens (see manifests.ts). The OS chrome
-	// dialogs (welcome, about, about:<id>, terminal-prefs, error) now render through
-	// the flat WindowHost path above, so Desktop no longer imports them directly.
-	// A lazily-imported Svelte component module. `default` is typed as the Svelte
-	// 5 `Component` constructor (props left open) so `<Comp ...>` renders without a
-	// cast — the per-branch markup below still type-checks each component's props.
-	type LazyModule = { default: Component<Record<string, unknown>> };
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
@@ -477,21 +469,11 @@
 				>
 					{#if isFlatWindow(w.id)}
 						<!-- Generic flat-window render path: every window a manifest claims
-						     via windows[] (the Player's launch + player:<id> instances, and
-						     Stats) renders identically through WindowHost, which resolves the
-						     component and context from the matcher. The legacy arms below
-						     shrink to nothing as the remaining apps migrate (Slices 4–7). -->
+						     via windows[] renders identically through WindowHost, which
+						     resolves the component and context from the matcher. With Finder
+						     and Trash migrated, every live window is flat; the {:else} arm is
+						     only reachable by a stale/unknown id (Brief 05 finalizes this). -->
 						<WindowHost win={w} {os} fs={terminalFs} />
-					{:else if w.id === 'trash'}
-						{#await getWindowComponent('trash')!() then mod}
-							{@const FinderWindow = (mod as LazyModule).default}
-							<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
-						{/await}
-					{:else if w.id === 'finder'}
-						{#await getWindowComponent('finder')!() then mod}
-							{@const FinderWindow = (mod as LazyModule).default}
-							<FinderWindow {os} fs={terminalFs} />
-						{/await}
 					{:else}
 						<div class="window-content">
 							<p>Coming soon...</p>
