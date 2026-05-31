@@ -3,7 +3,6 @@ import type { FileType, FsFile } from '$lib/terminalos';
 import type { WindowSpec } from '$lib/terminalos/apps/app-manifest';
 import { MANIFESTS } from '$lib/terminalos/apps/manifests';
 import { matchWindow } from '$lib/terminalos/apps/app-catalog';
-import { getWindowComponent } from '$lib/os/app-registry';
 import { resolutionCache } from './window-host-cache';
 
 // invalidateWindow lives in the leaf cache module (so app state can invalidate
@@ -15,10 +14,10 @@ export { invalidateWindow } from './window-host-cache';
 export type WindowComponentLoader = () => Promise<{ default: Component }>;
 
 export type ResolvedWindow = {
-	/** Args the matcher parsed from the id (empty for exact / legacy windows). */
+	/** Args the matcher parsed from the id (empty for an exact window with none). */
 	args: Record<string, string>;
-	/** The matched spec, or null when resolved through the legacy registry. */
-	spec: WindowSpec | null;
+	/** The matched spec. resolveWindow returns null rather than a null spec. */
+	spec: WindowSpec;
 	/** Lazy component loader for this window. */
 	load: WindowComponentLoader;
 };
@@ -28,9 +27,8 @@ const cache = resolutionCache;
 /**
  * Resolve a window-id to { args, spec, load }, memoized by id so a window's
  * `{#await load()}` keeps the same promise across unrelated reactive ticks and
- * never remounts mid-life. During the migration, ids with no WindowSpec fall
- * back to the legacy registry (getWindowComponent) so unmigrated apps keep
- * rendering through the same single code path.
+ * never remounts mid-life. Every window is flat, so this is purely matchWindow —
+ * an id no manifest claims returns null (a stale/unknown saved id).
  *
  * Windows whose component depends on app state (the VCR's device) must call
  * `invalidateWindow(id)` when that state changes, so the next resolve re-runs.
@@ -39,22 +37,10 @@ export function resolveWindow(id: string): ResolvedWindow | null {
 	const cached = cache.get(id);
 	if (cached !== undefined) return cached;
 
-	let resolved: ResolvedWindow | null = null;
 	const m = matchWindow(id);
-	if (m) {
-		resolved = { args: m.args, spec: m.spec, load: m.spec.component };
-	} else {
-		const legacy = getWindowComponent(id);
-		if (legacy) {
-			// Legacy loaders are typed () => Promise<unknown> but resolve to a
-			// { default: Component } module at runtime; assert that at the boundary.
-			resolved = {
-				args: {},
-				spec: null,
-				load: async () => (await legacy()) as { default: Component }
-			};
-		}
-	}
+	const resolved: ResolvedWindow | null = m
+		? { args: m.args, spec: m.spec, load: m.spec.component }
+		: null;
 	cache.set(id, resolved);
 	return resolved;
 }

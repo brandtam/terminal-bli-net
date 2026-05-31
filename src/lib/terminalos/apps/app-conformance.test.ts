@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { MANIFESTS } from './manifests';
-import { synthAboutWindowId, synthWindowComponent } from './app-catalog';
+import { synthAboutWindowId } from './app-catalog';
 import type { TerminalAppManifest } from './app-manifest';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
@@ -112,14 +112,6 @@ describe('manifest conformance', () => {
 			expect(typeof loader).toBe('function');
 			const mod = (await loader()) as { default?: unknown };
 			expect(mod.default).toBeTruthy();
-		});
-
-		it('resolves a renderable component for its fixed window id', () => {
-			// For a fixed-window app the Desktop render chain must find a loader
-			// via synthWindowComponent. (error/about/trash reuse shared chrome
-			// components, which is fine — they still resolve a loader.)
-			if (!manifest.window?.id || !manifest.component) return;
-			expect(synthWindowComponent(manifest.window.id)).toBeTypeOf('function');
 		});
 	});
 
