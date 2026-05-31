@@ -25,6 +25,9 @@ import {
 import { resolveOpenTarget } from './window-host';
 import type { TerminalFS, FsFile } from '$lib/terminalos';
 
+const RESTORE_RECOVERY_HINT =
+	'Your current disk should be unchanged. Try the restore again from the same backup file. If Terminal OS will not boot cleanly after a crash or tab kill, reinstall or clear Terminal OS site data, then restore from the backup file again.';
+
 export class OsApiClass implements OsApi {
 	// ── Reactive state ────────────────────────────────────────────────────
 	windows = $state<WindowState[]>([]);
@@ -539,31 +542,40 @@ export class OsApiClass implements OsApi {
 								label: 'Restore',
 								primary: true,
 								action: () => {
-									this.fs.restoreBackup(data).then((r) => {
-										if (r.ok) {
-											const prefs = r.value.preferences;
-											if (prefs) {
-												if (prefs.tweaks !== undefined) saveTweaks(prefs.tweaks);
-												if (prefs.timezone != null) saveTimezone(prefs.timezone);
-												if (prefs.conversations !== undefined)
-													saveConversations(prefs.conversations);
-												if (prefs.windows !== undefined) {
-													// Set reactive state so the $effect's next
-													// debounce-save writes the restored windows,
-													// not the current session's stale layout.
-													this.windows = prefs.windows;
-													saveWindows(prefs.windows);
+									this.fs
+										.restoreBackup(data)
+										.then((r) => {
+											if (r.ok) {
+												const prefs = r.value.preferences;
+												if (prefs) {
+													if (prefs.tweaks !== undefined) saveTweaks(prefs.tweaks);
+													if (prefs.timezone != null) saveTimezone(prefs.timezone);
+													if (prefs.conversations !== undefined)
+														saveConversations(prefs.conversations);
+													if (prefs.windows !== undefined) {
+														// Set reactive state so the $effect's next
+														// debounce-save writes the restored windows,
+														// not the current session's stale layout.
+														this.windows = prefs.windows;
+														saveWindows(prefs.windows);
+													}
 												}
+												window.location.reload();
+											} else {
+												this.showAlert({
+													title: 'Restore Failed',
+													body: `${r.error.message}\n\n${RESTORE_RECOVERY_HINT}`,
+													buttons: [{ label: 'OK', primary: true }]
+												});
 											}
-											window.location.reload();
-										} else {
+										})
+										.catch((e) => {
 											this.showAlert({
 												title: 'Restore Failed',
-												body: r.error.message,
+												body: `${e instanceof Error ? e.message : 'Restore failed unexpectedly.'}\n\n${RESTORE_RECOVERY_HINT}`,
 												buttons: [{ label: 'OK', primary: true }]
 											});
-										}
-									});
+										});
 								}
 							}
 						]

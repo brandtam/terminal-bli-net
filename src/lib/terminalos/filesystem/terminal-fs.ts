@@ -22,9 +22,9 @@ import { getAppWindowId } from '../apps/app-install';
 import { findAppFile, isOwned as checkOwned, deriveOwnedApps } from '../apps/software-shop';
 import type { UndoRecord } from './operations';
 import { buildBackup, validateBackup, previewBackup, validateDiskForExport } from './backup';
-import type { BackupFileV3, BackupPreferences, BackupRestoreResult } from './backup';
+import type { BackupFile, BackupFileV3, BackupPreferences, BackupRestoreResult } from './backup';
 import { arrayBufferToBase64, base64ToArrayBuffer } from './storage/base64';
-import type { ManifestStore, BodyStore } from './storage/storage-types';
+import type { ManifestStore, BodyStore, BodyEntry } from './storage/storage-types';
 import { InMemoryManifestStore, InMemoryBodyStore } from './storage/storage-types';
 import { computeDiskUsage } from './usage';
 import type { DiskUsage } from './usage';
@@ -56,6 +56,27 @@ import {
 } from './well-known-ids';
 
 const VOLUME_ID = 'volume_terminal_hd';
+
+class InvalidBackupBodyError extends Error {
+	constructor(
+		readonly bodyId: BodyId,
+		readonly cause: unknown
+	) {
+		super(`Backup body "${bodyId}" is not valid base64`);
+	}
+}
+
+async function* backupBodyEntries(backup: BackupFile): AsyncIterable<BodyEntry> {
+	if (backup.version !== 3) return;
+
+	for (const [bodyId, b64] of Object.entries(backup.bodies)) {
+		try {
+			yield { bodyId, data: base64ToArrayBuffer(b64) };
+		} catch (e) {
+			throw new InvalidBackupBodyError(bodyId, e);
+		}
+	}
+}
 
 const README_CONTENT = `README.TXT — Terminal v1.0
 
@@ -1487,34 +1508,69 @@ export class TerminalFS {
 		const preview = previewBackup(backup);
 
 		await this.flushPersist();
-		this.nodes.clear();
+
+		const nextNodes = new Map<NodeId, FsNode>();
 		for (const node of backup.nodes) {
-			this.nodes.set(node.id, node as FsNode);
+			nextNodes.set(node.id, node as FsNode);
 		}
 
 		// Restore ownedApps from v2/v3 backups (always set — even if empty/undefined)
-		if (backup.version !== 1) {
-			this.volume = { ...this.volume, ownedApps: backup.disk.ownedApps ?? [] };
-		}
+		const nextVolume =
+			backup.version !== 1
+				? { ...this.volume, ownedApps: backup.disk.ownedApps ?? [] }
+				: this.volume;
 
-		// Restore is a full disk replacement, so clear the body store first —
-		// for ANY format. Otherwise blobs written since (e.g. recordings) would
-		// orphan in IndexedDB after restoring an older v1/v2 backup, whose nodes
-		// reference none of them. v3 then writes its own blobs back from base64.
-		await this.bodies.clear();
-		if (backup.version === 3) {
-			for (const [bodyId, b64] of Object.entries(backup.bodies)) {
-				const res = await this.writeBody(bodyId, base64ToArrayBuffer(b64));
-				if (!res.ok) return res as FsResult<BackupRestoreResult>;
+		const oldVolume = this.volume;
+		const oldNodes = Array.from(this.nodes.values());
+		const rollbackManifest = async (
+			restoreError: unknown
+		): Promise<FsResult<BackupRestoreResult>> => {
+			const rollback = await this.manifest.save(oldVolume, oldNodes);
+			if (!rollback.ok) {
+				return fail(
+					'corrupt_disk',
+					'Restore failed and Terminal HD could not roll back its manifest. Reload Terminal OS, then restore from the backup file again.',
+					{ restoreError, rollbackError: rollback.error }
+				);
 			}
-		}
+			if (restoreError instanceof InvalidBackupBodyError) {
+				return fail(
+					'invalid_backup',
+					`Backup body "${restoreError.bodyId}" is not valid base64`,
+					restoreError.cause
+				);
+			}
+			if (
+				restoreError &&
+				typeof restoreError === 'object' &&
+				'ok' in restoreError &&
+				restoreError.ok === false
+			) {
+				return restoreError as FsResult<BackupRestoreResult>;
+			}
+			return fail('corrupt_disk', 'Restore failed while replacing backup bodies', restoreError);
+		};
 
-		// Persist the restored state
-		const persistResult = await this.persist();
-		if (!persistResult.ok) return persistResult as FsResult<BackupRestoreResult>;
+		// Save the staged manifest before replacing bodies. The body store stages
+		// its writes and leaves active bodies unchanged on normal failure, so this
+		// ordering lets restore roll the manifest back without snapshotting old
+		// blob bytes in memory.
+		const manifestResult = await this.manifest.save(nextVolume, Array.from(nextNodes.values()));
+		if (!manifestResult.ok) return manifestResult as FsResult<BackupRestoreResult>;
+
+		try {
+			const bodyResult = await this.bodies.replaceAll(backupBodyEntries(backup));
+			if (!bodyResult.ok) {
+				return rollbackManifest(bodyResult);
+			}
+		} catch (e) {
+			return rollbackManifest(e);
+		}
 
 		// Clear undo — restore is a full disk replacement
 		this.lastUndo = null;
+		this.volume = nextVolume;
+		this.nodes = nextNodes;
 
 		// Notify watchers
 		const allNodeIds = Array.from(this.nodes.keys());

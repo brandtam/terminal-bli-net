@@ -2,6 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { TerminalFS, DOCUMENTS_ID, APPLICATIONS_ID, ROOT_ID } from './terminal-fs';
 import { validateBackup, previewBackup, validateDiskForExport } from './backup';
 import type { BackupPreferences, BackupFileV3 } from './backup';
+import type { BodyEntry } from './storage/storage-types';
+import { InMemoryBodyStore, InMemoryManifestStore } from './storage/storage-types';
+
+class FailingReplaceBodyStore extends InMemoryBodyStore {
+	async replaceAll(_entries: AsyncIterable<BodyEntry>) {
+		return {
+			ok: false as const,
+			error: { code: 'quota_exceeded' as const, message: 'No space for replacement bodies' }
+		};
+	}
+}
 
 describe('exportBackup', () => {
 	it('produces a valid v3 backup file', async () => {
@@ -403,6 +414,95 @@ describe('restoreBackup', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe('invalid_backup');
+		}
+	});
+
+	it('leaves the current disk unchanged when a backup body is not valid base64', async () => {
+		const manifest = new InMemoryManifestStore();
+		const bodies = new InMemoryBodyStore();
+		const fs = TerminalFS.createCleanDisk(manifest, bodies);
+		await fs.createTextFile(DOCUMENTS_ID, 'keep.txt', 'keep');
+		await fs.writeBody('body_keep', new TextEncoder().encode('old clip').buffer as ArrayBuffer);
+
+		const source = TerminalFS.createCleanDisk();
+		const badFile = {
+			id: 'node_bad_body',
+			volumeId: 'volume_terminal_hd',
+			kind: 'file' as const,
+			parentId: DOCUMENTS_ID,
+			name: 'bad.webm',
+			fileType: 'recording' as const,
+			bodyRef: { kind: 'indexeddb-blob' as const, bodyId: 'body_bad', size: 10 },
+			createdAt: 1,
+			updatedAt: 1
+		};
+		const backup: BackupFileV3 = {
+			format: 'terminal-hd',
+			version: 3,
+			exportedAt: new Date().toISOString(),
+			disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
+			nodes: [
+				...Array.from(source.getAllNodes().values()).filter((n) => !n.flags?.hidden),
+				badFile
+			],
+			bodies: { body_bad: 'not valid base64!' }
+		};
+
+		const result = await fs.restoreBackup(backup);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('invalid_backup');
+		}
+
+		const docs = await fs.listFolder(DOCUMENTS_ID);
+		expect(docs.ok).toBe(true);
+		if (docs.ok) {
+			expect(docs.value.some((n) => n.name === 'keep.txt')).toBe(true);
+			expect(docs.value.some((n) => n.name === 'bad.webm')).toBe(false);
+		}
+
+		const oldBody = await fs.readBody('body_keep');
+		expect(oldBody.ok).toBe(true);
+		if (oldBody.ok) {
+			expect(new TextDecoder().decode(oldBody.value)).toBe('old clip');
+		}
+
+		const reopened = await TerminalFS.open(manifest, bodies);
+		const reopenedDocs = await reopened.listFolder(DOCUMENTS_ID);
+		expect(reopenedDocs.ok).toBe(true);
+		if (reopenedDocs.ok) {
+			expect(reopenedDocs.value.some((n) => n.name === 'keep.txt')).toBe(true);
+			expect(reopenedDocs.value.some((n) => n.name === 'bad.webm')).toBe(false);
+		}
+	});
+
+	it('rolls the manifest back when body replacement fails', async () => {
+		const manifest = new InMemoryManifestStore();
+		const bodies = new FailingReplaceBodyStore();
+		const fs = TerminalFS.createCleanDisk(manifest, bodies);
+		await fs.createTextFile(DOCUMENTS_ID, 'keep.txt', 'keep');
+
+		const source = TerminalFS.createCleanDisk();
+		const exportResult = await source.exportBackup();
+		if (!exportResult.ok) throw new Error('export failed');
+
+		const result = await fs.restoreBackup(exportResult.value);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('quota_exceeded');
+		}
+
+		const docs = await fs.listFolder(DOCUMENTS_ID);
+		expect(docs.ok).toBe(true);
+		if (docs.ok) {
+			expect(docs.value.some((n) => n.name === 'keep.txt')).toBe(true);
+		}
+
+		const reopened = await TerminalFS.open(manifest, bodies);
+		const reopenedDocs = await reopened.listFolder(DOCUMENTS_ID);
+		expect(reopenedDocs.ok).toBe(true);
+		if (reopenedDocs.ok) {
+			expect(reopenedDocs.value.some((n) => n.name === 'keep.txt')).toBe(true);
 		}
 	});
 

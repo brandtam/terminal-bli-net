@@ -1,10 +1,11 @@
-import type { BodyStore } from './storage-types';
+import type { BodyEntry, BodyStore } from './storage-types';
 import type { BodyId, FsResult } from '../types';
 import { ok, fail } from '../errors';
 
 const DB_NAME = 'terminalos';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'bodies';
+const STAGING_STORE_NAME = 'bodies_staging';
 
 function openDB(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
@@ -14,10 +15,31 @@ function openDB(): Promise<IDBDatabase> {
 			if (!db.objectStoreNames.contains(STORE_NAME)) {
 				db.createObjectStore(STORE_NAME);
 			}
+			if (!db.objectStoreNames.contains(STAGING_STORE_NAME)) {
+				db.createObjectStore(STAGING_STORE_NAME);
+			}
 		};
 		request.onsuccess = () => resolve(request.result);
 		request.onerror = () => reject(request.error);
 	});
+}
+
+function isQuotaError(error: unknown): boolean {
+	return (
+		error !== null &&
+		typeof error === 'object' &&
+		'name' in error &&
+		error.name === 'QuotaExceededError'
+	);
+}
+
+function storageFailure(
+	error: unknown,
+	quotaMessage: string,
+	fallbackMessage: string
+): FsResult<void> {
+	if (isQuotaError(error)) return fail('quota_exceeded', quotaMessage, error);
+	return fail('corrupt_disk', fallbackMessage, error);
 }
 
 export class IndexedDBBodyStore implements BodyStore {
@@ -45,7 +67,7 @@ export class IndexedDBBodyStore implements BodyStore {
 	async write(bodyId: BodyId, data: ArrayBuffer): Promise<FsResult<void>> {
 		try {
 			const db = await this.getDB();
-			return new Promise((resolve, reject) => {
+			return new Promise((resolve) => {
 				const tx = db.transaction(STORE_NAME, 'readwrite');
 				const store = tx.objectStore(STORE_NAME);
 				const getReq = store.get(bodyId);
@@ -62,15 +84,17 @@ export class IndexedDBBodyStore implements BodyStore {
 					resolve(ok(undefined));
 				};
 				tx.onerror = () => {
-					if (tx.error?.name === 'QuotaExceededError') {
-						resolve(fail('quota_exceeded', 'IndexedDB storage quota exceeded'));
-					} else {
-						reject(tx.error);
-					}
+					resolve(
+						storageFailure(
+							tx.error,
+							'IndexedDB storage quota exceeded',
+							'Failed to write to IndexedDB'
+						)
+					);
 				};
 			});
 		} catch (e) {
-			return fail('quota_exceeded', 'Failed to write to IndexedDB', e);
+			return storageFailure(e, 'IndexedDB storage quota exceeded', 'Failed to write to IndexedDB');
 		}
 	}
 
@@ -99,14 +123,122 @@ export class IndexedDBBodyStore implements BodyStore {
 	async clear(): Promise<void> {
 		const db = await this.getDB();
 		return new Promise((resolve, reject) => {
-			const tx = db.transaction(STORE_NAME, 'readwrite');
-			const store = tx.objectStore(STORE_NAME);
-			store.clear();
+			const tx = db.transaction([STORE_NAME, STAGING_STORE_NAME], 'readwrite');
+			tx.objectStore(STORE_NAME).clear();
+			tx.objectStore(STAGING_STORE_NAME).clear();
 			tx.oncomplete = () => {
 				this.cachedBytes = 0;
 				resolve();
 			};
 			tx.onerror = () => reject(tx.error);
+		});
+	}
+
+	async replaceAll(entries: AsyncIterable<BodyEntry>): Promise<FsResult<void>> {
+		let db: IDBDatabase;
+		try {
+			db = await this.getDB();
+		} catch (e) {
+			return storageFailure(e, 'IndexedDB storage quota exceeded', 'Failed to open IndexedDB');
+		}
+
+		const cleared = await this.clearStaging(db);
+		if (!cleared.ok) return cleared;
+
+		try {
+			for await (const { bodyId, data } of entries) {
+				const written = await this.writeStaging(db, bodyId, data);
+				if (!written.ok) {
+					await this.clearStagingQuietly(db);
+					return written;
+				}
+			}
+		} catch (e) {
+			await this.clearStagingQuietly(db);
+			throw e;
+		}
+
+		const swapped = await this.swapStagingIntoActive(db);
+		if (!swapped.ok) {
+			await this.clearStagingQuietly(db);
+			return swapped;
+		}
+
+		this.cachedBytes = null;
+		return ok(undefined);
+	}
+
+	private clearStaging(db: IDBDatabase): Promise<FsResult<void>> {
+		return new Promise((resolve) => {
+			const tx = db.transaction(STAGING_STORE_NAME, 'readwrite');
+			tx.objectStore(STAGING_STORE_NAME).clear();
+			tx.oncomplete = () => resolve(ok(undefined));
+			tx.onerror = () =>
+				resolve(
+					storageFailure(
+						tx.error,
+						'IndexedDB storage quota exceeded',
+						'Failed to clear IndexedDB body staging store'
+					)
+				);
+		});
+	}
+
+	private async clearStagingQuietly(db: IDBDatabase): Promise<void> {
+		try {
+			await this.clearStaging(db);
+		} catch {
+			// The next replaceAll attempt clears staging before writing.
+		}
+	}
+
+	private writeStaging(
+		db: IDBDatabase,
+		bodyId: BodyId,
+		data: ArrayBuffer
+	): Promise<FsResult<void>> {
+		return new Promise((resolve) => {
+			const tx = db.transaction(STAGING_STORE_NAME, 'readwrite');
+			tx.objectStore(STAGING_STORE_NAME).put(data, bodyId);
+			tx.oncomplete = () => resolve(ok(undefined));
+			tx.onerror = () =>
+				resolve(
+					storageFailure(
+						tx.error,
+						'IndexedDB storage quota exceeded while staging backup bodies',
+						'Failed to stage backup body in IndexedDB'
+					)
+				);
+		});
+	}
+
+	private swapStagingIntoActive(db: IDBDatabase): Promise<FsResult<void>> {
+		return new Promise((resolve) => {
+			const tx = db.transaction([STORE_NAME, STAGING_STORE_NAME], 'readwrite');
+			const active = tx.objectStore(STORE_NAME);
+			const staging = tx.objectStore(STAGING_STORE_NAME);
+
+			active.clear();
+			const cursorRequest = staging.openCursor();
+			cursorRequest.onsuccess = () => {
+				const cursor = cursorRequest.result;
+				if (!cursor) {
+					staging.clear();
+					return;
+				}
+				active.put(cursor.value, cursor.key);
+				cursor.continue();
+			};
+
+			tx.oncomplete = () => resolve(ok(undefined));
+			tx.onerror = () =>
+				resolve(
+					storageFailure(
+						tx.error,
+						'IndexedDB storage quota exceeded while replacing backup bodies',
+						'Failed to replace IndexedDB bodies'
+					)
+				);
 		});
 	}
 
