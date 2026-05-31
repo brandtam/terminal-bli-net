@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { TweaksState } from '$lib/types';
+	import { getSystem } from '$lib/os/os-context';
 
-	let {
-		tweaks,
-		onSetTweak
-	}: {
-		tweaks: TweaksState;
-		onSetTweak: (key: keyof TweaksState, value: TweaksState[keyof TweaksState]) => void;
-	} = $props();
+	// Zero-prop window component: reads tweaks off the live OS context and writes
+	// them back through os.setTweak.
+	const { os } = getSystem();
+	const tweaks = $derived(os.tweaks);
+	const onSetTweak = (key: keyof TweaksState, value: TweaksState[keyof TweaksState]) =>
+		os.setTweak(key, value);
 </script>
 
 <div class="window-content prefs-content">

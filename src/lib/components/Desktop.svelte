@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { onMount, onDestroy, type Component } from 'svelte';
-	import { isShowOnAir } from '$lib/schedule';
+	import { onMount, onDestroy } from 'svelte';
 	import { saveWindows } from '$lib/persistence';
 	import { OsApiClass } from '$lib/os/os-api.svelte';
 	import {
 		TerminalFS,
 		LocalStorageManifestStore,
+		IndexedDBBodyStore,
 		DOCUMENTS_ID,
 		DESKTOP_ID,
 		ROOT_ID,
@@ -16,32 +16,29 @@
 	} from '$lib/terminalos';
 	import type { FsFile, FsNode, FsAlias } from '$lib/terminalos';
 	import { createFolderView } from '$lib/terminalos';
-	import type { GroupMeta, TweaksState } from '$lib/types';
-	import type { StickyNote } from '$lib/apps/stickies/types';
-	import { APPS, getWindowComponent } from '$lib/os/app-registry';
+	import { resolveWindow } from '$lib/os/window-host';
 	import Window from './Window.svelte';
+	import WindowHost from './WindowHost.svelte';
 	import MenuBar from './MenuBar.svelte';
 	import DesktopIcon from './DesktopIcon.svelte';
 	import PixelIcon from './PixelIcon.svelte';
 	import Dock from './Dock.svelte';
 	import BootScreen from './BootScreen.svelte';
-	import WelcomeWindow from '$lib/apps/welcome/WelcomeWindow.svelte';
-	import AboutAppWindow from '$lib/apps/finder/AboutAppWindow.svelte';
-	import { createStickiesManager } from '$lib/apps/stickies/stickies-manager.svelte';
+	import {
+		createStickyNote,
+		seedDefaultStickies,
+		setStickyColor
+	} from '$lib/apps/stickies/stickies-manager.svelte';
 	import DesktopContextMenu from './DesktopContextMenu.svelte';
-	import { SYS7_PATTERNS } from './wallpaper-patterns';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import { matchWindow } from '$lib/terminalos/apps/app-catalog';
 	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
-	// App windows are loaded lazily via getWindowComponent(w.id), so each app's
-	// chunk is fetched only when its window opens (see manifests.ts). Cheap shared
-	// chrome stays statically imported: WelcomeWindow (first-visit greeter) and
-	// AboutAppWindow (renders every about-* dialog) — lazy-loading these would add
-	// a round-trip with no bundle win.
-	// A lazily-imported Svelte component module. `default` is typed as the Svelte
-	// 5 `Component` constructor (props left open) so `<Comp ...>` renders without a
-	// cast — the per-branch markup below still type-checks each component's props.
-	type LazyModule = { default: Component<Record<string, unknown>> };
+	// matchWindow is the sole render gate: a window-id renders iff a manifest claims
+	// it via windows[]. Every window goes through the one WindowHost path, which
+	// lazy-loads the app's chunk when the window opens (see manifests.ts). The OS
+	// has no app-specific render branch — adding an app is a manifest entry only.
+	const isFlatWindow = (id: string) => matchWindow(id) !== null;
 
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
@@ -49,7 +46,6 @@
 
 	let selectedIconId = $state<string | null>(null);
 
-	let stickies = $state<ReturnType<typeof createStickiesManager>>(undefined!);
 	let desktopView: ReturnType<typeof createFolderView> | null = $state(null);
 
 	function resolveAliasSync(node: FsNode, seen?: Set<string>): FsNode | null {
@@ -79,16 +75,8 @@
 			}
 			// Special apps need their own handling
 			if (appId === 'stickies') {
-				const id = await stickies.create();
-				if (id) os.openWindow(`sticky-${id}`);
-				return;
-			}
-			if (appId === 'system-prefs') {
-				os.openSystemPreferences();
-				return;
-			}
-			if (appId === 'about-terminal') {
-				os.openAbout(null);
+				const id = await createStickyNote(terminalFs);
+				if (id) os.openWindow(`sticky:${id}`);
 				return;
 			}
 			// Generic: look up the window ID
@@ -178,42 +166,43 @@
 	function openTextEditFile(name: string) {
 		const files = terminalFs.findByApp('textedit', DOCUMENTS_ID);
 		const file = files.find((f) => f.name === name);
-		if (file) os.openWindow(`textedit-${file.id}`);
+		if (file) os.openWindow(`textedit:${file.id}`);
 	}
-
-	let cameraRecording = $state(false);
 
 	onMount(async () => {
 		const bootStart = Date.now();
 
 		// Open filesystem
-		const fs = await TerminalFS.open(new LocalStorageManifestStore());
+		// Bodies persist to IndexedDB (blob bytes), nodes to localStorage (the
+		// manifest). Backup round-trips blobs as base64, so this is safe to wire
+		// before any app writes a blob.
+		const fs = await TerminalFS.open(new LocalStorageManifestStore(), new IndexedDBBodyStore());
 		terminalFs = fs;
 
 		// Create OS API
 		os = new OsApiClass(fs);
 
-		// Initialize stickies manager and desktop folder view
-		stickies = createStickiesManager(fs);
-		stickies.init();
+		// Seed the first-run note (notes live as files; the filesystem is the
+		// source of truth, so there is no manager cache to initialize).
+		seedDefaultStickies(fs);
 		desktopView = createFolderView(fs, DESKTOP_ID);
 
 		// Register app launch handlers
 		os.registerLaunchHandler('stickies', async (payload) => {
 			if (payload?.action === 'new') {
-				const id = await stickies.create();
-				if (id) os.openWindow(`sticky-${id}`);
+				const id = await createStickyNote(terminalFs);
+				if (id) os.openWindow(`sticky:${id}`);
 				return;
 			}
 			if (payload?.action === 'color' && payload?.color) {
-				if (os.activeId?.startsWith('sticky-')) {
-					const noteId = os.activeId.replace('sticky-', '');
-					stickies.setColor(noteId, payload.color as string);
+				if (os.activeId?.startsWith('sticky:')) {
+					const noteId = os.activeId.replace('sticky:', '');
+					setStickyColor(terminalFs, noteId, payload.color as string);
 				}
 				return;
 			}
-			const id = await stickies.create();
-			if (id) os.openWindow(`sticky-${id}`);
+			const id = await createStickyNote(terminalFs);
+			if (id) os.openWindow(`sticky:${id}`);
 		});
 
 		os.registerLaunchHandler('textedit', (payload) => {
@@ -227,7 +216,7 @@
 					name = `${base} ${i}${ext}`;
 				}
 				terminalFs.createTextFile(DOCUMENTS_ID, name, '').then((result) => {
-					if (result.ok) os.openWindow(`textedit-${result.value.id}`);
+					if (result.ok) os.openWindow(`textedit:${result.value.id}`);
 				});
 				return;
 			}
@@ -235,7 +224,7 @@
 				const docs = terminalFs.findByApp('textedit', DOCUMENTS_ID);
 				const buttons = docs.map((d) => ({
 					label: d.name,
-					action: () => os.openWindow(`textedit-${d.id}`)
+					action: () => os.openWindow(`textedit:${d.id}`)
 				}));
 				os.alert({
 					title: 'Open Document',
@@ -315,8 +304,8 @@
 
 	const chatContextInfo = $derived.by((): string | undefined => {
 		if (!booted) return undefined;
-		if (os.activeApp.id === 'chatrbot' && os.activeId?.startsWith('chat-')) {
-			const showSlug = os.activeId.replace('chat-', '');
+		if (os.activeApp.id === 'chatrbot' && os.activeId?.startsWith('chat:')) {
+			const showSlug = os.activeId.replace('chat:', '');
 			const group = os.groups.find((g) => g.slug === showSlug);
 			return group?.name;
 		}
@@ -327,19 +316,19 @@
 	const dockOpenIds = $derived.by(() => {
 		if (!booted) return [];
 		const ids = os.windows.map((w) => w.id);
-		if (os.windows.some((w) => w.id.startsWith('chat-'))) ids.push('chat');
+		if (os.windows.some((w) => w.id.startsWith('chat:'))) ids.push('chat');
 		if (
 			os.windows.some((w) => {
-				if (!w.id.startsWith('textedit-')) return false;
-				const fileId = w.id.replace('textedit-', '');
+				if (!w.id.startsWith('textedit:')) return false;
+				const fileId = w.id.replace('textedit:', '');
 				return terminalFs.peekNode(fileId)?.name === 'Pricing.txt';
 			})
 		)
 			ids.push('pricing');
 		if (
 			os.windows.some((w) => {
-				if (!w.id.startsWith('textedit-')) return false;
-				const fileId = w.id.replace('textedit-', '');
+				if (!w.id.startsWith('textedit:')) return false;
+				const fileId = w.id.replace('textedit:', '');
 				return terminalFs.peekNode(fileId)?.name === 'README.TXT';
 			})
 		)
@@ -396,7 +385,6 @@
 				app={os.activeApp}
 				{os}
 				openWindows={os.windows.length}
-				isRecording={cameraRecording}
 				contextInfo={chatContextInfo}
 				now={os.now}
 				timezone={os.timezone}
@@ -461,19 +449,16 @@
 
 			{#each os.windows as w (w.id)}
 				{@const def = os.getWindowDef(w.id)}
-				{@const stickyNote = w.id.startsWith('sticky-')
-					? stickies.notes.find((n) => n.id === w.id.replace('sticky-', ''))
-					: null}
 				<Window
 					id={w.id}
-					title={stickyNote?.title || def.title}
+					title={def.title}
 					x={w.x}
 					y={w.y}
 					width={w.w}
 					height={w.h}
 					z={w.z}
 					active={os.activeId === w.id}
-					chromeless={w.id.startsWith('sticky-')}
+					chromeless={resolveWindow(w.id)?.spec.chromeless ?? false}
 					minW={def.minW}
 					minH={def.minH}
 					onfocus={(id) => os.focusWindow(id)}
@@ -481,163 +466,14 @@
 					onmove={(id, x, y) => os.moveWindow(id, x, y)}
 					onresize={(id, ww, hh) => os.resizeWindow(id, ww, hh)}
 				>
-					{#if w.id === 'welcome'}
-						<WelcomeWindow />
-					{:else if w.id === 'tv-guide'}
-						{#await getWindowComponent('tv-guide')!() then mod}
-							{@const TVGuide = (mod as LazyModule).default}
-							<TVGuide
-								groups={os.groups}
-								bots={os.bots}
-								channels={os.channels}
-								timezone={os.timezone}
-								now={os.now}
-								slotNow={os.slotNow}
-								activeChatGroupSlug={os.activeChatGroupSlug}
-								gridLoop={os.tweaks.tvGridLoop}
-								marqueeLoop={os.tweaks.marqueeLoop}
-								pauseOnHover={os.tweaks.tvPauseOnHover}
-								onOpenChat={(group: GroupMeta) => os.openChat(group)}
-								onFocusChat={(slug: string) => os.focusWindow(`chat-${slug}`)}
-							/>
-						{/await}
-					{:else if w.id.startsWith('chat-')}
-						{@const showSlug = w.id.replace('chat-', '')}
-						{@const group = os.groups.find((g) => g.slug === showSlug)}
-						{@const showBots = os.bots.filter((b) => b.group === showSlug)}
-						{#if group && showBots.length > 0}
-							{#await getWindowComponent(w.id)!() then mod}
-								{@const ChatWindow = (mod as LazyModule).default}
-								<ChatWindow
-									{showSlug}
-									showName={group.name}
-									castBots={showBots}
-									minutesLeft={isShowOnAir(group.slug, os.channels, os.now, os.timezone)
-										? 30 - (os.now.getMinutes() % 30)
-										: null}
-									offAir={!isShowOnAir(group.slug, os.channels, os.now, os.timezone)}
-								/>
-							{/await}
-						{/if}
-					{:else if w.id === 'terminal-prefs'}
-						{#await getWindowComponent('terminal-prefs')!() then mod}
-							{@const TerminalPrefs = (mod as LazyModule).default}
-							<TerminalPrefs
-								tweaks={os.tweaks}
-								{SYS7_PATTERNS}
-								onSetTweak={(k: keyof TweaksState, v: TweaksState[keyof TweaksState]) =>
-									os.setTweak(k, v)}
-							/>
-						{/await}
-					{:else if w.id === 'tvguide-prefs'}
-						{#await getWindowComponent('tvguide-prefs')!() then mod}
-							{@const TVGuidePrefs = (mod as LazyModule).default}
-							<TVGuidePrefs
-								tweaks={os.tweaks}
-								onSetTweak={(k: keyof TweaksState, v: TweaksState[keyof TweaksState]) =>
-									os.setTweak(k, v)}
-							/>
-						{/await}
-					{:else if w.id === 'chatrbot-prefs'}
-						{#await getWindowComponent('chatrbot-prefs')!() then mod}
-							{@const ChatrbotPrefs = (mod as LazyModule).default}
-							<ChatrbotPrefs />
-						{/await}
-					{:else if w.id === 'vcr-prefs'}
-						{#await getWindowComponent('vcr-prefs')!() then mod}
-							{@const VCRPrefs = (mod as LazyModule).default}
-							<VCRPrefs />
-						{/await}
-					{:else if w.id.startsWith('textedit-')}
-						{@const fileId = w.id.replace('textedit-', '')}
-						{#await getWindowComponent(w.id)!() then mod}
-							{@const TextEditWindow = (mod as LazyModule).default}
-							<TextEditWindow docId={fileId} fs={terminalFs} />
-						{/await}
-					{:else if w.id === 'about'}
-						{#await getWindowComponent('about')!() then mod}
-							{@const AboutTerminal = (mod as LazyModule).default}
-							<AboutTerminal {os} fs={terminalFs} />
-						{/await}
-					{:else if w.id.startsWith('about-')}
-						{@const aboutAppId = w.id.replace('about-', '')}
-						{@const aboutApp = APPS[aboutAppId]}
-						{#if aboutApp?.about}
-							<AboutAppWindow about={aboutApp.about} />
-						{/if}
-					{:else if w.id === 'software-shop'}
-						{#await getWindowComponent('software-shop')!() then mod}
-							{@const SoftwareShopWindow = (mod as LazyModule).default}
-							<SoftwareShopWindow {os} fs={terminalFs} />
-						{/await}
-					{:else if w.id === 'computer-store'}
-						{#await getWindowComponent('computer-store')!() then mod}
-							{@const ComputerStoreWindow = (mod as LazyModule).default}
-							<ComputerStoreWindow {os} fs={terminalFs} />
-						{/await}
-					{:else if w.id === 'stats'}
-						{#await getWindowComponent('stats')!() then mod}
-							{@const StatsWindow = (mod as LazyModule).default}
-							<StatsWindow
-								showCount={os.groups.filter((g) => g.active).length}
-								botCount={os.bots.length}
-							/>
-						{/await}
-					{:else if w.id === 'error'}
-						{#await getWindowComponent('error')!() then mod}
-							{@const ErrorDialog = (mod as LazyModule).default}
-							<ErrorDialog onclose={() => os.closeWindow('error')} />
-						{/await}
-					{:else if w.id === 'trash'}
-						{#await getWindowComponent('trash')!() then mod}
-							{@const FinderWindow = (mod as LazyModule).default}
-							<FinderWindow {os} fs={terminalFs} folderId={TRASH_ID} />
-						{/await}
-					{:else if w.id === 'vcr'}
-						{#await getWindowComponent('vcr')!() then mod}
-							{@const VCRWindow = (mod as LazyModule).default}
-							<VCRWindow />
-						{/await}
-					{:else if w.id === 'recorder'}
-						{#await getWindowComponent('recorder')!() then mod}
-							{@const RecorderWindow = (mod as LazyModule).default}
-							<RecorderWindow bind:recording={cameraRecording} fs={terminalFs} />
-						{/await}
-					{:else if w.id.startsWith('recorder-')}
-						{@const recFileId = w.id.replace('recorder-', '')}
-						{@const recText = terminalFs.readText(recFileId)}
-						{#if recText}
-							<div class="recording-playback">
-								<video src={recText} controls autoplay class="recording-video">
-									<track kind="captions" />
-								</video>
-							</div>
-						{:else}
-							<div class="window-content">
-								<p>Recording not found.</p>
-							</div>
-						{/if}
-					{:else if w.id.startsWith('sticky-')}
-						{@const noteId = w.id.replace('sticky-', '')}
-						{@const note = stickies.notes.find((n) => n.id === noteId)}
-						{#if note}
-							{#await getWindowComponent(w.id)!() then mod}
-								{@const StickiesNote = (mod as LazyModule).default}
-								<StickiesNote
-									{note}
-									ondelete={async (id: string) => {
-										await stickies.remove(id);
-										os.closeWindow(`sticky-${id}`);
-									}}
-									onupdate={(n: StickyNote) => stickies.update(n)}
-								/>
-							{/await}
-						{/if}
-					{:else if w.id === 'finder'}
-						{#await getWindowComponent('finder')!() then mod}
-							{@const FinderWindow = (mod as LazyModule).default}
-							<FinderWindow {os} fs={terminalFs} />
-						{/await}
+					{#if isFlatWindow(w.id)}
+						<!-- The single render path. Every window a manifest claims via
+						     windows[] renders through WindowHost, which resolves the component
+						     and context from matchWindow — the OS holds zero app-specific
+						     render branches. The {:else} arm is unreachable for any live id
+						     (matchWindow gates isFlatWindow); it only catches a stale/unknown
+						     saved id that slipped past the restore filter. -->
+						<WindowHost win={w} {os} fs={terminalFs} />
 					{:else}
 						<div class="window-content">
 							<p>Coming soon...</p>
@@ -685,7 +521,7 @@
 									</div>
 								{:else}
 									<div style="display: flex; gap: 8px; flex-wrap: wrap;">
-										{#each os.alertSpec.buttons || [{ label: 'OK', primary: true }] as b}
+										{#each os.alertSpec.buttons || [{ label: 'OK', primary: true }] as b (b.label)}
 											<button
 												class="btn {b.primary ? 'primary' : ''}"
 												onclick={() => {
@@ -883,20 +719,6 @@
 		to {
 			transform: scaleX(1);
 		}
-	}
-
-	/* Recording playback */
-	.recording-playback {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		background: var(--brand-color-ink, #000);
-	}
-	.recording-video {
-		width: 100%;
-		height: 100%;
-		object-fit: contain;
 	}
 
 	@media (max-width: 767px) {

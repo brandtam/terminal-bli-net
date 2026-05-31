@@ -1,18 +1,16 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import type { TerminalFS, FsFile } from '$lib/terminalos';
+	import type { FsFile } from '$lib/terminalos';
 	import { RECORDINGS_ID } from '$lib/terminalos';
+	import { getSystem } from '$lib/os/os-context';
+	import { recorderState } from './recorder-state.svelte';
 
-	let {
-		recording = $bindable(false),
-		fs
-	}: {
-		recording?: boolean;
-		fs: TerminalFS;
-	} = $props();
+	// Zero-prop: fs comes from the host context. The global "● REC" menu-bar badge
+	// is driven by recorderState (read through this app's statusExtra), set on
+	// start/stop/cleanup below — no bindable prop threaded through Desktop.
+	const { fs } = getSystem();
 
-	const MAX_DURATION = 10;
-	const MAX_RECORDINGS = 5;
+	const MAX_DURATION = 60;
 
 	let stream = $state<MediaStream | null>(null);
 	let recorder = $state<MediaRecorder | null>(null);
@@ -20,15 +18,34 @@
 	let elapsed = $state(0);
 	let recordings = $state<FsFile[]>([]);
 	let playbackUrl = $state<string | null>(null);
+	let playingId = $state<string | null>(null);
 	let error = $state<string | null>(null);
 	let videoEl: HTMLVideoElement | undefined = $state(undefined);
 	let playbackEl: HTMLVideoElement | undefined = $state(undefined);
 	let chunks: Blob[] = [];
 	let timerInterval: ReturnType<typeof setInterval> | null = null;
+	// Object URLs leak unless revoked. Track the live one so we can free it
+	// before replacing playbackUrl. Legacy data: URLs are not tracked here.
+	let currentObjectUrl: string | null = null;
 
-	$effect(() => {
-		recording = isRecording;
-	});
+	function setPlayback(url: string, id: string | null, isObjectUrl: boolean) {
+		if (currentObjectUrl) {
+			URL.revokeObjectURL(currentObjectUrl);
+			currentObjectUrl = null;
+		}
+		playbackUrl = url;
+		playingId = id;
+		if (isObjectUrl) currentObjectUrl = url;
+	}
+
+	function clearPlayback() {
+		if (currentObjectUrl) {
+			URL.revokeObjectURL(currentObjectUrl);
+			currentObjectUrl = null;
+		}
+		playbackUrl = null;
+		playingId = null;
+	}
 
 	function refreshRecordings() {
 		recordings = fs.findByApp('recorder', RECORDINGS_ID);
@@ -62,10 +79,6 @@
 
 	function startRecording() {
 		if (!stream) return;
-		if (recordings.length >= MAX_RECORDINGS) {
-			error = `Storage full — delete a recording first (max ${MAX_RECORDINGS}).`;
-			return;
-		}
 
 		chunks = [];
 		try {
@@ -83,39 +96,41 @@
 			if (e.data.size > 0) chunks.push(e.data);
 		};
 
-		recorder.onstop = () => {
+		recorder.onstop = async () => {
 			const blob = new Blob(chunks, { type: recorder?.mimeType || 'video/webm' });
-			const reader = new FileReader();
-			reader.onload = async () => {
-				const dataUrl = reader.result as string;
-				let clipNumber = recordings.length + 1;
-				let name = `Clip ${clipNumber} (${elapsed}s).webm`;
-				while (fs.exists(RECORDINGS_ID, name)) {
-					clipNumber++;
-					name = `Clip ${clipNumber} (${elapsed}s).webm`;
-				}
-				const result = await fs.createFile(RECORDINGS_ID, name, {
-					appId: 'recorder',
-					fileType: 'recording',
-					text: dataUrl
-				});
-				if (result.ok) {
-					refreshRecordings();
-					playbackUrl = dataUrl;
-				} else {
-					error =
-						result.error.code === 'duplicate_name'
-							? 'A recording with that name already exists.'
-							: 'Storage full — delete old recordings to free space.';
-				}
-			};
-			reader.readAsDataURL(blob);
+			const bytes = await blob.arrayBuffer();
+			let clipNumber = recordings.length + 1;
+			let name = `Clip ${clipNumber} (${elapsed}s).webm`;
+			while (fs.exists(RECORDINGS_ID, name)) {
+				clipNumber++;
+				name = `Clip ${clipNumber} (${elapsed}s).webm`;
+			}
+			const result = await fs.createBlobFile(RECORDINGS_ID, name, bytes, {
+				// Recorder is the creator; the system Player is the handler that
+				// opens the clip — so it stays playable even if Recorder (a store
+				// app) is uninstalled. The Player itself lands in the next slice.
+				appId: 'recorder',
+				opensWith: 'player',
+				fileType: 'recording',
+				contentType: blob.type
+			});
+			if (result.ok) {
+				refreshRecordings();
+				// Reuse the blob we already have rather than reading back from disk.
+				setPlayback(URL.createObjectURL(blob), result.value.id, true);
+			} else {
+				error =
+					result.error.code === 'duplicate_name'
+						? 'A recording with that name already exists.'
+						: 'Storage full — delete old recordings to free space.';
+			}
 		};
 
 		recorder.start(100);
 		isRecording = true;
+		recorderState.recording = true;
 		elapsed = 0;
-		playbackUrl = null;
+		clearPlayback();
 
 		timerInterval = setInterval(() => {
 			elapsed++;
@@ -130,6 +145,9 @@
 			recorder.stop();
 		}
 		isRecording = false;
+		// Clear the menu-bar badge. cleanup() calls stopRecording(), so closing the
+		// window mid-record clears REC too — no separate effect needed.
+		recorderState.recording = false;
 		if (timerInterval) {
 			clearInterval(timerInterval);
 			timerInterval = null;
@@ -139,21 +157,36 @@
 	async function removeRecording(id: string) {
 		await fs.deleteNode(id);
 		refreshRecordings();
-		if (playbackUrl && recordings.every((r) => getFileText(r) !== playbackUrl)) {
-			playbackUrl = null;
+		if (playingId === id) {
+			clearPlayback();
 		}
 	}
 
-	function getFileText(file: FsFile): string {
-		return file.bodyRef?.kind === 'inline-text' ? file.bodyRef.text : '';
-	}
-
-	function playRecording(rec: FsFile) {
-		playbackUrl = getFileText(rec);
+	async function playRecording(rec: FsFile) {
+		if (rec.bodyRef?.kind === 'inline-text') {
+			// Legacy base64 data URL — plays as-is.
+			setPlayback(rec.bodyRef.text, rec.id, false);
+			return;
+		}
+		if (rec.bodyRef?.kind === 'indexeddb-blob') {
+			const res = await fs.readBody(rec.bodyRef.bodyId);
+			if (res.ok) {
+				const blob = new Blob([res.value], {
+					type: rec.bodyRef.contentType || 'video/webm'
+				});
+				setPlayback(URL.createObjectURL(blob), rec.id, true);
+			} else {
+				error = 'This recording data is missing and cannot be played.';
+			}
+		}
 	}
 
 	function cleanup() {
 		stopRecording();
+		if (currentObjectUrl) {
+			URL.revokeObjectURL(currentObjectUrl);
+			currentObjectUrl = null;
+		}
 		if (stream) {
 			stream.getTracks().forEach((t) => t.stop());
 			stream = null;
@@ -215,7 +248,7 @@
 
 	{#if recordings.length > 0}
 		<div class="recordings-list">
-			<div class="list-header">SAVED ({recordings.length}/{MAX_RECORDINGS})</div>
+			<div class="list-header">SAVED ({recordings.length})</div>
 			{#each recordings as rec (rec.id)}
 				<div class="rec-item">
 					<button class="rec-item-play" onclick={() => playRecording(rec)}>

@@ -18,12 +18,15 @@ import {
 import { getAppWindowId } from '$lib/terminalos/apps/app-install';
 import { getAppDef } from '$lib/terminalos/apps/app-library';
 import {
-	synthKnownWindowIds,
-	synthWindowDefs,
 	synthAboutWindowId,
-	synthPrefsWindowId
+	synthPrefsWindowId,
+	matchWindow
 } from '$lib/terminalos/apps/app-catalog';
-import type { TerminalFS } from '$lib/terminalos';
+import { resolveOpenTarget } from './window-host';
+import type { TerminalFS, FsFile } from '$lib/terminalos';
+
+const RESTORE_RECOVERY_HINT =
+	'Your current disk should be unchanged. Try the restore again from the same backup file. If Terminal OS will not boot cleanly after a crash or tab kill, reinstall or clear Terminal OS site data, then restore from the backup file again.';
 
 export class OsApiClass implements OsApi {
 	// ── Reactive state ────────────────────────────────────────────────────
@@ -58,11 +61,6 @@ export class OsApiClass implements OsApi {
 	// ── Dock alias map ────────────────────────────────────────────────────
 	private DOCK_ALIASES: Record<string, () => void> = {};
 
-	// ── Known window IDs ──────────────────────────────────────────────────
-	// Synthesized from the per-app manifests (see manifests.ts /
-	// app-catalog.ts). Byte-identical to the hand-authored set this replaced.
-	private static KNOWN_WINDOW_IDS = synthKnownWindowIds();
-
 	constructor(fs: TerminalFS) {
 		this.fs = fs;
 	}
@@ -92,8 +90,12 @@ export class OsApiClass implements OsApi {
 			// API failure is non-fatal — the OS runs without guide data
 		}
 
-		// Restore windows or show welcome (filter out uninstalled store apps)
+		// Restore windows or show welcome. Two filters: drop ids that no longer
+		// resolve to any window (e.g. a `chat-<slug>` layout saved before the
+		// `chat:` separator cutover — now unknown, so it would otherwise restore
+		// into a dead "Coming soon" window), then drop uninstalled store apps.
 		const saved = loadWindows().filter((w) => {
+			if (!this.isKnownWindowId(w.id)) return false;
 			const wAppId = windowAppId(w.id);
 			const def = getAppDef(wAppId);
 			return !def || def.isSystem || this.fs.isAppInstalledSync(wAppId);
@@ -280,40 +282,36 @@ export class OsApiClass implements OsApi {
 	// ── Window definition lookup ──────────────────────────────────────────
 
 	getWindowDef(id: string): { title: string; w: number; h: number; minW?: number; minH?: number } {
-		// Static window defs are synthesized from the per-app manifests (see
-		// manifests.ts / app-catalog.ts), including the vcr device-sizing.
-		// The minted-prefix windows below stay dynamic.
-		const defs = synthWindowDefs();
-
-		if (id.startsWith('chat-')) {
-			const showSlug = id.replace('chat-', '');
-			const group = this.groups.find((g) => g.slug === showSlug);
-			return { title: group ? `chatrbot - ${group.name}` : 'Chat', w: 440, h: 560 };
+		// Every window resolves through matchWindow now — title/size are pure
+		// functions of (parsed args, fs) on the matched WindowSpec (the vcr deck's
+		// device-sizing reads the vcrPrefs module store inside its size()). An id no
+		// manifest claims (a stale/unknown saved id) gets the generic fallback.
+		const matched = matchWindow(id);
+		if (matched) {
+			const ctx = { args: matched.args, fs: this.fs };
+			return { title: matched.spec.title(ctx), ...matched.spec.size(ctx) };
 		}
-		if (id.startsWith('textedit-')) {
-			const fileId = id.replace('textedit-', '');
-			const node = this.fs.peekNode(fileId);
-			return { title: node?.name || 'Untitled.txt', w: 420, h: 400 };
-		}
-		if (id.startsWith('sticky-')) {
-			return { title: 'Stickies', w: 240, h: 220 };
-		}
-		if (id.startsWith('recorder-')) {
-			const fileId = id.replace('recorder-', '');
-			const node = this.fs.peekNode(fileId);
-			return { title: node?.name || 'Recording', w: 360, h: 340 };
-		}
-		return defs[id] || { title: 'Unknown', w: 380, h: 320 };
+		return { title: 'Unknown', w: 380, h: 320 };
 	}
 
 	isKnownWindowId(id: string): boolean {
-		return (
-			OsApiClass.KNOWN_WINDOW_IDS.has(id) ||
-			id.startsWith('chat-') ||
-			id.startsWith('sticky-') ||
-			id.startsWith('textedit-') ||
-			id.startsWith('recorder-')
-		);
+		// A window-id is known iff a manifest claims it via windows[] — matchWindow
+		// is the single gate. Fixed, prefix (chat:, textedit:, sticky:, player:,
+		// about:) and the system chrome (welcome, about, terminal-prefs) all resolve
+		// here. A stale `-`-separated id (chat-<slug>, sticky-<id>) or a legacy
+		// about-<id> / recorder-<id> from before the flat cutover is *unknown* and
+		// drops on restore (see init()'s saved-window filter); those clips reopen in
+		// the Player by content-type anyway.
+		return matchWindow(id) !== null;
+	}
+
+	/**
+	 * Open a document in its handler window — the single open rule. Routing lives
+	 * in resolveOpenTarget (opensWith → content-type → fileType), so the OS never
+	 * switches on a specific app. A recording opens in the system Player this way.
+	 */
+	openDocument(file: FsFile): void {
+		this.openWindow(resolveOpenTarget(file));
 	}
 
 	// ── Alert system ──────────────────────────────────────────────────────
@@ -444,7 +442,7 @@ export class OsApiClass implements OsApi {
 			});
 			return;
 		}
-		this.openWindow(`chat-${group.slug}`);
+		this.openWindow(`chat:${group.slug}`);
 	}
 
 	// ── System actions ────────────────────────────────────────────────────
@@ -544,31 +542,40 @@ export class OsApiClass implements OsApi {
 								label: 'Restore',
 								primary: true,
 								action: () => {
-									this.fs.restoreBackup(data).then((r) => {
-										if (r.ok) {
-											const prefs = r.value.preferences;
-											if (prefs) {
-												if (prefs.tweaks !== undefined) saveTweaks(prefs.tweaks);
-												if (prefs.timezone != null) saveTimezone(prefs.timezone);
-												if (prefs.conversations !== undefined)
-													saveConversations(prefs.conversations);
-												if (prefs.windows !== undefined) {
-													// Set reactive state so the $effect's next
-													// debounce-save writes the restored windows,
-													// not the current session's stale layout.
-													this.windows = prefs.windows;
-													saveWindows(prefs.windows);
+									this.fs
+										.restoreBackup(data)
+										.then((r) => {
+											if (r.ok) {
+												const prefs = r.value.preferences;
+												if (prefs) {
+													if (prefs.tweaks !== undefined) saveTweaks(prefs.tweaks);
+													if (prefs.timezone != null) saveTimezone(prefs.timezone);
+													if (prefs.conversations !== undefined)
+														saveConversations(prefs.conversations);
+													if (prefs.windows !== undefined) {
+														// Set reactive state so the $effect's next
+														// debounce-save writes the restored windows,
+														// not the current session's stale layout.
+														this.windows = prefs.windows;
+														saveWindows(prefs.windows);
+													}
 												}
+												window.location.reload();
+											} else {
+												this.showAlert({
+													title: 'Restore Failed',
+													body: `${r.error.message}\n\n${RESTORE_RECOVERY_HINT}`,
+													buttons: [{ label: 'OK', primary: true }]
+												});
 											}
-											window.location.reload();
-										} else {
+										})
+										.catch((e) => {
 											this.showAlert({
 												title: 'Restore Failed',
-												body: r.error.message,
+												body: `${e instanceof Error ? e.message : 'Restore failed unexpectedly.'}\n\n${RESTORE_RECOVERY_HINT}`,
 												buttons: [{ label: 'OK', primary: true }]
 											});
-										}
-									});
+										});
 								}
 							}
 						]
@@ -615,7 +622,7 @@ export class OsApiClass implements OsApi {
 	}
 
 	get activeChatGroupSlug(): string | null {
-		if (!this.activeId?.startsWith('chat-')) return null;
-		return this.activeId.replace('chat-', '');
+		if (!this.activeId?.startsWith('chat:')) return null;
+		return this.activeId.replace('chat:', '');
 	}
 }

@@ -5,7 +5,8 @@ import {
 	getSlotIndex,
 	getCurrentSlot,
 	isShowOnAir,
-	getEpisodePremise
+	getEpisodePremise,
+	minutesUntilSlotEnd
 } from './schedule';
 import type { Channel, Show } from './types';
 
@@ -14,6 +15,23 @@ function makeDate(dayOfWeek: number, hour: number, minute: number): Date {
 	const d = new Date(2026, 0, 4 + dayOfWeek, hour, minute, 0, 0);
 	return d;
 }
+
+describe('minutesUntilSlotEnd', () => {
+	it('counts down to the next 30-minute boundary in browser-local time', () => {
+		expect(minutesUntilSlotEnd(makeDate(0, 10, 0))).toBe(30); // exactly on a boundary
+		expect(minutesUntilSlotEnd(makeDate(0, 10, 17))).toBe(13);
+		expect(minutesUntilSlotEnd(makeDate(0, 10, 45))).toBe(15);
+	});
+
+	it('measures the minute in the schedule timezone, not browser-local', () => {
+		// 10:00 UTC is a slot boundary in UTC (30 min left) but reads :45 past the
+		// hour in Kathmandu (UTC+5:45) → only 15 min left. A getMinutes() calc
+		// would report the wrong countdown for fractional-offset timezones.
+		const atUtcBoundary = new Date('2026-01-04T10:00:00Z');
+		expect(minutesUntilSlotEnd(atUtcBoundary, 'UTC')).toBe(30);
+		expect(minutesUntilSlotEnd(atUtcBoundary, 'Asia/Kathmandu')).toBe(15);
+	});
+});
 
 describe('formatTimeUntil', () => {
 	it('formats minutes only', () => {

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { StickyNote } from './types';
+	import { getSystem } from '$lib/os/os-context';
+	import { stickyFromFile, updateSticky, deleteStickyNote } from './stickies-manager.svelte';
 
 	const COLORS: { label: string; bg: string }[] = [
 		{ label: 'Yellow', bg: '#f9bd2b' },
@@ -9,32 +10,42 @@
 		{ label: 'Orange', bg: '#f54e00' }
 	];
 
-	let {
-		note,
-		ondelete,
-		onupdate
-	}: {
-		note: StickyNote;
-		ondelete: (id: string) => void;
-		onupdate: (note: StickyNote) => void;
-	} = $props();
+	// Zero-prop: the host gives us fs + this window's handle. The note id is the
+	// arg the matcher parsed from `sticky:<noteId>`. The file is the source of
+	// truth — read it once for the initial values.
+	const { fs, win } = getSystem();
+	const noteId = win.args.noteId;
 
-	let bodyText = $state('');
-	let titleText = $state('');
+	const initial = stickyFromFile(fs.peekNode(noteId));
+	// There is no UI to edit the title (only the body textarea), so it is read
+	// once and written back unchanged to preserve it across saves.
+	const title = initial.title;
+	let bodyText = $state(initial.body);
+	let color = $state(initial.color);
 	let dirty = $state(false);
 
 	function getColorDef(hex: string) {
 		return COLORS.find((c) => c.bg === hex) || COLORS[0];
 	}
 
+	// COLOR is document-driven: the Color menu writes the file; reflect external
+	// changes here. fs.watch is a global watcher (fires on any fs change); re-read
+	// just this note's color. We do NOT re-read body — the window owns it while
+	// open, so its own debounced writes never clobber in-progress typing.
+	$effect(() => {
+		const off = fs.watch(() => {
+			color = stickyFromFile(fs.peekNode(noteId)).color;
+		});
+		return off;
+	});
+
 	function flushSave() {
-		onupdate({ ...note, title: titleText, body: bodyText });
+		updateSticky(fs, { id: noteId, title, body: bodyText, color });
 		dirty = false;
 	}
 
 	$effect(() => {
 		if (!dirty) return;
-		const _t = titleText;
 		const _b = bodyText;
 		const tid = setTimeout(() => flushSave(), 300);
 		return () => {
@@ -53,17 +64,17 @@
 		dirty = true;
 	}
 
-	$effect(() => {
-		bodyText = note.body;
-		titleText = note.title;
-	});
+	async function handleDelete() {
+		await deleteStickyNote(fs, noteId);
+		win.close();
+	}
 
-	const colorDef = $derived(getColorDef(note.color));
+	const colorDef = $derived(getColorDef(color));
 </script>
 
 <div class="sticky-note" style:--note-bg={colorDef.bg}>
 	<div class="sticky-drag-strip" data-drag-handle>
-		<button class="sticky-close" onclick={() => ondelete(note.id)} title="Delete note"></button>
+		<button class="sticky-close" onclick={handleDelete} title="Delete note"></button>
 	</div>
 	<textarea class="sticky-body" value={bodyText} oninput={handleBodyInput} placeholder="type here…"
 	></textarea>

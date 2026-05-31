@@ -45,6 +45,15 @@ export type FsError = {
 	details?: unknown;
 };
 
+export type BodyGcReport = {
+	stored: number;
+	reachable: number;
+	unreachable: number;
+	deleted: number;
+	failed: number;
+	failedBodyIds: BodyId[];
+};
+
 export type TerminalVolume = {
 	id: VolumeId;
 	name: string;

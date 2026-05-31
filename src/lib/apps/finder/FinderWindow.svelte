@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import type { OsApi } from '$lib/os/os-api';
 	import {
-		type TerminalFS,
 		ROOT_ID,
 		TRASH_ID,
 		SYSTEM_ID,
@@ -12,25 +10,20 @@
 		createFolderView
 	} from '$lib/terminalos';
 	import type { FsNode, FsFile, FsAlias } from '$lib/terminalos';
+	import { getSystem } from '$lib/os/os-context';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import { getAppDef } from '$lib/terminalos/apps/app-library';
 	import { isInstalled } from '$lib/terminalos/apps/software-shop';
 
-	let {
-		folderId = ROOT_ID,
-		os,
-		fs
-	}: {
-		folderId?: string;
-		os: OsApi;
-		fs: TerminalFS;
-	} = $props();
+	// Zero-prop: os/fs come from the host context. The starting folder is an
+	// explicit static arg on the matched window (finder → ROOT_ID, trash → TRASH_ID)
+	// — no default and no per-id branch. ROOT_ID/TRASH_ID stay imported for the
+	// navigation comparisons below (e.g. inTrash), just not as a prop fallback.
+	const { os, fs, win } = getSystem();
+	const folderId = win.args.folder;
 
-	function initialFolder() {
-		return folderId;
-	}
-	let currentFolderId = $state(initialFolder());
+	let currentFolderId = $state(folderId);
 	let selectedId = $state<string | null>(null);
 
 	let folderView = $state<ReturnType<typeof createFolderView> | null>(null);
@@ -102,11 +95,17 @@
 
 	function openDocFile(file: FsFile) {
 		if (file.appId === 'textedit') {
-			os.openWindow(`textedit-${file.id}`);
+			os.openWindow(`textedit:${file.id}`);
 		} else if (file.appId === 'recorder') {
-			os.openWindow(`recorder-${file.id}`);
+			// Route through the single document-open rule: a recording is tagged
+			// opensWith:'player', so it opens in the system Player (which reads the
+			// blob via readBody) instead of the old inline branch that called
+			// readText() and showed "Recording not found." for blob bodies.
+			os.openDocument(file);
 		} else if (file.appId === 'stickies') {
-			os.launchApp('stickies', { action: 'new' });
+			// Open THIS note (the file id is the note id), not a new blank one — the
+			// flat sticky:<noteId> window is a live view of its own file.
+			os.openWindow(`sticky:${file.id}`);
 		}
 	}
 
@@ -126,6 +125,20 @@
 		if (!appId) {
 			os.openWindow(file.id);
 			return;
+		}
+
+		// A document whose handler is a SYSTEM app (e.g. a recording tagged
+		// opensWith:'player') opens through the single open rule regardless of
+		// whether its *creator* app is installed — the handler is always present.
+		// Gate on the handler, not the creator. Only when the creator IS the
+		// handler (textedit, stickies → opensWith === appId) does the
+		// install gate below still apply.
+		if (file.opensWith && file.opensWith !== appId) {
+			const handler = getAppDef(file.opensWith);
+			if (handler?.isSystem) {
+				os.openDocument(file);
+				return;
+			}
 		}
 
 		// For document-type files, check if the owning app is still installed
@@ -153,14 +166,6 @@
 			}
 		}
 
-		if (appId === 'system-prefs') {
-			os.openSystemPreferences();
-			return;
-		}
-		if (appId === 'about-terminal') {
-			os.openAbout(null);
-			return;
-		}
 		// Generic: look up window ID from AppLibrary
 		const windowId = getAppWindowId(appId);
 		if (windowId) {
@@ -178,19 +183,33 @@
 	let contextMenuNode = $state<FsNode | null>(null);
 	let contextMenuX = $state(0);
 	let contextMenuY = $state(0);
-	let contextMenuEl = $state<HTMLDivElement | null>(null);
+
+	// Position the menu at {x, y} and nudge it back inside the viewport if it
+	// would overflow. A Svelte action (not bind:this + a hand-rolled rAF) — same
+	// approach as DesktopContextMenu. Runs once the menu element is mounted.
+	function clampToViewport(el: HTMLElement, pos: { x: number; y: number }) {
+		function adjust(px: number, py: number) {
+			el.style.left = `${px}px`;
+			el.style.top = `${py}px`;
+			requestAnimationFrame(() => {
+				const rect = el.getBoundingClientRect();
+				if (rect.right > window.innerWidth) el.style.left = `${px - rect.width}px`;
+				if (rect.bottom > window.innerHeight) el.style.top = `${py - rect.height}px`;
+			});
+		}
+		adjust(pos.x, pos.y);
+		return {
+			update(newPos: { x: number; y: number }) {
+				adjust(newPos.x, newPos.y);
+			}
+		};
+	}
 
 	function handleContextMenu(e: MouseEvent, node: FsNode) {
 		e.preventDefault();
 		contextMenuNode = node;
 		contextMenuX = e.clientX;
 		contextMenuY = e.clientY;
-		requestAnimationFrame(() => {
-			if (!contextMenuEl) return;
-			const rect = contextMenuEl.getBoundingClientRect();
-			if (rect.right > window.innerWidth) contextMenuX = e.clientX - rect.width;
-			if (rect.bottom > window.innerHeight) contextMenuY = e.clientY - rect.height;
-		});
 	}
 
 	function closeContextMenu() {
@@ -242,7 +261,7 @@
 
 <div class="finder">
 	<div class="finder-path">
-		{#each pathSegments as seg, i}
+		{#each pathSegments as seg, i (seg.id)}
 			{#if i > 0}<span class="path-sep">&#x25B8;</span>{/if}
 			<button class="path-crumb" onclick={() => navigateTo(seg.id)}>
 				{seg.name}
@@ -280,8 +299,7 @@
 			class="context-menu"
 			role="menu"
 			tabindex="-1"
-			bind:this={contextMenuEl}
-			style="left: {contextMenuX}px; top: {contextMenuY}px;"
+			use:clampToViewport={{ x: contextMenuX, y: contextMenuY }}
 			onclick={(e) => e.stopPropagation()}
 			onkeydown={(e) => {
 				if (e.key === 'Escape') closeContextMenu();

@@ -13,6 +13,28 @@ export function formatTimeUntil(minutes: number): string {
 	return `${h}h ${m}m`;
 }
 
+/**
+ * Minutes left in the current 30-minute slot (1–30), measured in the schedule's
+ * timezone so a chat countdown stays aligned with the slot grid even when the
+ * viewer's browser is in a different — possibly fractional-offset — timezone.
+ * Reads the minute the same tz-aware way getSlotIndex does, not getMinutes().
+ */
+export function minutesUntilSlotEnd(now: Date, timezone?: string): number {
+	let minute: number;
+	if (timezone) {
+		const opts: Intl.DateTimeFormatOptions = {
+			minute: '2-digit',
+			hour12: false,
+			timeZone: timezone
+		};
+		const parts = new Intl.DateTimeFormat('en-US', opts).formatToParts(now);
+		minute = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0');
+	} else {
+		minute = now.getMinutes();
+	}
+	return 30 - (minute % 30);
+}
+
 export function formatSlotTime(start: string, duration: number): string {
 	const { hours: sh, minutes: sm } = parseTime(start);
 	const endTotal = sh * 60 + sm + duration;

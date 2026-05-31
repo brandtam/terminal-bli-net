@@ -1,5 +1,5 @@
 import type { AppDef } from './os-api';
-import { synthApps, synthWindowComponent } from '$lib/terminalos/apps/app-catalog';
+import { synthApps } from '$lib/terminalos/apps/app-catalog';
 
 /**
  * The app registry — menus, About content, and Preferences per app.
@@ -9,10 +9,3 @@ import { synthApps, synthWindowComponent } from '$lib/terminalos/apps/app-catalo
  * hand-authored map did.
  */
 export const APPS: Record<string, AppDef> = synthApps();
-
-/**
- * Resolves a window-id to its lazy component loader (or undefined for windows
- * Desktop renders with bespoke markup). Desktop awaits the loader so each app's
- * chunk is fetched only when its window opens.
- */
-export { synthWindowComponent as getWindowComponent };

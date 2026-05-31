@@ -24,8 +24,7 @@ describe('getShopCatalog', () => {
 		const ids = catalog.map((item) => item.app.id);
 		expect(ids).not.toContain('finder');
 		expect(ids).not.toContain('trash');
-		expect(ids).not.toContain('system-prefs');
-		expect(ids).not.toContain('about-terminal');
+		expect(ids).not.toContain('system');
 		expect(ids).not.toContain('software-shop');
 		expect(ids).not.toContain('computer-store');
 		expect(ids).not.toContain('textedit');

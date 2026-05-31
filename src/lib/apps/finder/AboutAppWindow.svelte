@@ -1,29 +1,40 @@
 <script lang="ts">
-	import type { AboutSpec } from '$lib/os/os-api';
+	import { getSystem } from '$lib/os/os-context';
+	import { APPS } from '$lib/os/app-registry';
 
-	let { about }: { about: AboutSpec } = $props();
+	// Window components take no props. This shared component renders the per-app
+	// About box for whichever app the window-id names: openAbout('vcr') opens
+	// 'about:vcr', and the matcher parses that into win.args.appId === 'vcr'. The
+	// AboutSpec comes from the app registry (APPS[id].about), so one component
+	// serves every app's About dialog.
+	const { win } = getSystem();
+	const about = $derived(APPS[win.args.appId ?? '']?.about ?? null);
 </script>
 
-<div class="about-app">
-	<div class="header">
-		<div
-			class="icon"
-			style:background={about.glyphBg}
-			style:color={about.glyphFg || 'var(--ink)'}
-			style:font-size="{about.glyph.length > 2 ? 14 : 20}px"
-		>
-			{about.glyph}
+{#if about}
+	<div class="about-app">
+		<div class="header">
+			<div
+				class="icon"
+				style:background={about.glyphBg}
+				style:color={about.glyphFg || 'var(--ink)'}
+				style:font-size="{about.glyph.length > 2 ? 14 : 20}px"
+			>
+				{about.glyph}
+			</div>
+			<div>
+				<div class="title">{about.title}</div>
+				<div class="version">{about.version} · {about.tagline}</div>
+			</div>
 		</div>
-		<div>
-			<div class="title">{about.title}</div>
-			<div class="version">{about.version} · {about.tagline}</div>
-		</div>
+		{#each about.sections as section (section.h)}
+			<h3>{section.h}</h3>
+			<p>{section.body}</p>
+		{/each}
 	</div>
-	{#each about.sections as section}
-		<h3>{section.h}</h3>
-		<p>{section.body}</p>
-	{/each}
-</div>
+{:else}
+	<div class="about-app"><p>No information available.</p></div>
+{/if}
 
 <style>
 	.about-app {

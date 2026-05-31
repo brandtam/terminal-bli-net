@@ -1,4 +1,5 @@
 import type { WindowState, TweaksState, GroupMeta } from '$lib/types';
+import type { FsFile } from '$lib/terminalos';
 import { synthWindowAppMap, synthWindowAppId } from '$lib/terminalos/apps/app-catalog';
 
 export interface AboutSection {
@@ -93,6 +94,7 @@ export interface OsApi {
 	closeWindow: (windowId: string) => void;
 	focusWindow: (windowId: string) => void;
 	openWindow: (windowId: string) => void;
+	openDocument: (file: FsFile) => void;
 
 	openSystemPreferences: () => void;
 	openPreferences: (appId: string) => void;

@@ -13,3 +13,6 @@ vite.config.ts.timestamp-*
 .dev.vars
 /test-results
 bundle-stats.html
+
+# Claude Code scheduled-tasks runtime lock (not project state)
+scheduled_tasks.lock

@@ -1,16 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { TerminalFS, DOCUMENTS_ID, APPLICATIONS_ID, ROOT_ID } from './terminal-fs';
 import { validateBackup, previewBackup, validateDiskForExport } from './backup';
-import type { BackupPreferences } from './backup';
+import type { BackupPreferences, BackupFileV3 } from './backup';
+import type { BodyEntry } from './storage/storage-types';
+import { InMemoryBodyStore, InMemoryManifestStore } from './storage/storage-types';
+
+class FailingReplaceBodyStore extends InMemoryBodyStore {
+	async replaceAll(_entries: AsyncIterable<BodyEntry>) {
+		return {
+			ok: false as const,
+			error: { code: 'quota_exceeded' as const, message: 'No space for replacement bodies' }
+		};
+	}
+}
 
 describe('exportBackup', () => {
-	it('produces a valid v2 backup file', async () => {
+	it('produces a valid v3 backup file', async () => {
 		const fs = TerminalFS.createCleanDisk();
 		const result = await fs.exportBackup();
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.value.format).toBe('terminal-hd');
-			expect(result.value.version).toBe(2);
+			expect(result.value.version).toBe(3);
 			expect(result.value.disk.name).toBe('Terminal HD');
 			expect(result.value.nodes.length).toBeGreaterThan(0);
 		}
@@ -36,15 +47,18 @@ describe('exportBackup', () => {
 		}
 	});
 
-	it('backup includes inline text bodies', async () => {
+	it('inline text rides in nodes, not the bodies dict', async () => {
 		const fs = TerminalFS.createCleanDisk();
 		const result = await fs.exportBackup();
 		if (result.ok) {
+			// Inline-text files still survive — their text is inside the node.
 			const textFiles = result.value.nodes.filter(
 				(n) => n.kind === 'file' && n.bodyRef?.kind === 'inline-text'
 			);
 			expect(textFiles.length).toBeGreaterThan(0);
-			expect(Object.keys(result.value.bodies).length).toBeGreaterThan(0);
+			// In v3, bodies is the blob store (bodyId → base64), not inline text.
+			// A clean disk has no blobs, so it's empty.
+			expect(Object.keys(result.value.bodies).length).toBe(0);
 		}
 	});
 
@@ -100,6 +114,115 @@ describe('exportBackup', () => {
 		if (result.ok) {
 			expect(result.value.preferences).toBeUndefined();
 		}
+	});
+});
+
+describe('blob body round-trip', () => {
+	it('export captures blob bytes as base64 keyed by bodyId', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		const bytes = new TextEncoder().encode('binary clip').buffer as ArrayBuffer;
+		const bodyId = 'body_test_1';
+		await fs.writeBody(bodyId, bytes);
+
+		// No public API to make a blob-backed file yet (later phase), so attach
+		// the ref directly to the live node.
+		const created = await fs.createFile(DOCUMENTS_ID, 'clip.webm', { fileType: 'recording' });
+		if (!created.ok) throw new Error('createFile failed');
+		const node = fs.getAllNodes().get(created.value.id);
+		if (!node || node.kind !== 'file') throw new Error('node missing');
+		node.bodyRef = { kind: 'indexeddb-blob', bodyId, size: bytes.byteLength };
+
+		const result = await fs.exportBackup();
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.version).toBe(3);
+			expect(typeof result.value.bodies[bodyId]).toBe('string');
+			expect(result.value.bodies[bodyId].length).toBeGreaterThan(0);
+		}
+	});
+
+	it('round-trip restores blob bytes into a fresh disk', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		const bytes = new TextEncoder().encode('binary clip').buffer as ArrayBuffer;
+		const bodyId = 'body_test_1';
+		await fs.writeBody(bodyId, bytes);
+
+		const created = await fs.createFile(DOCUMENTS_ID, 'clip.webm', { fileType: 'recording' });
+		if (!created.ok) throw new Error('createFile failed');
+		const node = fs.getAllNodes().get(created.value.id);
+		if (!node || node.kind !== 'file') throw new Error('node missing');
+		node.bodyRef = { kind: 'indexeddb-blob', bodyId, size: bytes.byteLength };
+
+		const exported = await fs.exportBackup();
+		if (!exported.ok) throw new Error('export failed');
+
+		const fresh = TerminalFS.createCleanDisk();
+		const restored = await fresh.restoreBackup(exported.value);
+		expect(restored.ok).toBe(true);
+
+		const read = await fresh.readBody(bodyId);
+		expect(read.ok).toBe(true);
+		if (read.ok) {
+			expect(new TextDecoder().decode(read.value)).toBe('binary clip');
+		}
+
+		const restoredNode = fresh.getAllNodes().get(created.value.id);
+		expect(restoredNode?.kind).toBe('file');
+		if (restoredNode?.kind === 'file') {
+			expect(restoredNode.bodyRef?.kind).toBe('indexeddb-blob');
+		}
+	});
+
+	it('restore fails loud when a referenced body is missing', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		const fileNode = {
+			id: 'node_dangling',
+			volumeId: 'volume_terminal_hd',
+			kind: 'file' as const,
+			parentId: DOCUMENTS_ID,
+			name: 'dangling.webm',
+			fileType: 'recording' as const,
+			bodyRef: { kind: 'indexeddb-blob' as const, bodyId: 'body_missing', size: 10 },
+			createdAt: 1,
+			updatedAt: 1
+		};
+		const backup: BackupFileV3 = {
+			format: 'terminal-hd',
+			version: 3,
+			exportedAt: new Date().toISOString(),
+			disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
+			nodes: [...Array.from(fs.getAllNodes().values()).filter((n) => !n.flags?.hidden), fileNode],
+			bodies: {}
+		};
+
+		const result = await fs.restoreBackup(backup);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('invalid_backup');
+		}
+	});
+
+	it('restoring an older v1/v2 backup clears pre-existing blob bodies', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		// A blob written under the current (v3) world.
+		const bodyId = 'body_stale';
+		await fs.writeBody(bodyId, new TextEncoder().encode('stale clip').buffer as ArrayBuffer);
+		expect((await fs.readBody(bodyId)).ok).toBe(true);
+
+		// Restore a v2 backup — predates blobs, references none. Restore is a full
+		// disk replacement, so the stale blob must not survive.
+		const v2Backup = {
+			format: 'terminal-hd' as const,
+			version: 2 as const,
+			exportedAt: new Date().toISOString(),
+			disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
+			nodes: Array.from(fs.getAllNodes().values()).filter((n) => !n.flags?.hidden),
+			bodies: {} as Record<string, string>
+		};
+
+		const result = await fs.restoreBackup(v2Backup);
+		expect(result.ok).toBe(true);
+		expect((await fs.readBody(bodyId)).ok).toBe(false);
 	});
 });
 
@@ -172,10 +295,22 @@ describe('validateBackup', () => {
 		expect(result.ok).toBe(false);
 	});
 
-	it('rejects version 3 (future)', () => {
+	it('accepts version 3 backups', () => {
 		const result = validateBackup({
 			format: 'terminal-hd',
 			version: 3,
+			exportedAt: '2025-01-01T00:00:00.000Z',
+			disk: { id: 'v', name: 'V', ownedApps: ['tvguide'] },
+			nodes: [],
+			bodies: { body_x: 'YmluYXJ5' }
+		});
+		expect(result.ok).toBe(true);
+	});
+
+	it('rejects version 4 (future)', () => {
+		const result = validateBackup({
+			format: 'terminal-hd',
+			version: 4,
 			exportedAt: '',
 			disk: { id: '', name: '' },
 			nodes: [],
@@ -279,6 +414,95 @@ describe('restoreBackup', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error.code).toBe('invalid_backup');
+		}
+	});
+
+	it('leaves the current disk unchanged when a backup body is not valid base64', async () => {
+		const manifest = new InMemoryManifestStore();
+		const bodies = new InMemoryBodyStore();
+		const fs = TerminalFS.createCleanDisk(manifest, bodies);
+		await fs.createTextFile(DOCUMENTS_ID, 'keep.txt', 'keep');
+		await fs.writeBody('body_keep', new TextEncoder().encode('old clip').buffer as ArrayBuffer);
+
+		const source = TerminalFS.createCleanDisk();
+		const badFile = {
+			id: 'node_bad_body',
+			volumeId: 'volume_terminal_hd',
+			kind: 'file' as const,
+			parentId: DOCUMENTS_ID,
+			name: 'bad.webm',
+			fileType: 'recording' as const,
+			bodyRef: { kind: 'indexeddb-blob' as const, bodyId: 'body_bad', size: 10 },
+			createdAt: 1,
+			updatedAt: 1
+		};
+		const backup: BackupFileV3 = {
+			format: 'terminal-hd',
+			version: 3,
+			exportedAt: new Date().toISOString(),
+			disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
+			nodes: [
+				...Array.from(source.getAllNodes().values()).filter((n) => !n.flags?.hidden),
+				badFile
+			],
+			bodies: { body_bad: 'not valid base64!' }
+		};
+
+		const result = await fs.restoreBackup(backup);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('invalid_backup');
+		}
+
+		const docs = await fs.listFolder(DOCUMENTS_ID);
+		expect(docs.ok).toBe(true);
+		if (docs.ok) {
+			expect(docs.value.some((n) => n.name === 'keep.txt')).toBe(true);
+			expect(docs.value.some((n) => n.name === 'bad.webm')).toBe(false);
+		}
+
+		const oldBody = await fs.readBody('body_keep');
+		expect(oldBody.ok).toBe(true);
+		if (oldBody.ok) {
+			expect(new TextDecoder().decode(oldBody.value)).toBe('old clip');
+		}
+
+		const reopened = await TerminalFS.open(manifest, bodies);
+		const reopenedDocs = await reopened.listFolder(DOCUMENTS_ID);
+		expect(reopenedDocs.ok).toBe(true);
+		if (reopenedDocs.ok) {
+			expect(reopenedDocs.value.some((n) => n.name === 'keep.txt')).toBe(true);
+			expect(reopenedDocs.value.some((n) => n.name === 'bad.webm')).toBe(false);
+		}
+	});
+
+	it('rolls the manifest back when body replacement fails', async () => {
+		const manifest = new InMemoryManifestStore();
+		const bodies = new FailingReplaceBodyStore();
+		const fs = TerminalFS.createCleanDisk(manifest, bodies);
+		await fs.createTextFile(DOCUMENTS_ID, 'keep.txt', 'keep');
+
+		const source = TerminalFS.createCleanDisk();
+		const exportResult = await source.exportBackup();
+		if (!exportResult.ok) throw new Error('export failed');
+
+		const result = await fs.restoreBackup(exportResult.value);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('quota_exceeded');
+		}
+
+		const docs = await fs.listFolder(DOCUMENTS_ID);
+		expect(docs.ok).toBe(true);
+		if (docs.ok) {
+			expect(docs.value.some((n) => n.name === 'keep.txt')).toBe(true);
+		}
+
+		const reopened = await TerminalFS.open(manifest, bodies);
+		const reopenedDocs = await reopened.listFolder(DOCUMENTS_ID);
+		expect(reopenedDocs.ok).toBe(true);
+		if (reopenedDocs.ok) {
+			expect(reopenedDocs.value.some((n) => n.name === 'keep.txt')).toBe(true);
 		}
 	});
 

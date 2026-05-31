@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { TerminalFS, DOCUMENTS_ID, DESKTOP_ID, TRASH_ID } from './terminal-fs';
+import {
+	TerminalFS,
+	ROOT_ID,
+	DOCUMENTS_ID,
+	DESKTOP_ID,
+	TRASH_ID,
+	RECORDINGS_ID,
+	APPDATA_ID
+} from './terminal-fs';
 import type { FsFolder, FsFile, FsAlias } from './types';
 
 function createDisk() {
@@ -77,6 +85,221 @@ describe('createTextFile', () => {
 		if (!result.ok) {
 			expect(result.error.code).toBe('duplicate_name');
 		}
+	});
+});
+
+describe('createBlobFile', () => {
+	it('creates a file with an indexeddb-blob bodyRef and round-trips the bytes', async () => {
+		const fs = createDisk();
+		const bytes = new Uint8Array([1, 2, 3, 4, 5, 200, 255]);
+		const result = await fs.createBlobFile(RECORDINGS_ID, 'Clip.webm', bytes.buffer, {
+			appId: 'recorder',
+			fileType: 'recording',
+			contentType: 'video/webm'
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const file = result.value;
+		expect(file.bodyRef?.kind).toBe('indexeddb-blob');
+		if (file.bodyRef?.kind !== 'indexeddb-blob') return;
+		expect(file.bodyRef.size).toBe(bytes.byteLength);
+		expect(file.bodyRef.contentType).toBe('video/webm');
+
+		const read = await fs.readBody(file.bodyRef.bodyId);
+		expect(read.ok).toBe(true);
+		if (!read.ok) return;
+		expect(new Uint8Array(read.value)).toEqual(bytes);
+	});
+
+	it('sets fileType and appId from opts', async () => {
+		const fs = createDisk();
+		const result = await fs.createBlobFile(
+			RECORDINGS_ID,
+			'Clip2.webm',
+			new Uint8Array([9]).buffer,
+			{
+				appId: 'recorder',
+				fileType: 'recording'
+			}
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		expect(result.value.fileType).toBe('recording');
+		expect(result.value.appId).toBe('recorder');
+		expect(result.value.opensWith).toBe('recorder');
+	});
+
+	it('lets opensWith differ from appId (creator vs handler)', async () => {
+		const fs = createDisk();
+		const result = await fs.createBlobFile(
+			RECORDINGS_ID,
+			'Clip3.webm',
+			new Uint8Array([7]).buffer,
+			{
+				appId: 'recorder',
+				opensWith: 'player',
+				fileType: 'recording'
+			}
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		// A recording is created by 'recorder' but opened by the system 'player',
+		// so it stays playable after Recorder (a store app) is uninstalled.
+		expect(result.value.appId).toBe('recorder');
+		expect(result.value.opensWith).toBe('player');
+	});
+
+	it('rejects duplicate name', async () => {
+		const fs = createDisk();
+		await fs.createBlobFile(RECORDINGS_ID, 'Dupe.webm', new Uint8Array([1]).buffer, {});
+		const result = await fs.createBlobFile(
+			RECORDINGS_ID,
+			'dupe.webm',
+			new Uint8Array([2]).buffer,
+			{}
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('duplicate_name');
+		}
+	});
+});
+
+describe('getAppDataFolder / per-app FS scope', () => {
+	it('returns a folder id and is idempotent for the same appId', async () => {
+		const fs = createDisk();
+
+		const first = await fs.getAppDataFolder('chatrbot');
+		expect(first.ok).toBe(true);
+		if (!first.ok) return;
+
+		const second = await fs.getAppDataFolder('chatrbot');
+		expect(second.ok).toBe(true);
+		if (!second.ok) return;
+
+		// Same call twice returns the same folder — no duplicate created.
+		expect(second.value).toBe(first.value);
+
+		const listing = await fs.listFolder(APPDATA_ID);
+		expect(listing.ok).toBe(true);
+		if (!listing.ok) return;
+		const chatrbotFolders = listing.value.filter((n) => n.name === 'chatrbot');
+		expect(chatrbotFolders).toHaveLength(1);
+	});
+
+	it('gives different appIds different folders, both under AppData', async () => {
+		const fs = createDisk();
+
+		const a = await fs.getAppDataFolder('chatrbot');
+		const b = await fs.getAppDataFolder('recorder');
+		expect(a.ok).toBe(true);
+		expect(b.ok).toBe(true);
+		if (!a.ok || !b.ok) return;
+
+		expect(a.value).not.toBe(b.value);
+
+		const nodes = fs.getAllNodes();
+		expect(nodes.get(a.value)?.parentId).toBe(APPDATA_ID);
+		expect(nodes.get(b.value)?.parentId).toBe(APPDATA_ID);
+		expect(nodes.get(a.value)?.name).toBe('chatrbot');
+		expect(nodes.get(b.value)?.name).toBe('recorder');
+	});
+
+	it('keeps app files out of the disk root', async () => {
+		const fs = createDisk();
+
+		const folder = await fs.getAppDataFolder('chatrbot');
+		expect(folder.ok).toBe(true);
+		if (!folder.ok) return;
+
+		const file = await fs.createBlobFile(
+			folder.value,
+			'save.bin',
+			new Uint8Array([1, 2, 3]).buffer,
+			{ appId: 'chatrbot' }
+		);
+		expect(file.ok).toBe(true);
+		if (!file.ok) return;
+
+		const root = await fs.listFolder(ROOT_ID);
+		expect(root.ok).toBe(true);
+		if (!root.ok) return;
+		expect(root.value.map((n) => n.name)).not.toContain('save.bin');
+	});
+
+	it('self-heals: recreates the AppData container on an old disk', async () => {
+		// Simulate a disk persisted before AppData existed by exporting a backup,
+		// stripping the AppData node, and restoring it. restoreBackup replaces the
+		// live node map wholesale, so the container is genuinely gone.
+		const source = createDisk();
+		const exported = await source.exportBackup();
+		expect(exported.ok).toBe(true);
+		if (!exported.ok) return;
+
+		const stripped = {
+			...exported.value,
+			nodes: exported.value.nodes.filter((n) => n.id !== APPDATA_ID)
+		};
+
+		const fs = TerminalFS.createCleanDisk();
+		const restored = await fs.restoreBackup(stripped);
+		expect(restored.ok).toBe(true);
+		if (!restored.ok) return;
+		expect(fs.getAllNodes().has(APPDATA_ID)).toBe(false);
+
+		const folder = await fs.getAppDataFolder('chatrbot');
+		expect(folder.ok).toBe(true);
+		if (!folder.ok) return;
+
+		// Container was recreated under /System, app folder parented to it.
+		expect(fs.getAllNodes().has(APPDATA_ID)).toBe(true);
+		expect(fs.getAllNodes().get(folder.value)?.parentId).toBe(APPDATA_ID);
+	});
+
+	it('covers app-scoped files in backup, round-tripping blob bytes', async () => {
+		const source = createDisk();
+
+		const folder = await source.getAppDataFolder('chatrbot');
+		expect(folder.ok).toBe(true);
+		if (!folder.ok) return;
+
+		const bytes = new Uint8Array([10, 20, 30, 200, 255]);
+		const created = await source.createBlobFile(folder.value, 'save.bin', bytes.buffer, {
+			appId: 'chatrbot'
+		});
+		expect(created.ok).toBe(true);
+		if (!created.ok) return;
+
+		const exported = await source.exportBackup();
+		expect(exported.ok).toBe(true);
+		if (!exported.ok) return;
+
+		const fresh = TerminalFS.createCleanDisk();
+		const restored = await fresh.restoreBackup(exported.value);
+		expect(restored.ok).toBe(true);
+		if (!restored.ok) return;
+
+		// The app's AppData folder and its file survive restore.
+		const appFolder = await fresh.getAppDataFolder('chatrbot');
+		expect(appFolder.ok).toBe(true);
+		if (!appFolder.ok) return;
+
+		const listing = await fresh.listFolder(appFolder.value);
+		expect(listing.ok).toBe(true);
+		if (!listing.ok) return;
+		const saved = listing.value.find((n) => n.name === 'save.bin');
+		expect(saved).toBeDefined();
+		if (!saved || saved.kind !== 'file' || saved.bodyRef?.kind !== 'indexeddb-blob') {
+			throw new Error('expected restored blob file');
+		}
+
+		const read = await fresh.readBody(saved.bodyRef.bodyId);
+		expect(read.ok).toBe(true);
+		if (!read.ok) return;
+		expect(new Uint8Array(read.value)).toEqual(bytes);
 	});
 });
 

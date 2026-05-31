@@ -1,48 +1,67 @@
+import type { Component } from 'svelte';
 import type { AppCategory, AppStatus } from './app-types';
 import type { AppMenuSpec, AboutSpec, StatusExtra, OsApi } from '$lib/os/os-api';
+// Imported from their source files rather than the $lib/terminalos barrel to
+// avoid a barrel→apps→barrel import cycle (this file lives inside terminalos).
+import type { TerminalFS } from '../filesystem/terminal-fs';
+import type { FileType } from '../filesystem/types';
+
+// ── Flat window model ────────────────────────────────────────────────────────
+// An app declares its windows as a flat `windows: WindowSpec[]` — fixed, minted,
+// prefs and about as uniform entries. The OS learns everything it needs about a
+// window from one of these, so adding an app never edits OS code. (The legacy
+// window?/about?/prefs?/component fields this replaced are gone as of the Slice 6
+// collapse.)
 
 /**
- * The window an app owns. An app may have a fixed window (`id`), minted
- * instances (`idPrefix`), or both — `recorder` has both `id: 'recorder'` and
- * `idPrefix: 'recorder-'`. Window-ids that differ from the app-id stay
- * explicit here; they are never derived (e.g. tvguide → 'tv-guide').
+ * How a window-id maps to its spec, and how the id is parsed into named args.
+ * The prefix rule lives ONLY here — `kind: 'prefix'` both matches `player:42`
+ * and names the tail (`arg: 'fileId'` → `args.fileId === '42'`), and is
+ * invertible (build `player:42` from the arg) so document-open needs no second
+ * table. Replaces every hand-written `startsWith('player-')` across the OS.
  */
-export type AppWindowSpec = {
-	id?: string;
-	idPrefix?: string;
-	title: string;
-	w: number;
-	h: number;
-	minW?: number;
-	minH?: number;
-};
+export type WindowMatch =
+	// `args` lets an exact window declare static params (e.g. Finder and Trash are
+	// the same component pointed at different folders: { folder: ROOT_ID } vs
+	// { folder: TRASH_ID }). They flow into win.args exactly like a prefix window's
+	// parsed args, so the component stays zero-id-branch.
+	| { kind: 'exact'; id: string; args?: Record<string, string> }
+	| { kind: 'prefix'; prefix: string; arg: string };
 
 /**
- * The app's About dialog. OS chrome, not the app's own window — rendered by the
- * shared AboutAppWindow. Just an id; the content lives in `about` (AboutSpec).
+ * What `title`/`size` are derived from. Deliberately NOT the reactive os: these
+ * are pure functions of (parsed args, filesystem) so they can run inside
+ * openWindow before the window — and its reactive context — exists, and so app
+ * domain logic never leaks into window geometry.
  */
-export type AppAboutWindowSpec = {
-	id: string;
-};
+export type SpecCtx = { args: Record<string, string>; fs: TerminalFS };
+
+export type Geometry = { w: number; h: number; minW?: number; minH?: number };
+
+/** Routing-only tag (menu bar / active-app), never a render branch. */
+export type WindowRole = 'app' | 'prefs' | 'about' | 'chrome';
 
 /**
- * The app's Preferences dialog. OS chrome with its own window-def. Each prefs
- * UI is a distinct component, lazily loaded so it is paid only when the dialog
- * opens (the window metadata feeds getWindowDef; the component feeds Desktop).
+ * One window an app owns. Every entry is uniform — a fixed window, a minted
+ * instance, a prefs dialog and an about dialog differ only in `match`/`role`,
+ * not in shape. Every window has a `component`; there is no "no component" arm.
+ * Window components take ZERO props — they read the shared context (getSystem)
+ * and derive what they need — so the host renders them all identically.
  */
-export type AppPrefsWindowSpec = {
-	id: string;
-	title: string;
-	w: number;
-	h: number;
+export type WindowSpec = {
+	match: WindowMatch;
+	title: (c: SpecCtx) => string;
+	size: (c: SpecCtx) => Geometry;
+	component: () => Promise<{ default: Component }>;
+	role?: WindowRole;
+	/** Sticky-style windows that draw their own chrome. */
+	chromeless?: boolean;
 	/**
-	 * Lazily-loaded prefs UI ({ default: SvelteComponent }). Required: every
-	 * consumer treats it as present — synthWindowComponent returns it directly
-	 * and Desktop invokes it with a non-null assertion — so a prefs block with
-	 * no component would crash on first open. Keeping it required turns that into
-	 * a compile error at the manifest authoring site instead.
+	 * Documents this window opens as a handler (LaunchServices-style). Drives
+	 * `os.openDocument`: a file routes to the window whose `opens` covers its
+	 * content-type (or coarser fileType), with no per-app id switch.
 	 */
-	component: () => Promise<unknown>;
+	opens?: { contentTypes?: string[]; fileTypes?: FileType[] };
 };
 
 /**
@@ -73,21 +92,18 @@ export type TerminalAppManifest = {
 	iconKind: string;
 
 	// ── Windows ─────────────────────────────────────────────────────────────
-	/** The app's own window. Absent for apps with no fixed window (e.g. chatrbot is minted per show). */
-	window?: AppWindowSpec;
-	/** The app's About dialog (OS chrome). */
-	about?: AppAboutWindowSpec;
-	/** The app's Preferences dialog (OS chrome). */
-	prefs?: AppPrefsWindowSpec;
+	/**
+	 * The app's windows in the flat model — fixed, minted, prefs and about as
+	 * uniform WindowSpec entries. Optional: a few apps own no window (Trash, whose
+	 * window lives on the finder manifest; coming-soon games).
+	 */
+	windows?: WindowSpec[];
 
 	// ── Menus / about content / status (from APPS) ──────────────────────────
 	menus: (os: OsApi) => AppMenuSpec[];
 	/** The About dialog content (AboutSpec), shown by AboutAppWindow. */
 	aboutSpec: AboutSpec;
 	statusExtra?: (os: OsApi) => StatusExtra | null;
-
-	// ── App window component (Phase 3 wires this; declared now, left unset) ──
-	component?: () => Promise<unknown>;
 };
 
 /**
@@ -98,9 +114,9 @@ export type TerminalAppManifest = {
  * It is generic over the literal `id` only, so `AppId` can be the closed union
  * of the real ids rather than `string`. The return type is the full
  * `TerminalAppManifest` with `id` narrowed to that literal — keeping every
- * optional key (`window`, `prefs`, `status`, …) present on every element, so the
- * catalog's `m.window?.id` lookups still type-check. (A bare `satisfies` on the
- * array would instead drop absent optional keys from each element's type.)
+ * optional key (`windows`, `status`, …) present on every element, so the
+ * catalog's `m.windows?.find(...)` lookups still type-check. (A bare `satisfies`
+ * on the array would instead drop absent optional keys from each element's type.)
  */
 export function defineApp<const Id extends string>(
 	manifest: TerminalAppManifest & { id: Id }

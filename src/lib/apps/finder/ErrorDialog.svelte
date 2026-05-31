@@ -1,5 +1,9 @@
 <script lang="ts">
-	let { onclose }: { onclose: () => void } = $props();
+	import { getSystem } from '$lib/os/os-context';
+
+	// Zero-prop window component: both buttons just dismiss this window, and the
+	// handle from getSystem() already closes by this window's own id.
+	const { win } = getSystem();
 </script>
 
 <div class="error">
@@ -11,8 +15,8 @@
 			<span class="muted">You knew this would happen.</span>
 		</div>
 		<div class="btns">
-			<button class="btn" onclick={onclose}>Restart</button>
-			<button class="btn primary" onclick={onclose}>Forget it</button>
+			<button class="btn" onclick={() => win.close()}>Restart</button>
+			<button class="btn primary" onclick={() => win.close()}>Forget it</button>
 		</div>
 	</div>
 </div>

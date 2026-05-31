@@ -1,10 +1,11 @@
 <script lang="ts">
-	import type { TerminalFS } from '$lib/terminalos';
 	import { getShopCatalog, canUninstall, isOwned } from '$lib/terminalos';
 	import type { ShopItem } from '$lib/terminalos';
-	import type { OsApi } from '$lib/os/os-api';
+	import { getSystem } from '$lib/os/os-context';
 
-	let { os, fs }: { os: OsApi; fs: TerminalFS } = $props();
+	// Zero-prop: the window reads os/fs from the host-provided context, not props,
+	// so the OS renders it identically to every other window (Slice 6 migration).
+	const { os, fs } = getSystem();
 
 	let catalog = $state<ShopItem[]>([]);
 	let loading = $state(true);

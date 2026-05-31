@@ -80,28 +80,36 @@ describe('TerminalFS.createCleanDisk', () => {
 		expect(names).not.toContain('DO_NOT_OPEN');
 	});
 
-	it('system-prefs and about-terminal are in /System', async () => {
+	it('seeds no app icons into /System (System Preferences / About are Apple-menu only)', async () => {
 		const fs = createDisk();
 		const result = await fs.listFolder(SYSTEM_ID);
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 
+		// Decision: System Preferences and About This Terminal are reached from the
+		// Apple menu, not from /System icons, so the folder seeds no app files.
+		const appFiles = result.value.filter((n) => n.kind === 'file' && n.fileType === 'app');
+		expect(appFiles).toHaveLength(0);
 		const names = result.value.map((n) => n.name);
-		expect(names).toContain('System Preferences');
-		expect(names).toContain('About This Terminal');
+		expect(names).not.toContain('System Preferences');
+		expect(names).not.toContain('About This Terminal');
 	});
 
 	it('non-filesystem apps are not installed as files', async () => {
 		const fs = createDisk();
 		const nodes = fs.getAllNodes();
 
-		// finder and trash should NOT have file nodes anywhere
+		// finder, trash and system (OS chrome owner) must NOT have file nodes
+		// anywhere — `system` is isSystem, so without the NON_FILE_APPS exclusion it
+		// would otherwise seed a "Terminal" icon into /Applications.
 		const allFiles = Array.from(nodes.values()).filter((n): n is FsFile => n.kind === 'file');
 		const finderFiles = allFiles.filter((f) => f.appId === 'finder');
 		const trashFiles = allFiles.filter((f) => f.appId === 'trash');
+		const systemFiles = allFiles.filter((f) => f.appId === 'system' || f.name === 'Terminal');
 
 		expect(finderFiles).toHaveLength(0);
 		expect(trashFiles).toHaveLength(0);
+		expect(systemFiles).toHaveLength(0);
 	});
 
 	it('desktop aliases point to correct app files', async () => {

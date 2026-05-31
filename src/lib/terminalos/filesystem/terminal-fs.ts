@@ -1,6 +1,8 @@
 import type {
 	NodeId,
 	BodyId,
+	BodyGcReport,
+	BodyRef,
 	AppId,
 	PersistedAppId,
 	FileType,
@@ -21,24 +23,61 @@ import { getAppWindowId } from '../apps/app-install';
 import { findAppFile, isOwned as checkOwned, deriveOwnedApps } from '../apps/software-shop';
 import type { UndoRecord } from './operations';
 import { buildBackup, validateBackup, previewBackup, validateDiskForExport } from './backup';
-import type { BackupFileV2, BackupPreferences, BackupRestoreResult } from './backup';
-import type { ManifestStore, BodyStore } from './storage/storage-types';
+import type { BackupFile, BackupFileV3, BackupPreferences, BackupRestoreResult } from './backup';
+import { arrayBufferToBase64, base64ToArrayBuffer } from './storage/base64';
+import type { ManifestStore, BodyStore, BodyEntry } from './storage/storage-types';
 import { InMemoryManifestStore, InMemoryBodyStore } from './storage/storage-types';
 import { computeDiskUsage } from './usage';
 import type { DiskUsage } from './usage';
 import { WatcherRegistry } from './watchers';
 import type { FsChangeEvent, FsWatchCallback } from './watchers';
 
-// Well-known IDs
-export const ROOT_ID: NodeId = 'root_terminal_hd';
-export const APPLICATIONS_ID: NodeId = 'folder_applications';
-export const DOCUMENTS_ID: NodeId = 'folder_documents';
-export const DESKTOP_ID: NodeId = 'folder_desktop';
-export const SYSTEM_ID: NodeId = 'folder_system';
-export const RECORDINGS_ID: NodeId = 'folder_recordings';
-export const TRASH_ID: NodeId = 'folder_trash';
+// Well-known IDs live in a leaf module (well-known-ids) so early-loaded code like
+// apps/manifests.ts can import them without a load-order cycle back through here.
+// Re-exported unchanged so every existing `$lib/terminalos` import site is intact.
+export {
+	ROOT_ID,
+	APPLICATIONS_ID,
+	DOCUMENTS_ID,
+	DESKTOP_ID,
+	SYSTEM_ID,
+	RECORDINGS_ID,
+	TRASH_ID,
+	APPDATA_ID
+} from './well-known-ids';
+import {
+	ROOT_ID,
+	APPLICATIONS_ID,
+	DOCUMENTS_ID,
+	DESKTOP_ID,
+	SYSTEM_ID,
+	RECORDINGS_ID,
+	TRASH_ID,
+	APPDATA_ID
+} from './well-known-ids';
 
 const VOLUME_ID = 'volume_terminal_hd';
+
+class InvalidBackupBodyError extends Error {
+	constructor(
+		readonly bodyId: BodyId,
+		readonly cause: unknown
+	) {
+		super(`Backup body "${bodyId}" is not valid base64`);
+	}
+}
+
+async function* backupBodyEntries(backup: BackupFile): AsyncIterable<BodyEntry> {
+	if (backup.version !== 3) return;
+
+	for (const [bodyId, b64] of Object.entries(backup.bodies)) {
+		try {
+			yield { bodyId, data: base64ToArrayBuffer(b64) };
+		} catch (e) {
+			throw new InvalidBackupBodyError(bodyId, e);
+		}
+	}
+}
 
 const README_CONTENT = `README.TXT — Terminal v1.0
 
@@ -100,14 +139,13 @@ SHOWRUNNER — $29/mo
 
 Cancel any time. Pricing in fake dollars. Real dollars also fine.`;
 
-/** Apps that exist as concepts (shell, folder) but not as installable file nodes. */
-const NON_FILE_APPS = new Set(['finder', 'trash']);
-
-/** System apps that go in /System instead of /Applications. */
-const SYSTEM_FOLDER_APPS = new Set(['system-prefs', 'about-terminal']);
-
-/** IDs of system-folder apps that are always seeded into /System. */
-const SYSTEM_FOLDER_APP_IDS = ['system-prefs', 'about-terminal'];
+/**
+ * Apps that exist as concepts (shell, folder, OS chrome) but not as installable
+ * file nodes. `system` is the chrome-dialog owner (About / Welcome / System
+ * Preferences) — it is isSystem like the others but must never get a "Terminal"
+ * icon in /Applications, so it is excluded from seeding here just like finder.
+ */
+const NON_FILE_APPS = new Set(['finder', 'trash', 'system']);
 
 /**
  * Generate a copy name: "Foo" -> "Foo copy", "Foo copy 2", etc.
@@ -219,6 +257,65 @@ export class TerminalFS {
 	private async persist(): Promise<FsResult<void>> {
 		const nodes = Array.from(this.nodes.values());
 		return this.manifest.save(this.volume, nodes);
+	}
+
+	private setLastUndo(record: UndoRecord): boolean {
+		const shouldCollectGarbage = this.undoRecordRetainsBlobBodies(this.lastUndo);
+		this.lastUndo = record;
+		return shouldCollectGarbage;
+	}
+
+	private clearLastUndo(): boolean {
+		const shouldCollectGarbage = this.undoRecordRetainsBlobBodies(this.lastUndo);
+		this.lastUndo = null;
+		return shouldCollectGarbage;
+	}
+
+	private nodeReferencesBlobBody(node: FsNode): boolean {
+		return node.kind === 'file' && node.bodyRef?.kind === 'indexeddb-blob';
+	}
+
+	private undoRecordRetainsBlobBodies(undo: UndoRecord | null): boolean {
+		if (!undo) return false;
+
+		switch (undo.undoData.type) {
+			case 'restore_nodes':
+				return undo.undoData.nodes.some((node) => this.nodeReferencesBlobBody(node));
+			case 'delete_node':
+			case 'delete_nodes':
+			case 'move_back':
+			case 'rename_back':
+				return false;
+		}
+	}
+
+	private addReachableBodyIds(nodes: Iterable<FsNode>, reachable: Set<BodyId>): void {
+		for (const node of nodes) {
+			if (node.kind !== 'file' || node.bodyRef?.kind !== 'indexeddb-blob') continue;
+			reachable.add(node.bodyRef.bodyId);
+		}
+	}
+
+	private reachableBodyIds(): Set<BodyId> {
+		const reachable = new Set<BodyId>();
+		this.addReachableBodyIds(this.nodes.values(), reachable);
+
+		const undo = this.lastUndo;
+		if (undo?.undoData.type === 'restore_nodes') {
+			this.addReachableBodyIds(undo.undoData.nodes, reachable);
+		}
+
+		return reachable;
+	}
+
+	private async collectGarbageAfterCommit(shouldCollectGarbage: boolean): Promise<void> {
+		if (!shouldCollectGarbage) return;
+		try {
+			await this.collectGarbage();
+		} catch {
+			// Automatic cleanup is retryable maintenance; the committed manifest
+			// remains the source of truth for the next full GC scan.
+		}
 	}
 
 	private debouncedPersist(): Promise<FsResult<void>> {
@@ -359,15 +456,27 @@ export class TerminalFS {
 			nodes.set(sf.id, folder);
 		}
 
+		// AppData container lives under /System. It's system-flagged (protected
+		// from casual deletion) but NOT hidden, so each app's files ride in the
+		// manifest backup automatically.
+		const appDataFolder: FsFolder = {
+			id: APPDATA_ID,
+			volumeId: VOLUME_ID,
+			kind: 'folder',
+			parentId: SYSTEM_ID,
+			name: 'AppData',
+			flags: { system: true, protected: true },
+			createdAt: now,
+			updatedAt: now
+		};
+		nodes.set(APPDATA_ID, appDataFolder);
+
 		// 4. Seed app file nodes
 		//    - system apps go into /Applications
-		//    - system-folder apps (system-prefs, about-terminal) always go into /System
 		//    - non-file apps (finder, trash) are never created as files
-		const appsToSeed = [
-			...getSystemApps(),
-			// System-folder apps always get seeded into /System
-			...SYSTEM_FOLDER_APP_IDS.map((id) => getAppDef(id)).filter(Boolean)
-		] as import('../apps/app-types').TerminalAppDefinition[];
+		// System Preferences and About This Terminal have no /System icons — they
+		// are reached from the Apple menu — so nothing seeds into /System here.
+		const appsToSeed = getSystemApps();
 
 		const appFileIds = new Map<string, NodeId>(); // appId -> file nodeId
 		const seenAppIds = new Set<string>();
@@ -377,7 +486,7 @@ export class TerminalFS {
 			if (seenAppIds.has(appDef.id)) continue;
 			seenAppIds.add(appDef.id);
 
-			const parentId = SYSTEM_FOLDER_APPS.has(appDef.id) ? SYSTEM_ID : APPLICATIONS_ID;
+			const parentId = APPLICATIONS_ID;
 			const fileId = generateUniqueId();
 			appFileIds.set(appDef.id, fileId);
 
@@ -583,17 +692,83 @@ export class TerminalFS {
 		};
 		this.nodes.set(nodeId, folder);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'create_folder',
 			label: `Create folder "${name}"`,
 			undoData: { type: 'delete_node', nodeId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFolder>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [parentId], 'create_folder');
 		return ok(folder);
+	}
+
+	/**
+	 * Get (or lazily create) an app's private folder under /System/AppData/<appId>.
+	 *
+	 * Apps store their files here so they don't collide in the disk root. The
+	 * folder is named by the appId string — human-readable in Finder and stable
+	 * across reloads, so it's looked up by name each call rather than by a fixed
+	 * id.
+	 *
+	 * Self-healing: disks persisted before AppData existed won't have the
+	 * container node. If APPDATA_ID is missing, this recreates it under /System,
+	 * so no separate migration pass is needed.
+	 */
+	async getAppDataFolder(appId: PersistedAppId): Promise<FsResult<NodeId>> {
+		let created = false;
+
+		// Ensure the /System/AppData container exists (seeded on clean disks,
+		// recreated here for older disks).
+		if (!this.nodes.has(APPDATA_ID)) {
+			const system = this.nodes.get(SYSTEM_ID);
+			if (!system) return fail('not_found', `System folder "${SYSTEM_ID}" not found`);
+
+			const now = Date.now();
+			const container: FsFolder = {
+				id: APPDATA_ID,
+				volumeId: this.volume.id,
+				kind: 'folder',
+				parentId: SYSTEM_ID,
+				name: 'AppData',
+				flags: { system: true, protected: true },
+				createdAt: now,
+				updatedAt: now
+			};
+			this.nodes.set(APPDATA_ID, container);
+			created = true;
+		}
+
+		// Find this app's folder by name within the container.
+		for (const n of this.nodes.values()) {
+			if (n.parentId === APPDATA_ID && n.kind === 'folder' && n.name === appId) {
+				if (created) await this.debouncedPersist();
+				return ok(n.id);
+			}
+		}
+
+		// Not found — create a normal (non-system) folder named by appId.
+		const now = Date.now();
+		const folderId = generateUniqueId();
+		const folder: FsFolder = {
+			id: folderId,
+			volumeId: this.volume.id,
+			kind: 'folder',
+			parentId: APPDATA_ID,
+			name: appId,
+			createdAt: now,
+			updatedAt: now
+		};
+		this.nodes.set(folderId, folder);
+
+		const persistResult = await this.debouncedPersist();
+		if (!persistResult.ok) return persistResult as FsResult<NodeId>;
+
+		this.notifyChange([folderId], [APPDATA_ID], 'create_folder');
+		return ok(folderId);
 	}
 
 	async createTextFile(parentId: NodeId, name: string, text: string): Promise<FsResult<FsFile>> {
@@ -621,14 +796,15 @@ export class TerminalFS {
 		};
 		this.nodes.set(nodeId, file);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'create_file',
 			label: `Create file "${name}"`,
 			undoData: { type: 'delete_node', nodeId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [parentId], 'create_file');
 		return ok(file);
@@ -664,14 +840,76 @@ export class TerminalFS {
 		};
 		this.nodes.set(nodeId, file);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'create_file',
 			label: `Create file "${name}"`,
 			undoData: { type: 'delete_node', nodeId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
+
+		this.notifyChange([nodeId], [parentId], 'create_file');
+		return ok(file);
+	}
+
+	async createBlobFile(
+		parentId: NodeId,
+		name: string,
+		data: ArrayBuffer,
+		opts: { appId?: AppId; opensWith?: PersistedAppId; fileType?: FileType; contentType?: string }
+	): Promise<FsResult<FsFile>> {
+		const parent = this.nodes.get(parentId);
+		if (!parent) return fail('not_found', `Parent "${parentId}" not found`);
+		if (parent.kind !== 'folder') return fail('not_folder', `Parent "${parentId}" is not a folder`);
+
+		if (hasSiblingConflict(name, this.siblings(parentId))) {
+			return fail('duplicate_name', `A node named "${name}" already exists in this folder`);
+		}
+
+		const nodeId = generateUniqueId();
+		const bodyId: BodyId = `body_${generateUniqueId()}`;
+
+		// Write the bytes first so a quota failure aborts before a dangling node exists.
+		const w = await this.bodies.write(bodyId, data);
+		if (!w.ok) return w as FsResult<FsFile>;
+
+		const now = Date.now();
+		const bodyRef: BodyRef = {
+			kind: 'indexeddb-blob',
+			bodyId,
+			size: data.byteLength,
+			...(opts.contentType !== undefined ? { contentType: opts.contentType } : {})
+		};
+		const file: FsFile = {
+			id: nodeId,
+			volumeId: this.volume.id,
+			kind: 'file',
+			parentId,
+			name,
+			fileType: opts.fileType ?? 'data',
+			// appId is the creator; opensWith is the handler that opens it. They
+			// were collapsed before. Defaulting opensWith to appId keeps every
+			// existing caller unchanged; a caller that differs (a recording made by
+			// 'recorder' but opened by the system 'player') passes opensWith.
+			opensWith: opts.opensWith ?? opts.appId,
+			appId: opts.appId,
+			bodyRef,
+			createdAt: now,
+			updatedAt: now
+		};
+		this.nodes.set(nodeId, file);
+
+		const shouldCollectGarbage = this.setLastUndo({
+			kind: 'create_file',
+			label: `Create file "${name}"`,
+			undoData: { type: 'delete_node', nodeId }
+		});
+
+		const persistResult = await this.debouncedPersist();
+		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [parentId], 'create_file');
 		return ok(file);
@@ -682,6 +920,7 @@ export class TerminalFS {
 		if (!node) return fail('not_found', `Node "${fileId}" not found`);
 		if (node.kind !== 'file') return fail('not_found', `Node "${fileId}" is not a file`);
 
+		const shouldCollectGarbage = node.bodyRef?.kind === 'indexeddb-blob';
 		const updated: FsFile = {
 			...node,
 			bodyRef: { kind: 'inline-text', text },
@@ -692,6 +931,7 @@ export class TerminalFS {
 		// No undo for writes — text editors handle their own undo
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsFile>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([fileId], [node.parentId], 'write');
 		return ok(updated);
@@ -722,14 +962,15 @@ export class TerminalFS {
 		const updated: FsNode = { ...node, name: newName, updatedAt: Date.now() };
 		this.nodes.set(nodeId, updated);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'rename',
 			label: `Rename "${previousName}" to "${newName}"`,
 			undoData: { type: 'rename_back', nodeId, previousName }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], node.parentId ? [node.parentId] : [], 'rename');
 		return ok(updated);
@@ -774,14 +1015,15 @@ export class TerminalFS {
 		} as FsNode;
 		this.nodes.set(nodeId, updated);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'move',
 			label: `Move "${node.name}"`,
 			undoData: { type: 'move_back', nodeId, previousParentId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [previousParentId, targetFolderId], 'move');
 		return ok(updated);
@@ -814,14 +1056,15 @@ export class TerminalFS {
 			newIds.push(n.id);
 		}
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'duplicate',
 			label: `Duplicate "${node.name}"`,
 			undoData: { type: 'delete_nodes', nodeIds: newIds }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange(newIds, [parentId], 'duplicate');
 		return ok(topNode);
@@ -851,14 +1094,15 @@ export class TerminalFS {
 		} as FsNode;
 		this.nodes.set(nodeId, updated);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'trash',
 			label: `Trash "${node.name}"`,
 			undoData: { type: 'move_back', nodeId, previousParentId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsNode>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([nodeId], [previousParentId, TRASH_ID], 'trash');
 		return ok(updated);
@@ -877,12 +1121,15 @@ export class TerminalFS {
 			this.nodes.delete(id);
 		}
 
-		// Clear undo — emptyTrash is destructive and irreversible
+		// Clear undo — emptyTrash is destructive and irreversible.
+		const shouldCollectGarbage =
+			trashChildren.length > 0 || this.undoRecordRetainsBlobBodies(this.lastUndo);
 		this.lastUndo = null;
 
 		await this.flushPersist();
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<{ deletedCount: number }>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange(trashChildren, [TRASH_ID], 'empty_trash');
 		return ok({ deletedCount: trashChildren.length });
@@ -933,14 +1180,15 @@ export class TerminalFS {
 		};
 		this.nodes.set(aliasId, alias);
 
-		this.lastUndo = {
+		const shouldCollectGarbage = this.setLastUndo({
 			kind: 'create_alias',
 			label: `Create alias "${aliasName}"`,
 			undoData: { type: 'delete_node', nodeId: aliasId }
-		};
+		});
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<FsAlias>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange([aliasId], [parentId], 'create_alias');
 		return ok(alias);
@@ -1039,6 +1287,7 @@ export class TerminalFS {
 
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<string>;
+		await this.collectGarbageAfterCommit(true);
 
 		this.notifyChange(affectedNodeIds, affectedFolderIds, 'undo');
 		return ok(label);
@@ -1148,17 +1397,18 @@ export class TerminalFS {
 			this.nodes.delete(id);
 		}
 
+		// Clear undo since uninstall involves multiple nodes.
+		const shouldCollectGarbage = this.clearLastUndo() || this.nodeReferencesBlobBody(appFile);
+
 		const persistResult = await this.debouncedPersist();
 		if (!persistResult.ok) return persistResult as FsResult<{ removedFiles: number }>;
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
 
 		this.notifyChange(
 			[appFile.id, ...removedAliasIds],
 			[APPLICATIONS_ID, DESKTOP_ID],
 			'uninstall_app'
 		);
-
-		// Clear undo since uninstall involves multiple nodes
-		this.lastUndo = null;
 
 		return ok({ removedFiles: 1 + removedAliasIds.length });
 	}
@@ -1237,6 +1487,47 @@ export class TerminalFS {
 
 	// --- Body storage ---
 
+	async collectGarbage(): Promise<FsResult<BodyGcReport>> {
+		let storedBodyIds: BodyId[];
+		try {
+			storedBodyIds = await this.bodies.listBodyIds();
+		} catch (e) {
+			return fail('corrupt_disk', 'Failed to list blob bodies for garbage collection', e);
+		}
+
+		const stored = new Set(storedBodyIds);
+		const reachable = this.reachableBodyIds();
+		const reachableStored = new Set<BodyId>();
+		for (const bodyId of stored) {
+			if (reachable.has(bodyId)) {
+				reachableStored.add(bodyId);
+			}
+		}
+
+		const failedBodyIds: BodyId[] = [];
+		let deleted = 0;
+
+		for (const bodyId of stored) {
+			if (reachable.has(bodyId)) continue;
+
+			try {
+				await this.bodies.delete(bodyId);
+				deleted++;
+			} catch {
+				failedBodyIds.push(bodyId);
+			}
+		}
+
+		return ok({
+			stored: stored.size,
+			reachable: reachableStored.size,
+			unreachable: stored.size - reachableStored.size,
+			deleted,
+			failed: failedBodyIds.length,
+			failedBodyIds
+		});
+	}
+
 	async readBody(bodyId: BodyId): Promise<FsResult<ArrayBuffer>> {
 		const data = await this.bodies.read(bodyId);
 		if (!data) return fail('not_found', `Body "${bodyId}" not found`);
@@ -1245,11 +1536,6 @@ export class TerminalFS {
 
 	async writeBody(bodyId: BodyId, data: ArrayBuffer): Promise<FsResult<void>> {
 		return this.bodies.write(bodyId, data);
-	}
-
-	async deleteBody(bodyId: BodyId): Promise<FsResult<void>> {
-		await this.bodies.delete(bodyId);
-		return ok(undefined);
 	}
 
 	// --- Disk usage ---
@@ -1278,11 +1564,26 @@ export class TerminalFS {
 
 	// --- Backup / Restore ---
 
-	async exportBackup(preferences?: BackupPreferences): Promise<FsResult<BackupFileV2>> {
+	async exportBackup(preferences?: BackupPreferences): Promise<FsResult<BackupFileV3>> {
 		const validation = validateDiskForExport(this.volume, this.nodes);
-		if (!validation.ok) return validation as FsResult<BackupFileV2>;
+		if (!validation.ok) return validation as FsResult<BackupFileV3>;
 
-		const backup = buildBackup(this.volume, this.nodes, preferences);
+		// Collect blob bytes from the body store, keyed by bodyId. Inline text
+		// rides inside the node, so only indexeddb-blob refs need exporting.
+		const bodies: Record<string, string> = {};
+		for (const node of this.nodes.values()) {
+			if (node.flags?.hidden) continue;
+			if (node.kind !== 'file' || node.bodyRef?.kind !== 'indexeddb-blob') continue;
+
+			const { bodyId } = node.bodyRef;
+			const data = await this.bodies.read(bodyId);
+			if (!data) {
+				return fail('not_found', `Body "${bodyId}" for "${node.name}" not found`);
+			}
+			bodies[bodyId] = arrayBufferToBase64(data);
+		}
+
+		const backup = buildBackup(this.volume, this.nodes, preferences, bodies);
 		return ok(backup);
 	}
 
@@ -1299,25 +1600,90 @@ export class TerminalFS {
 		if (!validated.ok) return validated as FsResult<BackupRestoreResult>;
 
 		const backup = validated.value;
+
+		// Fail loud BEFORE mutating any state: a v3 backup must carry the bytes
+		// for every blob its nodes reference, or restore would leave dangling
+		// pointers.
+		if (backup.version === 3) {
+			for (const node of backup.nodes) {
+				if (node.kind !== 'file' || node.bodyRef?.kind !== 'indexeddb-blob') continue;
+				const { bodyId } = node.bodyRef;
+				if (!(bodyId in backup.bodies)) {
+					return fail(
+						'invalid_backup',
+						`Backup references missing body "${bodyId}" for "${node.name}"`
+					);
+				}
+			}
+		}
+
 		const preview = previewBackup(backup);
 
 		await this.flushPersist();
-		this.nodes.clear();
+
+		const nextNodes = new Map<NodeId, FsNode>();
 		for (const node of backup.nodes) {
-			this.nodes.set(node.id, node as FsNode);
+			nextNodes.set(node.id, node as FsNode);
 		}
 
-		// Restore ownedApps from v2 backups (always set — even if empty/undefined)
-		if (backup.version === 2) {
-			this.volume = { ...this.volume, ownedApps: backup.disk.ownedApps ?? [] };
-		}
+		// Restore ownedApps from v2/v3 backups (always set — even if empty/undefined)
+		const nextVolume =
+			backup.version !== 1
+				? { ...this.volume, ownedApps: backup.disk.ownedApps ?? [] }
+				: this.volume;
 
-		// Persist the restored state
-		const persistResult = await this.persist();
-		if (!persistResult.ok) return persistResult as FsResult<BackupRestoreResult>;
+		const oldVolume = this.volume;
+		const oldNodes = Array.from(this.nodes.values());
+		const rollbackManifest = async (
+			restoreError: unknown
+		): Promise<FsResult<BackupRestoreResult>> => {
+			const rollback = await this.manifest.save(oldVolume, oldNodes);
+			if (!rollback.ok) {
+				return fail(
+					'corrupt_disk',
+					'Restore failed and Terminal HD could not roll back its manifest. Reload Terminal OS, then restore from the backup file again.',
+					{ restoreError, rollbackError: rollback.error }
+				);
+			}
+			if (restoreError instanceof InvalidBackupBodyError) {
+				return fail(
+					'invalid_backup',
+					`Backup body "${restoreError.bodyId}" is not valid base64`,
+					restoreError.cause
+				);
+			}
+			if (
+				restoreError &&
+				typeof restoreError === 'object' &&
+				'ok' in restoreError &&
+				restoreError.ok === false
+			) {
+				return restoreError as FsResult<BackupRestoreResult>;
+			}
+			return fail('corrupt_disk', 'Restore failed while replacing backup bodies', restoreError);
+		};
+
+		// Save the staged manifest before replacing bodies. The body store stages
+		// its writes and leaves active bodies unchanged on normal failure, so this
+		// ordering lets restore roll the manifest back without snapshotting old
+		// blob bytes in memory.
+		const manifestResult = await this.manifest.save(nextVolume, Array.from(nextNodes.values()));
+		if (!manifestResult.ok) return manifestResult as FsResult<BackupRestoreResult>;
+
+		try {
+			const bodyResult = await this.bodies.replaceAll(backupBodyEntries(backup));
+			if (!bodyResult.ok) {
+				return rollbackManifest(bodyResult);
+			}
+		} catch (e) {
+			return rollbackManifest(e);
+		}
 
 		// Clear undo — restore is a full disk replacement
 		this.lastUndo = null;
+		this.volume = nextVolume;
+		this.nodes = nextNodes;
+		await this.collectGarbageAfterCommit(true);
 
 		// Notify watchers
 		const allNodeIds = Array.from(this.nodes.keys());
@@ -1325,7 +1691,7 @@ export class TerminalFS {
 
 		const result: BackupRestoreResult = {
 			...preview,
-			preferences: backup.version === 2 ? backup.preferences : undefined
+			preferences: backup.version !== 1 ? backup.preferences : undefined
 		};
 		return ok(result);
 	}
@@ -1335,7 +1701,6 @@ export class TerminalFS {
 	async reinstallOS(): Promise<FsResult<void>> {
 		await this.flushPersist();
 		this.nodes.clear();
-		await this.bodies.clear();
 
 		// Rebuild factory defaults by creating a fresh disk and copying its state
 		const fresh = TerminalFS.createCleanDisk(this.manifest, this.bodies);
@@ -1345,12 +1710,13 @@ export class TerminalFS {
 		}
 		this.volume = fresh.getVolume();
 
-		// Persist
+		// Clear undo before the manifest commit. Blob bodies from the previous
+		// disk are reclaimed only after this save succeeds.
+		this.lastUndo = null;
+
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult;
-
-		// Clear undo
-		this.lastUndo = null;
+		await this.collectGarbageAfterCommit(true);
 
 		// Notify watchers
 		const allNodeIds = Array.from(this.nodes.keys());
@@ -1386,6 +1752,7 @@ export class TerminalFS {
 		await this.flushPersist();
 		const persistResult = await this.persist();
 		if (!persistResult.ok) return persistResult as FsResult<void>;
+		await this.collectGarbageAfterCommit(true);
 
 		this.notifyChange(toDelete, parentId ? [parentId] : [], 'delete');
 		return ok(undefined);

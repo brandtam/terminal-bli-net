@@ -6,7 +6,6 @@
 		app,
 		os,
 		openWindows = 0,
-		isRecording = false,
 		contextInfo,
 		now,
 		timezone,
@@ -15,7 +14,6 @@
 		app: AppDef;
 		os: OsApi;
 		openWindows?: number;
-		isRecording?: boolean;
 		contextInfo?: string;
 		now: Date;
 		timezone?: string;
@@ -251,9 +249,6 @@
 			</span>
 		{/if}
 		<span class="muted info">{openWindows} window{openWindows === 1 ? '' : 's'} open</span>
-		{#if isRecording}
-			<span class="rec"><span class="rec-dot"></span>REC</span>
-		{/if}
 
 		<div class="clock-wrap-outer">
 			<button
@@ -423,28 +418,19 @@
 	.status-extra.status-live {
 		color: var(--accent-2);
 	}
+	/* REC rides the same active-app status channel as LIVE, but keeps its old
+	   look: not inverted, accent text, a faster-pulsing dot. (Rehomed from the
+	   former bespoke .rec / .rec-dot rules.) */
+	.status-extra.status-rec {
+		background: none;
+		color: var(--accent);
+	}
 	.status-dot {
 		font-size: 7px;
 		color: var(--accent);
 		animation: blink 1.4s steps(2, end) infinite;
 	}
-	.rec {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		cursor: pointer;
-		padding: 2px 6px;
-		border-radius: 0;
-	}
-	.rec:hover {
-		background: var(--chrome-menubar-hover-bg, var(--ink));
-		color: var(--chrome-menubar-hover-fg, var(--paper));
-	}
-	.rec-dot {
-		display: inline-block;
-		width: 8px;
-		height: 8px;
-		background: var(--accent);
+	.status-rec .status-dot {
 		animation: blink 1s steps(2, end) infinite;
 	}
 

@@ -6,7 +6,8 @@ export {
 	DESKTOP_ID,
 	SYSTEM_ID,
 	RECORDINGS_ID,
-	TRASH_ID
+	TRASH_ID,
+	APPDATA_ID
 } from './filesystem/terminal-fs';
 export type {
 	FsNode,
@@ -19,6 +20,7 @@ export type {
 	NodeId,
 	VolumeId,
 	BodyId,
+	BodyGcReport,
 	AppId,
 	TerminalVolume,
 	FileType,
@@ -38,6 +40,7 @@ export type {
 	BackupFile,
 	BackupFileV1,
 	BackupFileV2,
+	BackupFileV3,
 	BackupPreview,
 	BackupPreferences,
 	BackupRestoreResult
@@ -47,7 +50,7 @@ export type { OperationKind, UndoRecord } from './filesystem/operations';
 export type { DiskUsage } from './filesystem/usage';
 export type { FsChangeEvent, FsWatchCallback } from './filesystem/watchers';
 export { WriteLock, InMemoryWriteLock } from './filesystem/lock';
-export type { ManifestStore, BodyStore } from './filesystem/storage/storage-types';
+export type { ManifestStore, BodyStore, BodyEntry } from './filesystem/storage/storage-types';
 export { InMemoryManifestStore, InMemoryBodyStore } from './filesystem/storage/storage-types';
 export { LocalStorageManifestStore } from './filesystem/storage/local-storage-adapter';
 export { IndexedDBBodyStore } from './filesystem/storage/indexeddb-adapter';

@@ -10,40 +10,25 @@
 		formatGuideDate,
 		formatLiveClock
 	} from './tv-guide-utils';
+	import { getSystem } from '$lib/os/os-context';
 	import { onMount, untrack } from 'svelte';
 
-	let {
-		groups,
-		bots,
-		channels,
-		timezone,
-		now,
-		slotNow,
-		activeChatGroupSlug = null,
-		gridLoop = 400,
-		marqueeLoop = 100,
-		pauseOnHover = false,
-		onOpenChat,
-		onFocusChat
-	}: {
-		groups: GroupMeta[];
-		bots: Bot[];
-		channels: Channel[];
-		timezone?: string;
-		now: Date;
-		slotNow: Date;
-		activeChatGroupSlug?: string | null;
-		gridLoop?: number;
-		marqueeLoop?: number;
-		pauseOnHover?: boolean;
-		onOpenChat: (group: GroupMeta) => void;
-		onFocusChat: (groupSlug: string) => void;
-	} = $props();
+	// Zero-prop window-host app (Slice 4). Everything the guide shows — the
+	// channel grid, the live clock, the marquee — derives off the live OS, so
+	// the schedule rolls forward in real time as os.slotNow/os.now advance with
+	// no props threaded through Desktop. Opening/focusing chats goes straight
+	// through os (chat windows are keyed `chat:<slug>`).
+	const { os } = getSystem();
 
 	const COLUMN_WIDTH_PX = 140;
 	const CHANNEL_COL_PX = 72;
 
-	let groupMap = $derived(new Map(groups.map((g) => [g.slug, g])));
+	let groupMap = $derived(new Map(os.groups.map((g) => [g.slug, g])));
+
+	// The slug of the show whose chat window is focused — used to highlight that
+	// channel and offer a "bring to front" button. Aliased from os for the three
+	// template reads below.
+	const activeChatGroupSlug = $derived(os.activeChatGroupSlug);
 
 	interface FeaturedShow {
 		channelSlug: string;
@@ -56,7 +41,7 @@
 	}
 
 	function getGroupBots(group: GroupMeta): Bot[] {
-		return bots.filter((b) => b.group === group.slug);
+		return os.bots.filter((b) => b.group === group.slug);
 	}
 
 	let scrollerEl = $state<HTMLDivElement | null>(null);
@@ -64,10 +49,10 @@
 	let paused = $state(false);
 	let featured = $state<FeaturedShow | null>(null);
 
-	let slots = $derived(buildTimeSlots(slotNow, timezone));
-	let currentSlotIdx = $derived(getSlotIndex(slotNow, timezone));
+	let slots = $derived(buildTimeSlots(os.slotNow, os.timezone));
+	let currentSlotIdx = $derived(getSlotIndex(os.slotNow, os.timezone));
 
-	let sortedChannels = $derived([...channels].sort((a, b) => a.number - b.number));
+	let sortedChannels = $derived([...os.channels].sort((a, b) => a.number - b.number));
 
 	let schedule = $derived.by(() => {
 		return sortedChannels.map((channel) => ({
@@ -79,7 +64,7 @@
 	let marqueeText = $derived.by(() => {
 		const nowPlaying: string[] = [];
 		for (const channel of sortedChannels) {
-			const slot = getCurrentSlot(channel, slotNow, timezone);
+			const slot = getCurrentSlot(channel, os.slotNow, os.timezone);
 			if (slot) {
 				const show = groupMap.get(slot.showSlug);
 				const epInfo = getEpisodeInfo(slot, groupMap);
@@ -123,7 +108,7 @@
 
 	const animState = { gridLoop: 0, paused: false };
 	$effect(() => {
-		animState.gridLoop = gridLoop;
+		animState.gridLoop = os.tweaks.tvGridLoop;
 	});
 	$effect(() => {
 		animState.paused = paused;
@@ -168,7 +153,7 @@
 	});
 
 	function selectFeaturedFromChannel(channel: Channel) {
-		const slot = getCurrentSlot(channel, slotNow, timezone);
+		const slot = getCurrentSlot(channel, os.slotNow, os.timezone);
 		if (slot) {
 			const epInfo = getEpisodeInfo(slot, groupMap);
 			featured = {
@@ -211,10 +196,10 @@
 	}
 
 	function handleCellDblClick(cell: MergedCell) {
-		if (!isShowOnAir(cell.showSlug, channels, slotNow, timezone)) return;
+		if (!isShowOnAir(cell.showSlug, os.channels, os.slotNow, os.timezone)) return;
 		const group = groupMap.get(cell.showSlug);
 		if (!group) return;
-		onOpenChat(group);
+		os.openChat(group);
 	}
 </script>
 
@@ -276,7 +261,7 @@
 		{@const feat = featured}
 		{@const featuredGroup = groupMap.get(feat.showSlug)}
 		{@const featuredBots = featuredGroup ? getGroupBots(featuredGroup) : []}
-		{@const showOnAir = isShowOnAir(feat.showSlug, channels, slotNow, timezone)}
+		{@const showOnAir = isShowOnAir(feat.showSlug, os.channels, os.slotNow, os.timezone)}
 		<div class="tvg-preview">
 			<div class="tvg-preview-bar">
 				<span class="tvg-preview-net">{feat.net} · CHANNEL {feat.ch}</span>
@@ -303,7 +288,7 @@
 					<button
 						class="btn primary"
 						onclick={() => {
-							if (featuredGroup) onOpenChat(featuredGroup);
+							if (featuredGroup) os.openChat(featuredGroup);
 						}}
 					>
 						▸ CHAT
@@ -315,7 +300,7 @@
 
 	<!-- Date Bar -->
 	<div class="tvg-datebar">
-		<span class="tvg-datebar-date">{formatGuideDate(now, timezone)}</span>
+		<span class="tvg-datebar-date">{formatGuideDate(os.now, os.timezone)}</span>
 		<button
 			class="tvg-datebar-live"
 			onclick={() => {
@@ -326,10 +311,10 @@
 				}, 1000);
 			}}
 		>
-			{#if sortedChannels.some((ch) => getCurrentSlot(ch, slotNow, timezone) !== null)}
-				<span class="tvg-now-dot live">●</span>LIVE @ {formatLiveClock(now, timezone)}
+			{#if sortedChannels.some((ch) => getCurrentSlot(ch, os.slotNow, os.timezone) !== null)}
+				<span class="tvg-now-dot live">●</span>LIVE @ {formatLiveClock(os.now, os.timezone)}
 			{:else}
-				<span class="tvg-now-dot">●</span>OFF AIR · {formatLiveClock(now, timezone)}
+				<span class="tvg-now-dot">●</span>OFF AIR · {formatLiveClock(os.now, os.timezone)}
 			{/if}
 			{#if paused}<span class="tvg-paused"> · ⏸ paused</span>{/if}
 		</button>
@@ -340,12 +325,12 @@
 		class="tvg-schedule"
 		role="region"
 		aria-label="TV schedule"
-		onmouseenter={pauseOnHover
+		onmouseenter={os.tweaks.tvPauseOnHover
 			? () => {
 					paused = true;
 				}
 			: undefined}
-		onmouseleave={pauseOnHover
+		onmouseleave={os.tweaks.tvPauseOnHover
 			? () => {
 					paused = false;
 				}
@@ -363,9 +348,10 @@
 					{slots[0].label}
 				</div>
 
-				{#each schedule as { channel, cells }, chIdx}
+				{#each schedule as { channel, cells }, chIdx (channel.slug)}
 					{@const isAlt = chIdx % 2 === 1}
-					{@const currentShowSlug = getCurrentSlot(channel, slotNow, timezone)?.showSlug ?? null}
+					{@const currentShowSlug =
+						getCurrentSlot(channel, os.slotNow, os.timezone)?.showSlug ?? null}
 					{@const nowCell = cells.find((c) => c.startSlot === 0)}
 					<div
 						class="tvg-cell tvg-ch-cell"
@@ -389,7 +375,7 @@
 								class="ch-open"
 								onclick={(e) => {
 									e.stopPropagation();
-									if (activeChatGroupSlug) onFocusChat(activeChatGroupSlug);
+									if (activeChatGroupSlug) os.focusWindow(`chat:${activeChatGroupSlug}`);
 								}}
 								title="Bring chat window to front">● open</button
 							>
@@ -424,7 +410,7 @@
 				class="tvg-scroll-grid"
 				style="grid-template-columns: repeat({slots.length - 1}, {COLUMN_WIDTH_PX}px);"
 			>
-				{#each slots as s, i}
+				{#each slots as s, i (i)}
 					{#if i > 0}
 						<div
 							class="tvg-cell tvg-time-cell"
@@ -437,7 +423,7 @@
 					{/if}
 				{/each}
 
-				{#each schedule as { channel, cells }, chIdx}
+				{#each schedule as { channel, cells }, chIdx (channel.slug)}
 					{@const isAlt = chIdx % 2 === 1}
 					{@const nowCell = cells.find((c) => c.startSlot === 0)}
 
@@ -445,7 +431,7 @@
 						{@render epCell(channel, nowCell, chIdx, isAlt, 1, nowCell.span - 1, false)}
 					{/if}
 
-					{#each cells as cell}
+					{#each cells as cell (cell.startSlot)}
 						{#if cell.startSlot > 0}
 							{@render epCell(channel, cell, chIdx, isAlt, cell.startSlot, cell.span, false)}
 						{/if}
@@ -457,7 +443,7 @@
 
 	<!-- Bottom Marquee -->
 	<div class="tvg-marquee">
-		<div class="tvg-marquee-track" style="animation-duration: {marqueeLoop}s;">
+		<div class="tvg-marquee-track" style="animation-duration: {os.tweaks.marqueeLoop}s;">
 			{marqueeText}&nbsp;&nbsp;&nbsp;{marqueeText}
 		</div>
 	</div>

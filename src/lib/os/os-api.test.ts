@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TerminalFS } from '$lib/terminalos';
 import { windowAppId } from './os-api';
+import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
 // Mock persistence so nothing touches localStorage
 vi.mock('$lib/persistence', () => ({
@@ -287,7 +288,7 @@ describe('system actions', () => {
 			ok: true as const,
 			value: {
 				format: 'terminal-hd' as const,
-				version: 2 as const,
+				version: 3 as const,
 				exportedAt: new Date().toISOString(),
 				disk: { id: 'volume_terminal_hd', name: 'Terminal HD' },
 				nodes: [],
@@ -362,30 +363,52 @@ describe('window definition lookup', () => {
 		expect(def.h).toBe(420);
 	});
 
-	it('getWindowDef chat-seinfeld uses group name for title', () => {
+	it('getWindowDef vcr is device-aware through the OS entry point (with min bounds)', () => {
+		// getWindowDef threads ctx into the matched spec's size(), and vcr is the one
+		// window whose size varies at runtime (it reads vcrPrefs.device). Lock both
+		// decks including minW/minH at the real os.getWindowDef path — the device
+		// sizing is otherwise only checked at the lower matchWindow level.
 		const { os } = createOs();
-		os.groups = [
-			{
-				slug: 'seinfeld',
-				name: 'Seinfeld',
-				description: '',
-				setting: '',
-				era: '',
-				image: '',
-				active: true
-			}
-		];
-		const def = os.getWindowDef('chat-seinfeld');
-		expect(def.title).toBe('chatrbot - Seinfeld');
+		const prev = vcrPrefs.device;
+		try {
+			vcrPrefs.setDevice('ag500r');
+			expect(os.getWindowDef('vcr')).toEqual({
+				title: 'VCR.app',
+				w: 900,
+				h: 560,
+				minW: 620,
+				minH: 420
+			});
+			vcrPrefs.setDevice('generic');
+			expect(os.getWindowDef('vcr')).toEqual({
+				title: 'VCR.app',
+				w: 560,
+				h: 523,
+				minW: 480,
+				minH: 470
+			});
+		} finally {
+			vcrPrefs.setDevice(prev);
+		}
 	});
 
-	it('getWindowDef chat-unknown returns fallback Chat title', () => {
+	it('getWindowDef chat:seinfeld derives the title from the slug', () => {
+		// Window-host flat app: SpecCtx is {args, fs} only, so the title comes
+		// from the slug (the live group name is read inside ChatWindow instead).
 		const { os } = createOs();
-		const def = os.getWindowDef('chat-unknown');
-		expect(def.title).toBe('Chat');
+		const def = os.getWindowDef('chat:seinfeld');
+		expect(def.title).toBe('Seinfeld');
+		expect(def.w).toBe(440);
+		expect(def.h).toBe(560);
 	});
 
-	it('getWindowDef textedit-someid uses file name for title', () => {
+	it('getWindowDef chat: title-cases a multi-word slug', () => {
+		const { os } = createOs();
+		const def = os.getWindowDef('chat:breaking-bad');
+		expect(def.title).toBe('Breaking Bad');
+	});
+
+	it('getWindowDef textedit:<id> uses the file name for title', () => {
 		const { os, fs } = createOs();
 		// Find a text file node in the default disk
 		const allNodes = fs.getAllNodes();
@@ -400,11 +423,12 @@ describe('window definition lookup', () => {
 		}
 
 		if (textFileId && textFileName) {
-			const def = os.getWindowDef(`textedit-${textFileId}`);
+			const def = os.getWindowDef(`textedit:${textFileId}`);
 			expect(def.title).toBe(textFileName);
 		} else {
-			// If no .txt exists, any textedit- prefix with no matching node falls back
-			const def = os.getWindowDef('textedit-nonexistent');
+			// No .txt on disk: a textedit: id with no matching node falls back to the
+			// manifest title.
+			const def = os.getWindowDef('textedit:nonexistent');
 			expect(def.title).toBe('Untitled.txt');
 		}
 	});
@@ -426,24 +450,45 @@ describe('isKnownWindowId', () => {
 		expect(os.isKnownWindowId('finder')).toBe(true);
 	});
 
-	it('returns true for chat- prefix match', () => {
+	it('returns true for chat: prefix match', () => {
 		const { os } = createOs();
-		expect(os.isKnownWindowId('chat-anything')).toBe(true);
+		expect(os.isKnownWindowId('chat:anything')).toBe(true);
 	});
 
-	it('returns true for sticky- prefix match', () => {
+	it('returns false for the legacy chat- separator (dropped on restore)', () => {
+		// After the chat: cutover, a window-id saved with the old `-` separator no
+		// longer resolves to any app, so the init() restore filter drops it.
 		const { os } = createOs();
-		expect(os.isKnownWindowId('sticky-abc')).toBe(true);
+		expect(os.isKnownWindowId('chat-anything')).toBe(false);
 	});
 
-	it('returns true for textedit- prefix match', () => {
+	it('returns true for sticky: prefix match', () => {
 		const { os } = createOs();
-		expect(os.isKnownWindowId('textedit-xyz')).toBe(true);
+		expect(os.isKnownWindowId('sticky:abc')).toBe(true);
 	});
 
-	it('returns true for recorder- prefix match', () => {
+	it('returns false for the legacy sticky- id (dropped on restore)', () => {
+		// Stickies migrated to the flat `sticky:` prefix; the old `sticky-` id no
+		// longer resolves, so a stale saved layout using it is dropped by init().
 		const { os } = createOs();
-		expect(os.isKnownWindowId('recorder-123')).toBe(true);
+		expect(os.isKnownWindowId('sticky-abc')).toBe(false);
+	});
+
+	it('returns true for textedit: prefix match', () => {
+		const { os } = createOs();
+		expect(os.isKnownWindowId('textedit:xyz')).toBe(true);
+	});
+
+	it('returns true for the exact recorder window', () => {
+		const { os } = createOs();
+		expect(os.isKnownWindowId('recorder')).toBe(true);
+	});
+
+	it('returns false for the dead recorder- clip prefix (dropped on restore)', () => {
+		// Recorder migrated exact-only; the `recorder-` clip-playback prefix is dead
+		// (clips open in the Player). A stale recorder- id no longer resolves.
+		const { os } = createOs();
+		expect(os.isKnownWindowId('recorder-123')).toBe(false);
 	});
 
 	it('returns false for random-junk', () => {
@@ -451,42 +496,52 @@ describe('isKnownWindowId', () => {
 		expect(os.isKnownWindowId('random-junk')).toBe(false);
 	});
 
-	it('returns true for all static known IDs', () => {
+	it('returns true for every flat-resolvable window id', () => {
 		const { os } = createOs();
+		// Every live id resolves through matchWindow: system chrome, fixed app
+		// windows, prefs dialogs, and a per-app About minted as about:<id>.
 		const knownIds = [
 			'welcome',
-			'tv-guide',
+			'about',
 			'terminal-prefs',
+			'tv-guide',
 			'tvguide-prefs',
 			'chatrbot-prefs',
-			'about',
-			'about-chatrbot',
-			'about-tvguide',
-			'about-textedit',
-			'about-stats',
-			'about-stickies',
-			'about-recorder',
-			'about-software-shop',
+			'vcr-prefs',
+			'about:vcr',
+			'about:chatrbot',
 			'stats',
 			'error',
 			'trash',
 			'recorder',
 			'finder',
-			'software-shop'
+			'software-shop',
+			'computer-store',
+			'vcr'
 		];
 		for (const id of knownIds) {
-			expect(os.isKnownWindowId(id)).toBe(true);
+			expect(os.isKnownWindowId(id), id).toBe(true);
 		}
+	});
+
+	it('returns false for the dead legacy about-<id> ids (dropped on restore)', () => {
+		// The per-app About boxes are about:<id> now; the old about-<id> form no
+		// longer resolves, so a stale saved layout using it is dropped by init().
+		const { os } = createOs();
+		expect(os.isKnownWindowId('about-vcr')).toBe(false);
+		expect(os.isKnownWindowId('about-chatrbot')).toBe(false);
 	});
 });
 
 // ── Navigation routing ────────────────────────────────────────────────────
 
 describe('navigation routing', () => {
-	it('openAbout chatrbot opens about-chatrbot window', async () => {
+	// Per-app About boxes are minted as about:<id> (the system app's flat about:
+	// prefix window); openAbout(null) is the system About box, window id 'about'.
+	it('openAbout chatrbot opens about:chatrbot window', async () => {
 		const { os } = await createOsWithApp('chatrbot');
 		os.openAbout('chatrbot');
-		expect(os.windows.some((w) => w.id === 'about-chatrbot')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:chatrbot')).toBe(true);
 	});
 
 	it('openAbout null opens about window', () => {
@@ -495,40 +550,40 @@ describe('navigation routing', () => {
 		expect(os.windows.some((w) => w.id === 'about')).toBe(true);
 	});
 
-	it('openAbout tvguide opens about-tvguide', async () => {
+	it('openAbout tvguide opens about:tvguide', async () => {
 		const { os } = await createOsWithApp('tvguide');
 		os.openAbout('tvguide');
-		expect(os.windows.some((w) => w.id === 'about-tvguide')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:tvguide')).toBe(true);
 	});
 
-	it('openAbout textedit opens about-textedit', () => {
+	it('openAbout textedit opens about:textedit', () => {
 		const { os } = createOs();
 		os.openAbout('textedit');
-		expect(os.windows.some((w) => w.id === 'about-textedit')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:textedit')).toBe(true);
 	});
 
-	it('openAbout stats opens about-stats', async () => {
+	it('openAbout stats opens about:stats', async () => {
 		const { os } = await createOsWithApp('stats');
 		os.openAbout('stats');
-		expect(os.windows.some((w) => w.id === 'about-stats')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:stats')).toBe(true);
 	});
 
-	it('openAbout stickies opens about-stickies', () => {
+	it('openAbout stickies opens about:stickies', () => {
 		const { os } = createOs();
 		os.openAbout('stickies');
-		expect(os.windows.some((w) => w.id === 'about-stickies')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:stickies')).toBe(true);
 	});
 
-	it('openAbout recorder opens about-recorder', async () => {
+	it('openAbout recorder opens about:recorder', async () => {
 		const { os } = await createOsWithApp('recorder');
 		os.openAbout('recorder');
-		expect(os.windows.some((w) => w.id === 'about-recorder')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:recorder')).toBe(true);
 	});
 
-	it('openAbout software-shop opens about-software-shop', () => {
+	it('openAbout software-shop opens about:software-shop', () => {
 		const { os } = createOs();
 		os.openAbout('software-shop');
-		expect(os.windows.some((w) => w.id === 'about-software-shop')).toBe(true);
+		expect(os.windows.some((w) => w.id === 'about:software-shop')).toBe(true);
 	});
 
 	it('openSystemPreferences opens terminal-prefs window', () => {
@@ -625,9 +680,9 @@ describe('derived state', () => {
 		expect(os.activeAppId).toBe('finder');
 	});
 
-	it('activeAppId returns chatrbot for chat- windows', async () => {
+	it('activeAppId returns chatrbot for chat: windows', async () => {
 		const { os } = await createOsWithApp('chatrbot');
-		os.openWindow('chat-seinfeld');
+		os.openWindow('chat:seinfeld');
 		expect(os.activeAppId).toBe('chatrbot');
 	});
 
@@ -635,6 +690,33 @@ describe('derived state', () => {
 		const { os } = await createOsWithApp('tvguide');
 		os.openWindow('tv-guide');
 		expect(os.activeAppId).toBe('tvguide');
+	});
+
+	// The OS chrome dialogs are owned by the `system` app, so the menu bar reads
+	// "Terminal" while one is focused (Slice 5, decision 1). These lock that
+	// menu-bar identity at the os-api level, not just synthWindowAppId.
+	it('activeAppId returns system for the system About box (openAbout null)', () => {
+		const { os } = createOs();
+		os.openAbout(null);
+		expect(os.activeAppId).toBe('system');
+	});
+
+	it('activeAppId returns system for a per-app About box (about:<id>)', async () => {
+		const { os } = await createOsWithApp('chatrbot');
+		os.openAbout('chatrbot');
+		expect(os.activeAppId).toBe('system');
+	});
+
+	it('activeAppId returns system for the Welcome window', () => {
+		const { os } = createOs();
+		os.openWindow('welcome');
+		expect(os.activeAppId).toBe('system');
+	});
+
+	it('activeAppId returns system for System Preferences', () => {
+		const { os } = createOs();
+		os.openSystemPreferences();
+		expect(os.activeAppId).toBe('system');
 	});
 
 	it('activeChatGroupSlug returns null when no chat window active', () => {
@@ -645,7 +727,7 @@ describe('derived state', () => {
 
 	it('activeChatGroupSlug returns slug for active chat window', async () => {
 		const { os } = await createOsWithApp('chatrbot');
-		os.openWindow('chat-seinfeld');
+		os.openWindow('chat:seinfeld');
 		expect(os.activeChatGroupSlug).toBe('seinfeld');
 	});
 });
@@ -712,18 +794,22 @@ describe('store app install gate', () => {
 
 	it('blocks chat windows when chatrbot is not installed', () => {
 		const { os } = createOs();
-		os.openWindow('chat-seinfeld');
+		os.openWindow('chat:seinfeld');
 
 		expect(os.windows).toHaveLength(0);
 		expect(os.alertSpec?.title).toBe('chatrbot is not installed');
 	});
 
-	it('blocks about windows for uninstalled store apps', () => {
+	it('opens about windows even for uninstalled store apps (system chrome)', () => {
+		// About boxes are owned by the `system` app now (window id about:<id>), so
+		// the open path is no longer install-gated through the named store app. In
+		// practice this is only reachable from the app's own Help menu — which needs
+		// the app installed and running — but the routing no longer blocks it.
 		const { os } = createOs();
 		os.openAbout('tvguide');
 
-		expect(os.windows).toHaveLength(0);
-		expect(os.alertSpec?.title).toBe('TV Guide is not installed');
+		expect(os.windows.some((w) => w.id === 'about:tvguide')).toBe(true);
+		expect(os.alertSpec).toBeNull();
 	});
 
 	it('purchase alert Visit Store button opens computer-store', () => {
@@ -775,16 +861,19 @@ describe('windowAppId', () => {
 	});
 
 	it('maps prefix-based window IDs', () => {
-		expect(windowAppId('chat-seinfeld')).toBe('chatrbot');
-		expect(windowAppId('sticky-abc')).toBe('stickies');
-		expect(windowAppId('textedit-xyz')).toBe('textedit');
-		expect(windowAppId('recorder-123')).toBe('recorder');
+		expect(windowAppId('chat:seinfeld')).toBe('chatrbot');
+		expect(windowAppId('sticky:abc')).toBe('stickies');
+		expect(windowAppId('textedit:xyz')).toBe('textedit');
+		expect(windowAppId('player:clip1')).toBe('player');
 	});
 
-	it('maps about windows to their app', () => {
-		expect(windowAppId('about-vcr')).toBe('vcr');
-		expect(windowAppId('about-chatrbot')).toBe('chatrbot');
-		expect(windowAppId('about-tvguide')).toBe('tvguide');
+	it('maps per-app About windows to the system app (about:<id>)', () => {
+		// About boxes live on the `system` app's flat about: prefix window, so their
+		// menu-bar identity is "Terminal", not the named app. (The old about-<id>
+		// form is dead — see the isKnownWindowId drop test.)
+		expect(windowAppId('about:vcr')).toBe('system');
+		expect(windowAppId('about:chatrbot')).toBe('system');
+		expect(windowAppId('about:tvguide')).toBe('system');
 	});
 
 	it('falls back to finder for unknown IDs', () => {

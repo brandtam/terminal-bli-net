@@ -49,6 +49,8 @@ export default [
 				BroadcastChannel: 'readonly',
 				MessageEvent: 'readonly',
 				Blob: 'readonly',
+				btoa: 'readonly',
+				atob: 'readonly',
 				__APP_VERSION__: 'readonly'
 			}
 		},

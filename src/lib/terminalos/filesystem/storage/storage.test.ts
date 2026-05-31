@@ -116,6 +116,15 @@ describe('body store', () => {
 		}
 	});
 
+	it('lists body ids without reading body data', async () => {
+		const bodies = new InMemoryBodyStore();
+		await bodies.write('body-a', new Uint8Array([1]).buffer as ArrayBuffer);
+		await bodies.write('body-b', new Uint8Array([2]).buffer as ArrayBuffer);
+
+		const ids = await bodies.listBodyIds();
+		expect(ids.sort()).toEqual(['body-a', 'body-b']);
+	});
+
 	it('returns not_found for missing body', async () => {
 		const fs = TerminalFS.createCleanDisk();
 		const result = await fs.readBody('nonexistent');
@@ -123,5 +132,51 @@ describe('body store', () => {
 		if (!result.ok) {
 			expect(result.error.code).toBe('not_found');
 		}
+	});
+
+	it('replaceAll swaps the complete body set', async () => {
+		const bodies = new InMemoryBodyStore();
+		await bodies.write('old-body', new TextEncoder().encode('old').buffer as ArrayBuffer);
+
+		const result = await bodies.replaceAll(
+			(async function* () {
+				yield {
+					bodyId: 'new-body',
+					data: new TextEncoder().encode('new').buffer as ArrayBuffer
+				};
+			})()
+		);
+
+		expect(result.ok).toBe(true);
+		expect(await bodies.read('old-body')).toBeNull();
+		const read = await bodies.read('new-body');
+		expect(read).not.toBeNull();
+		if (read) {
+			expect(new TextDecoder().decode(read)).toBe('new');
+		}
+	});
+
+	it('replaceAll leaves current bodies untouched when the source fails', async () => {
+		const bodies = new InMemoryBodyStore();
+		await bodies.write('old-body', new TextEncoder().encode('old').buffer as ArrayBuffer);
+
+		await expect(
+			bodies.replaceAll(
+				(async function* () {
+					yield {
+						bodyId: 'new-body',
+						data: new TextEncoder().encode('new').buffer as ArrayBuffer
+					};
+					throw new Error('bad source');
+				})()
+			)
+		).rejects.toThrow('bad source');
+
+		const old = await bodies.read('old-body');
+		expect(old).not.toBeNull();
+		if (old) {
+			expect(new TextDecoder().decode(old)).toBe('old');
+		}
+		expect(await bodies.read('new-body')).toBeNull();
 	});
 });

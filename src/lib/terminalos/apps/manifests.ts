@@ -1,5 +1,10 @@
-import { defineApp, type TerminalAppManifest } from './app-manifest';
+import { defineApp } from './app-manifest';
+// Import folder ids from the leaf module, NOT the $lib/terminalos barrel: this
+// file is read by app-catalog at module load, and the barrel pulls terminal-fs →
+// app-install → app-catalog, which would be a load-order cycle.
+import { ROOT_ID, TRASH_ID } from '../filesystem/well-known-ids';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
+import { recorderState } from '$lib/apps/recorder/recorder-state.svelte';
 
 /**
  * One manifest per app — the single source of truth for app identity. The
@@ -24,9 +29,32 @@ export const MANIFESTS = [
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'hd',
-		window: { id: 'finder', title: 'Terminal HD', w: 480, h: 420 },
-		about: { id: 'about' },
-		component: () => import('$lib/apps/finder/FinderWindow.svelte'),
+		// No About box of its own: the system About (window id 'about') is owned by
+		// the `system` app. Finder's Help → About Terminal routes there via
+		// os.openAbout(null), and matchWindow resolves 'about' → system, so the menu
+		// bar reads "Terminal" when it's focused (not "Finder").
+		// Finder and Trash are the SAME component pointed at two folders, declared as
+		// exact flat windows carrying a static `folder` arg (the static-arg-on-exact
+		// mechanism, #35). The trash entry lives on the finder manifest so
+		// matchWindow('trash') → appId 'finder' and the menu bar reads "Finder" for
+		// both. No `opens`: neither is a document handler. Legacy window/component
+		// stay additively until the collapse.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'finder', args: { folder: ROOT_ID } },
+				role: 'app',
+				title: () => 'Terminal HD',
+				size: () => ({ w: 480, h: 420 }),
+				component: () => import('$lib/apps/finder/FinderWindow.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'trash', args: { folder: TRASH_ID } },
+				role: 'chrome',
+				title: () => 'Trash',
+				size: () => ({ w: 380, h: 320 }),
+				component: () => import('$lib/apps/finder/FinderWindow.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'Terminal',
 			version: 'Version 1.0 "Pilot"',
@@ -141,41 +169,84 @@ export const MANIFESTS = [
 		statusExtra: () => null
 	}),
 
+	// The system app owns the OS chrome dialogs — Welcome, About This Terminal,
+	// the per-app About boxes (about:<id>), and System Preferences. They render
+	// through the flat Window Host like any other window, and the menu bar reads
+	// this app's name ("Terminal") whenever one of them is focused. It folds away
+	// the old `system-prefs` + `about-terminal` pseudo-manifests. None of its
+	// windows declare `opens`, so the system app is not a document handler.
 	defineApp({
-		id: 'system-prefs',
-		name: 'System Preferences',
-		fileName: 'System Preferences',
+		id: 'system',
+		name: 'Terminal',
+		fileName: 'Terminal',
 		category: 'system',
-		description: 'Terminal OS settings',
-		icon: '⚙',
-		removable: false,
-		desktopAliasByDefault: false,
-		isSystem: true,
-		iconKind: 'hd',
-		window: { id: 'terminal-prefs', title: 'System Preferences', w: 380, h: 360 },
-		// terminal-prefs renders the System Preferences UI (TerminalPrefs).
-		component: () => import('$lib/components/TerminalPrefs.svelte'),
-		// No APPS entry today: no menus, about content, or status. Kept minimal.
-		menus: () => [],
-		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
-	}),
-
-	defineApp({
-		id: 'about-terminal',
-		name: 'About This Terminal',
-		fileName: 'About This Terminal',
-		category: 'system',
-		description: 'System information',
+		description: 'System chrome — About, Welcome, System Preferences',
 		icon: ':)',
 		removable: false,
 		desktopAliasByDefault: false,
 		isSystem: true,
-		iconKind: 'doc',
-		window: { id: 'about', title: 'About This Terminal', w: 380, h: 380 },
-		// The 'about' window renders the system About dialog (AboutTerminal).
-		component: () => import('$lib/apps/finder/AboutTerminal.svelte'),
-		menus: () => [],
-		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
+		iconKind: 'hd',
+		windows: [
+			{
+				match: { kind: 'exact', id: 'welcome' },
+				role: 'chrome',
+				title: () => 'Welcome.app',
+				size: () => ({ w: 460, h: 540 }),
+				component: () => import('$lib/apps/welcome/WelcomeWindow.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'about' },
+				role: 'about',
+				title: () => 'About This Terminal',
+				size: () => ({ w: 380, h: 380 }),
+				component: () => import('$lib/apps/finder/AboutTerminal.svelte')
+			},
+			{
+				// Per-app About box. The id names which app (about:vcr → vcr); the
+				// shared AboutAppWindow reads args.appId and renders that app's spec.
+				// The title resolves the app's display name from the static manifest
+				// registry — SpecCtx has no `os`, so it must look the name up purely
+				// over MANIFESTS (see manifestName below). Listed AFTER the exact
+				// 'about' entry so the bare 'about' id never falls into this prefix.
+				match: { kind: 'prefix', prefix: 'about:', arg: 'appId' },
+				role: 'about',
+				title: ({ args }) => `About ${manifestName(args.appId)}`,
+				size: () => ({ w: 420, h: 460 }),
+				component: () => import('$lib/apps/finder/AboutAppWindow.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'terminal-prefs' },
+				role: 'prefs',
+				title: () => 'System Preferences',
+				size: () => ({ w: 380, h: 360 }),
+				component: () => import('$lib/components/TerminalPrefs.svelte')
+			}
+		],
+		// A non-empty aboutSpec.title is what puts an app in APPS (the hasRegistryEntry
+		// gate), and the menu bar reads APPS[activeAppId] for the name + menus. The
+		// system app never shows its own About box, so the rest stays empty.
+		aboutSpec: {
+			title: 'Terminal',
+			version: '',
+			tagline: '',
+			glyph: '',
+			glyphBg: '',
+			sections: []
+		},
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }]
+			},
+			{
+				label: 'Help',
+				items: [
+					{ type: 'action', label: 'About Terminal', action: () => os.openAbout(null) },
+					{ type: 'action', label: 'Welcome', action: () => os.openWindow('welcome') }
+				]
+			}
+		],
+		statusExtra: () => null
 	}),
 
 	defineApp({
@@ -189,9 +260,16 @@ export const MANIFESTS = [
 		desktopAliasByDefault: true,
 		isSystem: true,
 		iconKind: 'floppy',
-		window: { id: 'software-shop', title: 'My Shelf', w: 420, h: 520 },
-		about: { id: 'about-software-shop' },
-		component: () => import('$lib/apps/software-shop/SoftwareShopWindow.svelte'),
+		// One fixed window; SoftwareShopWindow reads os/fs off getSystem(), no props.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'software-shop' },
+				role: 'app',
+				title: () => 'My Shelf',
+				size: () => ({ w: 420, h: 520 }),
+				component: () => import('$lib/apps/software-shop/SoftwareShopWindow.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'My Shelf',
 			version: 'v1.0',
@@ -240,9 +318,16 @@ export const MANIFESTS = [
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'floppy',
-		window: { id: 'computer-store', title: 'Computer Store', w: 740, h: 620 },
-		about: { id: 'about-computer-store' },
-		component: () => import('$lib/apps/computer-store/ComputerStoreWindow.svelte'),
+		// ComputerStoreWindow reads os/fs off getSystem(), no props.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'computer-store' },
+				role: 'app',
+				title: () => 'Computer Store',
+				size: () => ({ w: 740, h: 620 }),
+				component: () => import('$lib/apps/computer-store/ComputerStoreWindow.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'Computer Store',
 			version: 'v1.0',
@@ -291,9 +376,9 @@ export const MANIFESTS = [
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'doc',
-		window: { id: 'trash', title: 'Trash', w: 380, h: 320 },
-		// Trash renders the shared FinderWindow scoped to the Trash folder.
-		component: () => import('$lib/apps/finder/FinderWindow.svelte'),
+		// Trash's window lives on the finder manifest (matchWindow('trash') → finder,
+		// the shared FinderWindow scoped to the Trash folder), so this app declares
+		// no window of its own — it carries only the Trash library/desktop identity.
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -310,9 +395,21 @@ export const MANIFESTS = [
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'doc',
-		window: { idPrefix: 'textedit-', title: 'Untitled.txt', w: 420, h: 400 },
-		about: { id: 'about-textedit' },
-		component: () => import('$lib/apps/textedit/TextEditWindow.svelte'),
+		// One window minted per open document, keyed `textedit:<fileId>`. The `:`
+		// separator matches chat:/player:/about: (file-ids contain `-`; the tail is
+		// sliced by prefix length, unambiguous either way). NO `opens`: TextEdit is
+		// launched (File ▸ New/Open, Finder double-click), not a content-type doc
+		// handler. The title is the file's name, read purely from the fs node since
+		// SpecCtx is {args, fs}.
+		windows: [
+			{
+				match: { kind: 'prefix', prefix: 'textedit:', arg: 'fileId' },
+				role: 'app',
+				title: ({ args, fs }) => fs.peekNode(args.fileId)?.name ?? 'Untitled.txt',
+				size: () => ({ w: 420, h: 400 }),
+				component: () => import('$lib/apps/textedit/TextEditWindow.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'TextEdit',
 			version: 'v1.0',
@@ -396,9 +493,20 @@ export const MANIFESTS = [
 		desktopAliasByDefault: true,
 		isSystem: true,
 		iconKind: 'stickies',
-		window: { idPrefix: 'sticky-', title: 'Stickies', w: 240, h: 220 },
-		about: { id: 'about-stickies' },
-		component: () => import('$lib/apps/stickies/StickiesNote.svelte'),
+		// Each note is a flat prefix window `sticky:<noteId>`. chromeless: true is
+		// spec-driven (Desktop reads it off the resolved spec) — stickies draw their
+		// own chrome, so the title is cosmetic. No `opens`: notes are launched, not
+		// a document handler.
+		windows: [
+			{
+				match: { kind: 'prefix', prefix: 'sticky:', arg: 'noteId' },
+				role: 'app',
+				chromeless: true,
+				title: () => 'Stickies',
+				size: () => ({ w: 240, h: 220 }),
+				component: () => import('$lib/apps/stickies/StickiesNote.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'Stickies',
 			version: 'v1.0',
@@ -482,16 +590,24 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tvguide',
-		window: { id: 'tv-guide', title: 'TV Guide.app', w: 660, h: 700 },
-		about: { id: 'about-tvguide' },
-		prefs: {
-			id: 'tvguide-prefs',
-			title: 'TV Guide Preferences',
-			w: 360,
-			h: 360,
-			component: () => import('$lib/components/TVGuidePrefs.svelte')
-		},
-		component: () => import('$lib/components/TVGuide.svelte'),
+		// A fixed main window + a prefs dialog. TVGuide / TVGuidePrefs read
+		// everything (channels, clock, tweaks) off getSystem(), so neither takes props.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'tv-guide' },
+				role: 'app',
+				title: () => 'TV Guide.app',
+				size: () => ({ w: 660, h: 700 }),
+				component: () => import('$lib/components/TVGuide.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'tvguide-prefs' },
+				role: 'prefs',
+				title: () => 'TV Guide Preferences',
+				size: () => ({ w: 360, h: 360 }),
+				component: () => import('$lib/components/TVGuidePrefs.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'TV Guide',
 			version: 'v1.0',
@@ -591,16 +707,30 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'doc',
-		window: { idPrefix: 'chat-', title: 'Chat', w: 440, h: 560 },
-		about: { id: 'about-chatrbot' },
-		prefs: {
-			id: 'chatrbot-prefs',
-			title: 'chatrbot Preferences',
-			w: 360,
-			h: 280,
-			component: () => import('$lib/components/ChatrbotPrefs.svelte')
-		},
-		component: () => import('$lib/components/ChatWindow.svelte'),
+		// One minted instance per show, keyed `chat:<slug>`, plus a prefs dialog. The
+		// `:` separator (not `-`) keeps the arg unambiguous since show slugs contain
+		// `-` (e.g. `breaking-bad`). The title is derived from the slug alone —
+		// SpecCtx is just {args, fs}, so the live group name is read inside ChatWindow.
+		windows: [
+			{
+				match: { kind: 'prefix', prefix: 'chat:', arg: 'slug' },
+				role: 'app',
+				title: ({ args }) =>
+					(args.slug ?? '')
+						.split('-')
+						.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+						.join(' ') || 'Chat',
+				size: () => ({ w: 440, h: 560 }),
+				component: () => import('$lib/components/ChatWindow.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'chatrbot-prefs' },
+				role: 'prefs',
+				title: () => 'chatrbot Preferences',
+				size: () => ({ w: 360, h: 280 }),
+				component: () => import('$lib/components/ChatrbotPrefs.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'chatrbot',
 			version: 'v1.0',
@@ -702,17 +832,19 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tv',
-		// recorder has BOTH a fixed window and minted instances. The w/h/title
-		// here size the fixed 'recorder' window (Camera.app) only —
-		// synthWindowDefs emits a static def for `id`, never for `idPrefix`. The
-		// 'recorder-' clip windows are sized dynamically in getWindowDef (os-api)
-		// from the recorded file node and do NOT read these dimensions.
-		window: { id: 'recorder', idPrefix: 'recorder-', title: 'Camera.app', w: 360, h: 480 },
-		about: { id: 'about-recorder' },
-		// Only the fixed 'recorder' window has a component. The 'recorder-' prefix
-		// mints clip-playback windows rendered inline in Desktop (a <video>
-		// element), so it has no component loader of its own.
-		component: () => import('$lib/apps/recorder/RecorderWindow.svelte'),
+		// Camera is exact-only: one fixed `recorder` window. There is NO
+		// `recorder-`/`recorder:` prefix — recorded clips are tagged
+		// opensWith:'player' and open in the system Player (the bug_002 fix) — and
+		// no `opens` here (the Camera UI isn't a doc handler).
+		windows: [
+			{
+				match: { kind: 'exact', id: 'recorder' },
+				role: 'app',
+				title: () => 'Camera.app',
+				size: () => ({ w: 360, h: 480 }),
+				component: () => import('$lib/apps/recorder/RecorderWindow.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'Camera',
 			version: 'v1.0',
@@ -749,6 +881,75 @@ export const MANIFESTS = [
 				items: [{ type: 'action', label: 'About Camera', action: () => os.openAbout('recorder') }]
 			}
 		],
+		// The "● REC" menu-bar badge rides the active-app status channel: it shows
+		// only while Camera is focused and recording. recorderState flips on
+		// start/stop, and MenuBar's $derived(app.statusExtra?.(os)) re-runs on the flip.
+		statusExtra: () => (recorderState.recording ? { label: 'REC', kind: 'rec' } : null)
+	}),
+
+	defineApp({
+		id: 'player',
+		name: 'Player',
+		fileName: 'Player.app',
+		category: 'system',
+		description: 'Plays video files',
+		icon: '▶',
+		removable: false,
+		desktopAliasByDefault: false,
+		isSystem: true,
+		iconKind: 'tv',
+		// Flat window model: the Player has no fixed window, only minted
+		// player:<fileId> instances. It is a GENERAL video document handler —
+		// declaring the content-types it opens is what routes any video file here
+		// via os.openDocument, with no per-app switch. A clip made by the
+		// (removable) Camera app opens here even after Camera is uninstalled,
+		// because the Player is a system app that is always present.
+		windows: [
+			{
+				// The Player's own launch window. Opening Player.app from Applications
+				// (no document) lands here and shows an empty state. It resolves
+				// through the flat matcher — exact id 'player' — so the Player needs
+				// no fixed `window` field; getAppWindowId('player') still returns
+				// 'player'. Distinct from the minted player:<fileId> instances below.
+				match: { kind: 'exact', id: 'player' },
+				role: 'app',
+				title: () => 'Player',
+				size: () => ({ w: 480, h: 380, minW: 320, minH: 240 }),
+				component: () => import('$lib/apps/player/MediaPlayerWindow.svelte')
+			},
+			{
+				match: { kind: 'prefix', prefix: 'player:', arg: 'fileId' },
+				role: 'app',
+				title: ({ args, fs }) => fs.peekNode(args.fileId)?.name ?? 'Player',
+				size: () => ({ w: 480, h: 380, minW: 320, minH: 240 }),
+				component: () => import('$lib/apps/player/MediaPlayerWindow.svelte'),
+				opens: { contentTypes: ['video/webm', 'video/mp4'], fileTypes: ['recording'] }
+			}
+		],
+		aboutSpec: {
+			title: 'Player',
+			version: 'v1.0',
+			tagline: 'play video clips',
+			glyph: '▶',
+			glyphBg: 'var(--accent)',
+			glyphFg: 'var(--paper)',
+			sections: [
+				{
+					h: 'WHAT IT IS',
+					body: 'The system video player. Opens any video file — clips recorded with Camera, or other video saved to disk — and plays it in its own window.'
+				}
+			]
+		},
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }]
+			},
+			{
+				label: 'Help',
+				items: [{ type: 'action', label: 'About Player', action: () => os.openAbout('player') }]
+			}
+		],
 		statusExtra: () => null
 	}),
 
@@ -764,9 +965,16 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'calc',
-		window: { id: 'stats', title: 'Stats.app', w: 360, h: 360 },
-		about: { id: 'about-stats' },
-		component: () => import('$lib/apps/stats/StatsWindow.svelte'),
+		// One fixed window; StatsWindow reads its counts off getSystem(), no props.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'stats' },
+				role: 'app',
+				title: () => 'Stats.app',
+				size: () => ({ w: 360, h: 360 }),
+				component: () => import('$lib/apps/stats/StatsWindow.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'Stats',
 			version: 'v0.1',
@@ -814,8 +1022,20 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'floppy',
-		window: { id: 'error', title: 'System Error', w: 420, h: 260 },
-		component: () => import('$lib/apps/finder/ErrorDialog.svelte'),
+		// ErrorDialog reads its close action off getSystem().win, no props. role:'app'
+		// because this is a launchable window (error has a desktop alias, so
+		// getAppWindowId('error') must resolve to it). Its menu-bar identity reads as
+		// Finder via the one remaining WINDOW_APP_OVERRIDES entry (checked before
+		// matchWindow), even though this manifest's appId is 'error'.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'error' },
+				role: 'app',
+				title: () => 'System Error',
+				size: () => ({ w: 420, h: 260 }),
+				component: () => import('$lib/apps/finder/ErrorDialog.svelte')
+			}
+		],
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -928,25 +1148,35 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tv',
-		// The VCR window is sized to the selected device at lookup time
-		// (see app-catalog.ts). The def here is the AG-500R default; the
-		// generic variant is special-cased in synthWindowDefs/getWindowDef.
-		window: { id: 'vcr', title: 'VCR.app', w: 900, h: 560, minW: 620, minH: 420 },
-		about: { id: 'about-vcr' },
-		prefs: {
-			id: 'vcr-prefs',
-			title: 'VCR Preferences',
-			w: 360,
-			h: 300,
-			component: () => import('$lib/components/VCRPrefs.svelte')
-		},
-		// The VCR ships two decks. Load ONLY the selected variant — picking the
-		// import at call time means the unselected deck never enters the bundle
-		// for a visitor who never switches to it (the big single-app win in #28).
-		component: () =>
-			vcrPrefs.device === 'ag500r'
-				? import('$lib/apps/vcr/VCRWindowAG500R.svelte')
-				: import('$lib/apps/vcr/VCRWindow.svelte'),
+		// The main VCR window + its prefs dialog. The main window's
+		// title/size/component are device-aware: SpecCtx bans the reactive `os` but
+		// NOT module stores, so these read `vcrPrefs.device` directly (generic carries
+		// minW 480 / minH 470). The two decks are separate imports so only the
+		// selected one enters the bundle (#28). A device switch while a vcr window is
+		// open calls invalidateWindow('vcr') (see vcr-prefs.svelte) so the next
+		// resolve picks the new deck + size.
+		windows: [
+			{
+				match: { kind: 'exact', id: 'vcr' },
+				role: 'app',
+				title: () => 'VCR.app',
+				size: () =>
+					vcrPrefs.device === 'generic'
+						? { w: 560, h: 523, minW: 480, minH: 470 }
+						: { w: 900, h: 560, minW: 620, minH: 420 },
+				component: () =>
+					vcrPrefs.device === 'ag500r'
+						? import('$lib/apps/vcr/VCRWindowAG500R.svelte')
+						: import('$lib/apps/vcr/VCRWindow.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'vcr-prefs' },
+				role: 'prefs',
+				title: () => 'VCR Preferences',
+				size: () => ({ w: 360, h: 300 }),
+				component: () => import('$lib/components/VCRPrefs.svelte')
+			}
+		],
 		aboutSpec: {
 			title: 'VCR',
 			version: 'v1.0',
@@ -1003,3 +1233,15 @@ export const MANIFESTS = [
 		statusExtra: () => null
 	})
 ];
+
+/**
+ * App display name from the static manifest registry. The system app's per-app
+ * About title (`about:<id>`) needs it, and that title runs inside getWindowDef
+ * with no `os` (SpecCtx is { args, fs }) — so it resolves the name purely over
+ * MANIFESTS, which is a fully-initialized module constant by the time any window
+ * opens. Declared after MANIFESTS; the title closure above is only invoked at
+ * window-open time, long after this module finishes loading.
+ */
+function manifestName(appId: string): string {
+	return MANIFESTS.find((m) => m.id === appId)?.name ?? '';
+}
