@@ -14,6 +14,15 @@
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 	import { getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import { openFilesystemNode } from '$lib/os/filesystem-open';
+	import {
+		canDragFilesystemNode,
+		canDropFilesystemNode,
+		clearFilesystemDragNode,
+		performFilesystemDrop,
+		readFilesystemDragNodeId,
+		writeFilesystemDragNode,
+		type FilesystemDropTarget
+	} from '$lib/os/filesystem-drag';
 
 	// Zero-prop: os/fs come from the host context. The starting folder is an
 	// explicit static arg on the matched window (finder → ROOT_ID, trash → TRASH_ID)
@@ -24,6 +33,8 @@
 
 	let currentFolderId = $state(folderId);
 	let selectedId = $state<string | null>(null);
+	let folderDropId = $state<string | null>(null);
+	let gridDropActive = $state(false);
 
 	let folderView = $state<ReturnType<typeof createFolderView> | null>(null);
 	let prevFolderView: ReturnType<typeof createFolderView> | null = null;
@@ -183,6 +194,99 @@
 		closeContextMenu();
 	}
 
+	function containsDragRelatedTarget(e: DragEvent): boolean {
+		const related = e.relatedTarget;
+		return related instanceof Node && (e.currentTarget as HTMLElement).contains(related);
+	}
+
+	function reportDropResult(result: Awaited<ReturnType<typeof performFilesystemDrop>>) {
+		if (result.ok) return;
+		os.alert({
+			title: 'Move Failed',
+			body: result.error.message,
+			buttons: [{ label: 'OK', primary: true }]
+		});
+	}
+
+	function draggedNode(e: DragEvent): FsNode | null {
+		const nodeId = readFilesystemDragNodeId(e.dataTransfer);
+		return nodeId ? (fs.peekNode(nodeId) ?? null) : null;
+	}
+
+	function targetAllowsDrop(e: DragEvent, target: FilesystemDropTarget): boolean {
+		const node = draggedNode(e);
+		return node ? canDropFilesystemNode(node, target) : false;
+	}
+
+	function handleDragStart(e: DragEvent, node: FsNode) {
+		if (!writeFilesystemDragNode(e.dataTransfer, node)) {
+			e.preventDefault();
+			return;
+		}
+		selectedId = node.id;
+		closeContextMenu();
+	}
+
+	function clearDropTarget() {
+		folderDropId = null;
+		gridDropActive = false;
+		clearFilesystemDragNode();
+	}
+
+	function handleFolderDragOver(e: DragEvent, node: FsNode) {
+		if (node.kind !== 'folder') return;
+		const target: FilesystemDropTarget = { kind: 'folder', folderId: node.id };
+		if (!targetAllowsDrop(e, target)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		folderDropId = node.id;
+		gridDropActive = false;
+	}
+
+	function handleFolderDragLeave(e: DragEvent, node: FsNode) {
+		if (folderDropId === node.id && !containsDragRelatedTarget(e)) folderDropId = null;
+	}
+
+	async function handleFolderDrop(e: DragEvent, node: FsNode) {
+		if (node.kind !== 'folder') return;
+		const nodeId = readFilesystemDragNodeId(e.dataTransfer);
+		if (!nodeId) return;
+		const target: FilesystemDropTarget = { kind: 'folder', folderId: node.id };
+		if (!targetAllowsDrop(e, target)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		clearDropTarget();
+		selectedId = nodeId;
+		reportDropResult(await performFilesystemDrop(fs, nodeId, target));
+	}
+
+	function handleGridDragOver(e: DragEvent) {
+		const target: FilesystemDropTarget = { kind: 'folder', folderId: currentFolderId };
+		if (!targetAllowsDrop(e, target)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		gridDropActive = true;
+		folderDropId = null;
+	}
+
+	function handleGridDragLeave(e: DragEvent) {
+		if (!containsDragRelatedTarget(e)) gridDropActive = false;
+	}
+
+	async function handleGridDrop(e: DragEvent) {
+		const nodeId = readFilesystemDragNodeId(e.dataTransfer);
+		if (!nodeId) return;
+		const target: FilesystemDropTarget = { kind: 'folder', folderId: currentFolderId };
+		if (!targetAllowsDrop(e, target)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		clearDropTarget();
+		selectedId = nodeId;
+		reportDropResult(await performFilesystemDrop(fs, nodeId, target));
+	}
+
 	const inTrash = $derived(currentFolderId === TRASH_ID);
 </script>
 
@@ -198,15 +302,30 @@
 		{/each}
 	</div>
 
-	<div class="finder-grid">
+	<div
+		class="finder-grid"
+		class:drop-active={gridDropActive}
+		role="region"
+		aria-label="Folder contents"
+		ondragover={handleGridDragOver}
+		ondragleave={handleGridDragLeave}
+		ondrop={handleGridDrop}
+	>
 		{#each items as node (node.id)}
 			<button
 				type="button"
 				class="finder-item"
 				class:selected={selectedId === node.id}
+				class:drop-target={folderDropId === node.id}
+				draggable={canDragFilesystemNode(node)}
 				onclick={() => handleSelect(node.id)}
 				ondblclick={() => handleOpen(node)}
 				oncontextmenu={(e) => handleContextMenu(e, node)}
+				ondragstart={(e) => handleDragStart(e, node)}
+				ondragend={clearDropTarget}
+				ondragover={(e) => handleFolderDragOver(e, node)}
+				ondragleave={(e) => handleFolderDragLeave(e, node)}
+				ondrop={(e) => handleFolderDrop(e, node)}
 			>
 				<div class="finder-item-icon" class:alias={node.kind === 'alias'}>
 					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
@@ -311,6 +430,14 @@
 		align-content: start;
 	}
 
+	.finder-grid.drop-active {
+		background:
+			repeating-linear-gradient(45deg, rgba(245, 78, 0, 0.08) 0 6px, transparent 6px 12px),
+			var(--paper, #fff);
+		outline: 2px dashed var(--accent, #f54e00);
+		outline-offset: -8px;
+	}
+
 	.finder-item {
 		display: flex;
 		flex-direction: column;
@@ -326,8 +453,22 @@
 		text-align: center;
 	}
 
+	.finder-item[draggable='true'] {
+		cursor: grab;
+	}
+
+	.finder-item[draggable='true']:active {
+		cursor: grabbing;
+	}
+
 	.finder-item:hover {
 		background: rgba(0, 0, 0, 0.04);
+	}
+
+	.finder-item.drop-target {
+		background: var(--accent-2, #f9bd2b);
+		outline: 2px dashed var(--ink, #0a0a0a);
+		outline-offset: -2px;
 	}
 
 	.finder-item.selected {

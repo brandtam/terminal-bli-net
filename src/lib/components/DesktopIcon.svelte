@@ -6,18 +6,32 @@
 		disabled = false,
 		alias = false,
 		selected = false,
+		draggable = false,
+		dropTarget = false,
 		ondblclick,
 		onselect,
 		oncontextmenu,
+		ondragstart,
+		ondragend,
+		ondragover,
+		ondragleave,
+		ondrop,
 		children
 	}: {
 		label: string;
 		disabled?: boolean;
 		alias?: boolean;
 		selected?: boolean;
+		draggable?: boolean;
+		dropTarget?: boolean;
 		ondblclick: () => void;
 		onselect?: () => void;
 		oncontextmenu?: (e: MouseEvent) => void;
+		ondragstart?: (e: DragEvent) => void;
+		ondragend?: (e: DragEvent) => void;
+		ondragover?: (e: DragEvent) => void;
+		ondragleave?: (e: DragEvent) => void;
+		ondrop?: (e: DragEvent) => void;
 		children: Snippet;
 	} = $props();
 </script>
@@ -27,6 +41,8 @@
 	class:disabled
 	class:alias
 	class:selected
+	class:drop-target={dropTarget}
+	{draggable}
 	role="button"
 	tabindex="0"
 	onclick={(e) => {
@@ -50,6 +66,11 @@
 			oncontextmenu(e);
 		}
 	}}
+	{ondragstart}
+	{ondragend}
+	{ondragover}
+	{ondragleave}
+	{ondrop}
 >
 	<div class="glyph">
 		{@render children()}
@@ -71,6 +92,17 @@
 	.desktop-icon.disabled {
 		opacity: 0.5;
 		filter: grayscale(0.6);
+	}
+	.desktop-icon[draggable='true'] {
+		cursor: grab;
+	}
+	.desktop-icon[draggable='true']:active {
+		cursor: grabbing;
+	}
+	.desktop-icon.drop-target .glyph {
+		background: var(--accent-2, #f9bd2b);
+		outline: 2px dashed var(--paper);
+		outline-offset: 3px;
 	}
 	.glyph {
 		width: 52px;

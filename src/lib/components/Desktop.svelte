@@ -34,6 +34,15 @@
 	import { matchWindow } from '$lib/terminalos/apps/app-catalog';
 	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 	import { openFilesystemNode } from '$lib/os/filesystem-open';
+	import {
+		canDragFilesystemNode,
+		canDropFilesystemNode,
+		clearFilesystemDragNode,
+		performFilesystemDrop,
+		readFilesystemDragNodeId,
+		writeFilesystemDragNode,
+		type FilesystemDropTarget
+	} from '$lib/os/filesystem-drag';
 
 	// matchWindow is the sole render gate: a window-id renders iff a manifest claims
 	// it via windows[]. Every window goes through the one WindowHost path, which
@@ -48,6 +57,8 @@
 	let selectedIconId = $state<string | null>(null);
 
 	let desktopView: ReturnType<typeof createFolderView> | null = $state(null);
+	let desktopDropActive = $state(false);
+	let trashDropActive = $state(false);
 
 	function resolveAliasSync(node: FsNode, seen?: Set<string>): FsNode | null {
 		if (node.kind !== 'alias') return null;
@@ -143,6 +154,108 @@
 		if (!deskCtxNode) return;
 		await terminalFs.trash(deskCtxNode.id);
 		closeDeskCtx();
+	}
+
+	function containsDragRelatedTarget(e: DragEvent): boolean {
+		const related = e.relatedTarget;
+		return related instanceof Node && (e.currentTarget as HTMLElement).contains(related);
+	}
+
+	function clearDropTarget() {
+		desktopDropActive = false;
+		trashDropActive = false;
+		clearFilesystemDragNode();
+	}
+
+	function reportDropResult(result: Awaited<ReturnType<typeof performFilesystemDrop>>) {
+		if (result.ok) return;
+		os.alert({
+			title: 'Move Failed',
+			body: result.error.message,
+			buttons: [{ label: 'OK', primary: true }]
+		});
+	}
+
+	function draggedNode(e: DragEvent): FsNode | null {
+		const nodeId = readFilesystemDragNodeId(e.dataTransfer);
+		return nodeId ? (terminalFs.peekNode(nodeId) ?? null) : null;
+	}
+
+	function targetAllowsDrop(e: DragEvent, target: FilesystemDropTarget): boolean {
+		const node = draggedNode(e);
+		return node ? canDropFilesystemNode(node, target) : false;
+	}
+
+	function dropOriginIsDesktopSurface(e: DragEvent): boolean {
+		const target = e.target;
+		if (!(target instanceof HTMLElement)) return false;
+		return !target.closest(
+			'.window, .dock, .menubar, .desktop-icon, .desktop-context-menu, .system-alert-backdrop'
+		);
+	}
+
+	function handleDesktopDragStart(e: DragEvent, node: FsNode) {
+		if (!writeFilesystemDragNode(e.dataTransfer, node)) {
+			e.preventDefault();
+			return;
+		}
+		selectedIconId = node.id;
+		closeDeskCtx();
+	}
+
+	function handleDesktopDragOver(e: DragEvent) {
+		const target: FilesystemDropTarget = { kind: 'folder', folderId: DESKTOP_ID };
+		if (!dropOriginIsDesktopSurface(e) || !targetAllowsDrop(e, target)) {
+			desktopDropActive = false;
+			return;
+		}
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		desktopDropActive = true;
+		trashDropActive = false;
+	}
+
+	function handleDesktopDragLeave(e: DragEvent) {
+		if (!containsDragRelatedTarget(e)) desktopDropActive = false;
+	}
+
+	async function handleDesktopDrop(e: DragEvent) {
+		const nodeId = readFilesystemDragNodeId(e.dataTransfer);
+		const target: FilesystemDropTarget = { kind: 'folder', folderId: DESKTOP_ID };
+		if (!nodeId || !dropOriginIsDesktopSurface(e) || !targetAllowsDrop(e, target)) {
+			clearDropTarget();
+			return;
+		}
+		e.preventDefault();
+		e.stopPropagation();
+		clearDropTarget();
+		selectedIconId = nodeId;
+		reportDropResult(await performFilesystemDrop(terminalFs, nodeId, target));
+	}
+
+	function handleTrashDragOver(e: DragEvent) {
+		const target: FilesystemDropTarget = { kind: 'trash' };
+		if (!targetAllowsDrop(e, target)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		trashDropActive = true;
+		desktopDropActive = false;
+	}
+
+	function handleTrashDragLeave(e: DragEvent) {
+		if (!containsDragRelatedTarget(e)) trashDropActive = false;
+	}
+
+	async function handleTrashDrop(e: DragEvent) {
+		const nodeId = readFilesystemDragNodeId(e.dataTransfer);
+		const target: FilesystemDropTarget = { kind: 'trash' };
+		if (!nodeId || !targetAllowsDrop(e, target)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		clearDropTarget();
+		selectedIconId = null;
+		reportDropResult(await performFilesystemDrop(terminalFs, nodeId, target));
 	}
 
 	function openTextEditFile(name: string) {
@@ -341,6 +454,7 @@
 	{:else}
 		<div
 			class="desktop"
+			class:drop-active={desktopDropActive}
 			data-wallpaper={os.tweaks.wallpaper.startsWith('sys7-') ? undefined : os.tweaks.wallpaper}
 			style={os.tweaks.wallpaper.startsWith('sys7-')
 				? `background: url(/themes/system7/wallpapers/${os.tweaks.wallpaper.replace('sys7-', '')}.png) repeat; image-rendering: pixelated;`
@@ -362,6 +476,9 @@
 				e.preventDefault();
 				closeDeskCtx();
 			}}
+			ondragover={handleDesktopDragOver}
+			ondragleave={handleDesktopDragLeave}
+			ondrop={handleDesktopDrop}
 		>
 			<MenuBar
 				app={os.activeApp}
@@ -394,11 +511,14 @@
 							label={node.name}
 							alias={node.kind === 'alias'}
 							selected={selectedIconId === node.id}
+							draggable={canDragFilesystemNode(node)}
 							onselect={() => {
 								selectedIconId = node.id;
 							}}
 							ondblclick={() => openDesktopNode(node)}
 							oncontextmenu={(e) => handleDesktopContextMenu(e, node)}
+							ondragstart={(e) => handleDesktopDragStart(e, node)}
+							ondragend={clearDropTarget}
 						>
 							<PixelIcon kind={desktopIconKind(node)} />
 						</DesktopIcon>
@@ -406,11 +526,15 @@
 					<DesktopIcon
 						label="Trash"
 						selected={selectedIconId === 'trash'}
+						dropTarget={trashDropActive}
 						onselect={() => {
 							selectedIconId = 'trash';
 						}}
 						ondblclick={() => os.openWindow('trash')}
 						oncontextmenu={(e) => showDesktopCtx(e, { open: () => os.openWindow('trash') })}
+						ondragover={handleTrashDragOver}
+						ondragleave={handleTrashDragLeave}
+						ondrop={handleTrashDrop}
 					>
 						<PixelIcon kind="trash" />
 					</DesktopIcon>
@@ -575,6 +699,15 @@
 		cursor: default;
 		user-select: none;
 		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
+	}
+	.desktop.drop-active::after {
+		content: '';
+		position: fixed;
+		inset: 30px 10px 10px;
+		border: 2px dashed var(--paper);
+		background: rgba(255, 255, 255, 0.08);
+		pointer-events: none;
+		z-index: 0;
 	}
 	.desktop[data-wallpaper='teal'] {
 		background-color: #008080;
