@@ -915,6 +915,50 @@ export class TerminalFS {
 		return ok(file);
 	}
 
+	async replaceBlobFileBody(
+		fileId: NodeId,
+		data: ArrayBuffer,
+		opts: { contentType?: string | null } = {}
+	): Promise<FsResult<FsFile>> {
+		const node = this.nodes.get(fileId);
+		if (!node) return fail('not_found', `Node "${fileId}" not found`);
+		if (node.kind !== 'file') return fail('not_found', `Node "${fileId}" is not a file`);
+
+		const previousBodyRef = node.bodyRef;
+		const bodyId: BodyId = `body_${generateUniqueId()}`;
+
+		// Write the new immutable body before the manifest points at it.
+		const writeResult = await this.bodies.write(bodyId, data);
+		if (!writeResult.ok) return writeResult as FsResult<FsFile>;
+
+		const preservedContentType =
+			previousBodyRef?.kind === 'indexeddb-blob' ? previousBodyRef.contentType : undefined;
+		const contentType = opts.contentType === undefined ? preservedContentType : opts.contentType;
+		const bodyRef: BodyRef = {
+			kind: 'indexeddb-blob',
+			bodyId,
+			size: data.byteLength,
+			...(contentType != null ? { contentType } : {})
+		};
+		const updated: FsFile = {
+			...node,
+			bodyRef,
+			updatedAt: Date.now()
+		};
+		this.nodes.set(fileId, updated);
+
+		const shouldCollectGarbage = previousBodyRef?.kind === 'indexeddb-blob';
+		const persistResult = await this.debouncedPersist();
+		if (!persistResult.ok) {
+			this.nodes.set(fileId, node);
+			return persistResult as FsResult<FsFile>;
+		}
+		await this.collectGarbageAfterCommit(shouldCollectGarbage);
+
+		this.notifyChange([fileId], [node.parentId], 'write');
+		return ok(updated);
+	}
+
 	async writeText(fileId: NodeId, text: string): Promise<FsResult<FsFile>> {
 		const node = this.nodes.get(fileId);
 		if (!node) return fail('not_found', `Node "${fileId}" not found`);
@@ -1532,10 +1576,6 @@ export class TerminalFS {
 		const data = await this.bodies.read(bodyId);
 		if (!data) return fail('not_found', `Body "${bodyId}" not found`);
 		return ok(data);
-	}
-
-	async writeBody(bodyId: BodyId, data: ArrayBuffer): Promise<FsResult<void>> {
-		return this.bodies.write(bodyId, data);
 	}
 
 	// --- Disk usage ---

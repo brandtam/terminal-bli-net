@@ -105,7 +105,7 @@ describe('body store', () => {
 		const fs = TerminalFS.createCleanDisk(undefined, bodies);
 
 		const data = new TextEncoder().encode('Hello World').buffer;
-		const writeResult = await fs.writeBody('body-1', data);
+		const writeResult = await bodies.write('body-1', data);
 		expect(writeResult.ok).toBe(true);
 
 		const readResult = await fs.readBody('body-1');

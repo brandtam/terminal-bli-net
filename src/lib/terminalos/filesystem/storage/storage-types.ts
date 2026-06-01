@@ -28,7 +28,7 @@ export class InMemoryManifestStore implements ManifestStore {
 	async load() {
 		return this.data;
 	}
-	async save(volume: TerminalVolume, nodes: FsNode[]) {
+	async save(volume: TerminalVolume, nodes: FsNode[]): Promise<FsResult<void>> {
 		this.data = { volume, nodes };
 		return { ok: true as const, value: undefined };
 	}
@@ -43,7 +43,7 @@ export class InMemoryBodyStore implements BodyStore {
 	async read(bodyId: BodyId) {
 		return this.bodies.get(bodyId) ?? null;
 	}
-	async write(bodyId: BodyId, data: ArrayBuffer) {
+	async write(bodyId: BodyId, data: ArrayBuffer): Promise<FsResult<void>> {
 		this.bodies.set(bodyId, data);
 		return { ok: true as const, value: undefined };
 	}

@@ -121,16 +121,12 @@ describe('blob body round-trip', () => {
 	it('export captures blob bytes as base64 keyed by bodyId', async () => {
 		const fs = TerminalFS.createCleanDisk();
 		const bytes = new TextEncoder().encode('binary clip').buffer as ArrayBuffer;
-		const bodyId = 'body_test_1';
-		await fs.writeBody(bodyId, bytes);
-
-		// No public API to make a blob-backed file yet (later phase), so attach
-		// the ref directly to the live node.
-		const created = await fs.createFile(DOCUMENTS_ID, 'clip.webm', { fileType: 'recording' });
+		const created = await fs.createBlobFile(DOCUMENTS_ID, 'clip.webm', bytes, {
+			fileType: 'recording'
+		});
 		if (!created.ok) throw new Error('createFile failed');
-		const node = fs.getAllNodes().get(created.value.id);
-		if (!node || node.kind !== 'file') throw new Error('node missing');
-		node.bodyRef = { kind: 'indexeddb-blob', bodyId, size: bytes.byteLength };
+		const bodyId =
+			created.value.bodyRef?.kind === 'indexeddb-blob' ? created.value.bodyRef.bodyId : '';
 
 		const result = await fs.exportBackup();
 		expect(result.ok).toBe(true);
@@ -144,14 +140,12 @@ describe('blob body round-trip', () => {
 	it('round-trip restores blob bytes into a fresh disk', async () => {
 		const fs = TerminalFS.createCleanDisk();
 		const bytes = new TextEncoder().encode('binary clip').buffer as ArrayBuffer;
-		const bodyId = 'body_test_1';
-		await fs.writeBody(bodyId, bytes);
-
-		const created = await fs.createFile(DOCUMENTS_ID, 'clip.webm', { fileType: 'recording' });
+		const created = await fs.createBlobFile(DOCUMENTS_ID, 'clip.webm', bytes, {
+			fileType: 'recording'
+		});
 		if (!created.ok) throw new Error('createFile failed');
-		const node = fs.getAllNodes().get(created.value.id);
-		if (!node || node.kind !== 'file') throw new Error('node missing');
-		node.bodyRef = { kind: 'indexeddb-blob', bodyId, size: bytes.byteLength };
+		const bodyId =
+			created.value.bodyRef?.kind === 'indexeddb-blob' ? created.value.bodyRef.bodyId : '';
 
 		const exported = await fs.exportBackup();
 		if (!exported.ok) throw new Error('export failed');
@@ -203,10 +197,11 @@ describe('blob body round-trip', () => {
 	});
 
 	it('restoring an older v1/v2 backup clears pre-existing blob bodies', async () => {
-		const fs = TerminalFS.createCleanDisk();
+		const bodies = new InMemoryBodyStore();
+		const fs = TerminalFS.createCleanDisk(undefined, bodies);
 		// A blob written under the current (v3) world.
 		const bodyId = 'body_stale';
-		await fs.writeBody(bodyId, new TextEncoder().encode('stale clip').buffer as ArrayBuffer);
+		await bodies.write(bodyId, new TextEncoder().encode('stale clip').buffer as ArrayBuffer);
 		expect((await fs.readBody(bodyId)).ok).toBe(true);
 
 		// Restore a v2 backup — predates blobs, references none. Restore is a full
@@ -422,7 +417,7 @@ describe('restoreBackup', () => {
 		const bodies = new InMemoryBodyStore();
 		const fs = TerminalFS.createCleanDisk(manifest, bodies);
 		await fs.createTextFile(DOCUMENTS_ID, 'keep.txt', 'keep');
-		await fs.writeBody('body_keep', new TextEncoder().encode('old clip').buffer as ArrayBuffer);
+		await bodies.write('body_keep', new TextEncoder().encode('old clip').buffer as ArrayBuffer);
 
 		const source = TerminalFS.createCleanDisk();
 		const badFile = {
