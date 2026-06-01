@@ -1,4 +1,4 @@
-import type { WindowState, TweaksState, GroupMeta, Bot, Channel } from '$lib/types';
+import type { WindowState, TweaksState, GroupMeta, PublicBot, Channel } from '$lib/types';
 import type { OsApi, AlertSpec, GuideApi, ShowInfo } from './os-api';
 import { windowAppId } from './os-api';
 import { APPS } from './app-registry';
@@ -44,7 +44,7 @@ export class OsApiClass implements OsApi {
 	now = $state(new Date());
 	slotNow = $state(new Date());
 	groups = $state<GroupMeta[]>([]);
-	bots = $state<Bot[]>([]);
+	bots = $state<PublicBot[]>([]);
 	channels = $state<Channel[]>([]);
 	isMobile = $state(false);
 	mounted = $state(false);
@@ -79,7 +79,7 @@ export class OsApiClass implements OsApi {
 			if (res.ok) {
 				const data = (await res.json()) as {
 					groups: GroupMeta[];
-					bots: Bot[];
+					bots: PublicBot[];
 					channels: Channel[];
 				};
 				this.groups = data.groups;

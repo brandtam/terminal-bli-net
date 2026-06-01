@@ -2,8 +2,9 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { POST } from './+server';
 import { streamCompletion } from '$lib/server/llm';
 import { canRespond, recordMessage, recordTokens } from '$lib/server/spend';
-import { getBotById, loadChannels, loadGroups } from '$lib/server/bots';
+import { loadContentCatalog } from '$lib/server/content-catalog';
 import type { Bot, Channel, Show, TextChunk } from '$lib/types';
+import type { ContentCatalog } from '$lib/server/content-catalog';
 
 vi.mock('$lib/server/llm', () => ({
 	streamCompletion: vi.fn()
@@ -15,19 +16,15 @@ vi.mock('$lib/server/spend', () => ({
 	recordTokens: vi.fn()
 }));
 
-vi.mock('$lib/server/bots', () => ({
-	getBotById: vi.fn(),
-	loadChannels: vi.fn(),
-	loadGroups: vi.fn()
+vi.mock('$lib/server/content-catalog', () => ({
+	loadContentCatalog: vi.fn()
 }));
 
 const streamCompletionMock = vi.mocked(streamCompletion);
 const canRespondMock = vi.mocked(canRespond);
 const recordMessageMock = vi.mocked(recordMessage);
 const recordTokensMock = vi.mocked(recordTokens);
-const getBotByIdMock = vi.mocked(getBotById);
-const loadChannelsMock = vi.mocked(loadChannels);
-const loadGroupsMock = vi.mocked(loadGroups);
+const loadContentCatalogMock = vi.mocked(loadContentCatalog);
 
 const sessionId = '00000000-0000-4000-8000-000000000000';
 
@@ -94,6 +91,20 @@ function makeTokenStream(chunks: TextChunk[]): ReadableStream<TextChunk> {
 	});
 }
 
+function makeCatalog(channels: Channel[]): ContentCatalog {
+	return {
+		bots: [bot],
+		groups: [show],
+		shows: [show],
+		channels,
+		botsById: new Map([[bot.id, bot]]),
+		botsByGroup: new Map([[bot.group, [bot]]]),
+		groupsBySlug: new Map([[show.slug, show]]),
+		showsBySlug: new Map([[show.slug, show]]),
+		channelsBySlug: new Map(channels.map((channel) => [channel.slug, channel]))
+	};
+}
+
 function makeEvent(body: Record<string, unknown>) {
 	return {
 		request: new Request('http://localhost/api/chat', {
@@ -128,14 +139,14 @@ describe('POST /api/chat', () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-01-04T10:00:00Z'));
 
-		getBotByIdMock.mockReturnValue(bot);
-		loadGroupsMock.mockReturnValue([show]);
-		loadChannelsMock.mockReturnValue([
-			makeChannel({
-				20: { showSlug: 'seinfeld', season: 3, episode: 7 },
-				31: { showSlug: 'seinfeld', season: 5, episode: 14 }
-			})
-		]);
+		loadContentCatalogMock.mockReturnValue(
+			makeCatalog([
+				makeChannel({
+					20: { showSlug: 'seinfeld', season: 3, episode: 7 },
+					31: { showSlug: 'seinfeld', season: 5, episode: 14 }
+				})
+			])
+		);
 		canRespondMock.mockResolvedValue({ allowed: true });
 		recordMessageMock.mockResolvedValue();
 		recordTokensMock.mockResolvedValue(0);

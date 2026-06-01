@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { streamCompletion } from '$lib/server/llm';
 import { canRespond, recordTokens, recordMessage } from '$lib/server/spend';
-import { getBotById, loadChannels, loadGroups } from '$lib/server/bots';
+import { loadContentCatalog } from '$lib/server/content-catalog';
 import { createChatSession, validateChatTimezone } from '$lib/server/chat-session';
 import type { ChatMessage, LlmProvider } from '$lib/types';
 import type { LlmProviderConfig } from '$lib/server/llm';
@@ -134,15 +134,16 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		throw error(400, e instanceof Error ? e.message : 'timezone is invalid');
 	}
 
-	const bot = getBotById(botId);
+	const catalog = loadContentCatalog();
+	const bot = catalog.botsById.get(botId);
 	if (!bot) {
 		throw error(404, `Bot "${botId}" not found`);
 	}
 
 	const chatSession = createChatSession({
 		bot,
-		channels: loadChannels(),
-		shows: loadGroups(),
+		channels: catalog.channels,
+		shows: catalog.shows,
 		now: new Date(),
 		timezone
 	});

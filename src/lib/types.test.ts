@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf } from 'vitest';
-import type { Episode, ChannelSlot, Channel, Show, GroupMeta } from './types';
+import type { Episode, ChannelSlot, Channel, Show, GroupMeta, PublicBot } from './types';
 
 describe('Episode type', () => {
 	it('accepts a valid episode', () => {
@@ -107,5 +107,11 @@ describe('Show / GroupMeta type', () => {
 
 	it('does not include the retired weekly schedule field', () => {
 		expectTypeOf<Extract<'schedule', keyof GroupMeta>>().toEqualTypeOf<never>();
+	});
+});
+
+describe('PublicBot type', () => {
+	it('does not include private prompt text', () => {
+		expectTypeOf<Extract<'prompt', keyof PublicBot>>().toEqualTypeOf<never>();
 	});
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { GroupMeta, Bot, Channel, ChannelSlot } from '$lib/types';
+	import type { GroupMeta, PublicBot, Channel, ChannelSlot } from '$lib/types';
 	import { getSlotIndex, getCurrentSlot, isShowOnAir } from '$lib/schedule';
 	import {
 		type TimeSlot,
@@ -40,7 +40,7 @@
 		isLive: boolean;
 	}
 
-	function getGroupBots(group: GroupMeta): Bot[] {
+	function getGroupBots(group: GroupMeta): PublicBot[] {
 		return os.bots.filter((b) => b.group === group.slug);
 	}
 
