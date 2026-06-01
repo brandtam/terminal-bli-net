@@ -22,6 +22,33 @@
 	];
 
 	const iconKinds = ['hd', 'folder', 'tv', 'doc', 'trash', 'calc', 'floppy', 'guide'];
+
+	const tokenLayers = [
+		{
+			name: 'Brand tokens',
+			prefix: '--brand-*',
+			file: 'brand.css',
+			desc: 'The constants: palette, fonts, the size scale, the 4px spacing scale, radius, and motion easings. Defined once at :root and never overridden by a theme.'
+		},
+		{
+			name: 'Chrome tokens',
+			prefix: '--chrome-*',
+			file: 'chrome.system7.css',
+			desc: 'The per-theme surface — window, title bar, menu, dock, dialog, scrollbar, cursor. A theme sets these; they reference brand tokens as their values/fallbacks. Win95 is a separate chrome file.'
+		},
+		{
+			name: 'Wallpaper tokens',
+			prefix: '--wallpaper-*',
+			file: 'brand.css',
+			desc: 'The desktop background palettes — a base fill plus a dither/speckle overlay per pattern (teal, speckle, yellow, pink, navy). Consumed by Desktop.svelte.'
+		},
+		{
+			name: 'Bridge aliases',
+			prefix: '--ink, --paper, --accent…',
+			file: 'app.css',
+			desc: 'Short ergonomic names mapping straight to brand tokens (--ink → --brand-color-ink, --accent → --brand-color-orange). Most app chrome reaches for these.'
+		}
+	];
 </script>
 
 <svelte:head>
@@ -33,6 +60,59 @@
 		<h1>Design System</h1>
 		<p>Living style guide for Terminal — previously on screens...</p>
 	</header>
+
+	<!-- Token Layers -->
+	<section class="ds-section">
+		<h2>Token Layers</h2>
+		<p class="ds-desc">
+			Design tokens stack in layers. A contributor styling app chrome reaches for the bridge
+			aliases; a theme author sets chrome tokens; both bottom out in the brand constants. Reach for
+			the layer that matches what you're changing.
+		</p>
+		<div class="layer-grid">
+			{#each tokenLayers as layer (layer.name)}
+				<div class="layer-card">
+					<div class="layer-head">
+						<strong class="layer-name">{layer.name}</strong>
+						<code class="layer-prefix">{layer.prefix}</code>
+					</div>
+					<span class="layer-file">{layer.file}</span>
+					<p class="layer-desc">{layer.desc}</p>
+				</div>
+			{/each}
+		</div>
+		<p class="ds-desc layer-notes">
+			<strong>Typography</strong> — reach for <code>--brand-font-*</code> (display / body / ui) and
+			the <code>--brand-text-*</code> size scale. <strong>Spacing</strong> — the
+			<code>--brand-space-*</code> 4px scale (space-1 = 4px … space-12 = 48px).
+			<strong>Motion</strong> — <code>--brand-easing-snap</code> (linear) and
+			<code>--brand-easing-pop</code> (overshoot). <strong>Icons</strong> are intentional pixel art: PixelIcon
+			fills are pinned inline and deliberately not tokenized, so an icon reads on any theme.
+		</p>
+		<h3 class="recipe-title">Adding a themed color</h3>
+		<ol class="recipe">
+			<li>
+				Add the constant to the palette block in <code>brand.css</code>:
+				<code>--brand-color-foo: #abc123;</code>. This is the single source of truth.
+			</li>
+			<li>
+				If app code wants a short name, add a bridge alias in <code>app.css</code>:
+				<code>--foo: var(--brand-color-foo);</code>.
+			</li>
+			<li>
+				If a theme's chrome should use it, point a chrome token at it in the theme file:
+				<code>--chrome-…: var(--brand-color-foo);</code> — never the raw hex.
+			</li>
+			<li>
+				For a new wallpaper, add <code>--wallpaper-foo-base</code> / <code>-dither</code> in
+				<code>brand.css</code> and reference them in <code>Desktop.svelte</code>.
+			</li>
+			<li>
+				A TS default that can't read a CSS var (e.g. a persisted default) carries the hex with a
+				comment naming the token it mirrors — see <code>persistence.ts</code>'s accent default.
+			</li>
+		</ol>
+	</section>
 
 	<!-- Color Palette -->
 	<section class="ds-section">
@@ -275,6 +355,78 @@
 		font-size: 19px;
 		margin: 0 0 16px;
 		opacity: 0.8;
+	}
+
+	/* Token Layers */
+	.layer-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: 12px;
+	}
+	.layer-card {
+		border: 2px solid var(--ink);
+		background: var(--paper-soft);
+		padding: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.layer-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.layer-name {
+		font-family: var(--brand-font-ui);
+		font-size: 16px;
+	}
+	.layer-prefix {
+		font-family: var(--brand-font-body);
+		font-size: 16px;
+		background: var(--paper);
+		padding: 1px 5px;
+		border: 1px solid var(--ink);
+	}
+	.layer-file {
+		font-family: var(--brand-font-display);
+		font-size: 8px;
+		opacity: 0.7;
+	}
+	.layer-desc {
+		font-family: var(--brand-font-body);
+		font-size: 17px;
+		line-height: 1.3;
+		margin: 4px 0 0;
+	}
+	.layer-notes {
+		margin-top: 16px;
+		margin-bottom: 0;
+	}
+	.layer-notes code {
+		background: var(--paper-soft);
+		padding: 1px 4px;
+		border: 1px solid var(--ink);
+	}
+	.recipe-title {
+		font-family: var(--brand-font-ui);
+		font-size: 18px;
+		margin: 20px 0 8px;
+	}
+	.recipe {
+		font-family: var(--brand-font-body);
+		font-size: 17px;
+		line-height: 1.35;
+		margin: 0;
+		padding-left: 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.recipe code {
+		background: var(--paper-soft);
+		padding: 1px 4px;
+		border: 1px solid var(--ink);
 	}
 
 	/* Color Palette */

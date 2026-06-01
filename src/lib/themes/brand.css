@@ -17,6 +17,23 @@
 	--brand-color-paper: #ffffff;
 	--brand-color-paper-soft: #e9e8df;
 
+	/* ── Wallpaper ──
+	   Desktop background palettes. Each pattern is a base fill plus a
+	   dither/speckle overlay. Bases for teal/yellow/pink match the brand
+	   palette above; the dither shades, the speckle base/dots, and navy are
+	   net-new and only used by the desktop wallpaper. */
+	--wallpaper-teal-base: #008080;
+	--wallpaper-teal-dither: #5e8585;
+	--wallpaper-speckle-base: #e8e1d3;
+	--wallpaper-speckle-dot-1: #c8bda6;
+	--wallpaper-speckle-dot-2: #b8a989;
+	--wallpaper-yellow-base: #f9bd2b;
+	--wallpaper-yellow-dither: #e3aa20;
+	--wallpaper-pink-base: #ff79c6;
+	--wallpaper-pink-dither: #ee63b3;
+	--wallpaper-navy-base: #0e1a2b;
+	--wallpaper-navy-dither: #16243a;
+
 	/* ── Show colors ── */
 	--brand-show-seinfeld: #f9bd2b;
 	--brand-show-office: #2b6cb0;

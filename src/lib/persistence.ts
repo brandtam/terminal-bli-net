@@ -88,6 +88,8 @@ export function saveWindows(windows: WindowState[]): void {
 
 const TWEAKS_DEFAULTS: TweaksState = {
 	wallpaper: 'teal',
+	// Mirrors --brand-color-orange in brand.css. A TS default can't read a CSS
+	// var, so keep this hex in sync with that token if the brand orange changes.
 	accent: '#f54e00',
 	tvGridLoop: 400,
 	marqueeLoop: 100,
