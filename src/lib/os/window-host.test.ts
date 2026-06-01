@@ -167,6 +167,27 @@ describe('recorder statusExtra (REC badge)', () => {
 });
 
 describe('resolveOpenTarget', () => {
+	it('routes TextEdit documents to their textedit instance window', () => {
+		const file = mkFile({
+			id: 'readme1',
+			name: 'README.TXT',
+			fileType: 'text',
+			opensWith: 'textedit'
+		});
+		expect(resolveOpenTarget(file)).toBe('textedit:readme1');
+	});
+
+	it('routes sticky documents to their sticky note instance window', () => {
+		const file = mkFile({
+			id: 'note1',
+			name: 'Untitled Note',
+			appId: 'stickies',
+			fileType: 'sticky',
+			opensWith: 'stickies'
+		});
+		expect(resolveOpenTarget(file)).toBe('sticky:note1');
+	});
+
 	it('routes a recording to the Player via opensWith (the bug_002 path)', () => {
 		const file = mkFile({
 			id: 'rec1',

@@ -30,9 +30,10 @@
 		setStickyColor
 	} from '$lib/apps/stickies/stickies-manager.svelte';
 	import DesktopContextMenu from './DesktopContextMenu.svelte';
-	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import { getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import { matchWindow } from '$lib/terminalos/apps/app-catalog';
 	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
+	import { openFilesystemNode } from '$lib/os/filesystem-open';
 
 	// matchWindow is the sole render gate: a window-id renders iff a manifest claims
 	// it via windows[]. Every window goes through the one WindowHost path, which
@@ -60,34 +61,15 @@
 		return target;
 	}
 
-	async function openDesktopNode(node: FsNode) {
-		if (node.kind === 'alias') {
-			const target = resolveAliasSync(node);
-			if (target) openDesktopNode(target);
-			return;
-		}
-		if (node.kind === 'file') {
-			const file = node as FsFile;
-			const appId = file.appId;
-			if (!appId) {
-				os.openWindow(file.id);
-				return;
-			}
-			// Special apps need their own handling
-			if (appId === 'stickies') {
-				const id = await createStickyNote(terminalFs);
-				if (id) os.openWindow(`sticky:${id}`);
-				return;
-			}
-			// Generic: look up the window ID
-			const windowId = getAppWindowId(appId);
-			if (windowId) {
-				os.openWindow(windowId);
-				return;
-			}
-			// Fallback for files opened by their app (textedit docs, recordings)
-			os.openWindow(file.id);
-		}
+	function openDesktopNode(node: FsNode) {
+		openFilesystemNode(node, {
+			resolveAlias: (alias) => resolveAliasSync(alias),
+			openFolder: (folder) => {
+				os.openWindow(folder.id === TRASH_ID ? 'trash' : 'finder');
+			},
+			launchApp: (appId) => os.launchApp(appId),
+			openDocument: (file) => os.openDocument(file)
+		});
 	}
 
 	function desktopIconKind(node: FsNode): string {
