@@ -1,4 +1,18 @@
 <script lang="ts">
+	/*
+	 * Pixel-art convention — read before adding fills.
+	 *
+	 * The hex `fill` values below are intentional pixel-art internals, NOT theme
+	 * tokens. Each icon has a fixed retro palette that lives inline. We
+	 * deliberately do NOT drive these from --brand-* / --chrome-* tokens: an
+	 * icon has to read correctly on every wallpaper and theme, so its colors are
+	 * pinned, not themed. Don't tokenize them.
+	 *
+	 * The only theme seam is the props below. Two kinds accept them:
+	 *   - `tv`  uses `color` for its screen fill (defaults to #a6f000).
+	 *   - `doc` uses `accent` to flip its page fill yellow vs white.
+	 * Every other kind ignores both props by design.
+	 */
 	let {
 		kind,
 		color,

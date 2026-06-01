@@ -709,10 +709,22 @@
 		z-index: 0;
 	}
 	.desktop[data-wallpaper='teal'] {
-		background-color: #008080;
+		background-color: var(--wallpaper-teal-base);
 		background-image:
-			linear-gradient(45deg, #5e8585 25%, transparent 25%, transparent 75%, #5e8585 75%),
-			linear-gradient(45deg, #5e8585 25%, transparent 25%, transparent 75%, #5e8585 75%);
+			linear-gradient(
+				45deg,
+				var(--wallpaper-teal-dither) 25%,
+				transparent 25%,
+				transparent 75%,
+				var(--wallpaper-teal-dither) 75%
+			),
+			linear-gradient(
+				45deg,
+				var(--wallpaper-teal-dither) 25%,
+				transparent 25%,
+				transparent 75%,
+				var(--wallpaper-teal-dither) 75%
+			);
 		background-size:
 			4px 4px,
 			4px 4px;
@@ -721,10 +733,10 @@
 			2px 2px;
 	}
 	.desktop[data-wallpaper='speckle'] {
-		background-color: #e8e1d3;
+		background-color: var(--wallpaper-speckle-base);
 		background-image:
-			radial-gradient(circle at 1px 1px, #c8bda6 1px, transparent 1.5px),
-			radial-gradient(circle at 3px 5px, #b8a989 1px, transparent 1.5px);
+			radial-gradient(circle at 1px 1px, var(--wallpaper-speckle-dot-1) 1px, transparent 1.5px),
+			radial-gradient(circle at 3px 5px, var(--wallpaper-speckle-dot-2) 1px, transparent 1.5px);
 		background-size:
 			6px 6px,
 			8px 8px;
@@ -733,10 +745,22 @@
 			2px 3px;
 	}
 	.desktop[data-wallpaper='yellow'] {
-		background-color: #f9bd2b;
+		background-color: var(--wallpaper-yellow-base);
 		background-image:
-			linear-gradient(45deg, #e3aa20 25%, transparent 25%, transparent 75%, #e3aa20 75%),
-			linear-gradient(45deg, #e3aa20 25%, transparent 25%, transparent 75%, #e3aa20 75%);
+			linear-gradient(
+				45deg,
+				var(--wallpaper-yellow-dither) 25%,
+				transparent 25%,
+				transparent 75%,
+				var(--wallpaper-yellow-dither) 75%
+			),
+			linear-gradient(
+				45deg,
+				var(--wallpaper-yellow-dither) 25%,
+				transparent 25%,
+				transparent 75%,
+				var(--wallpaper-yellow-dither) 75%
+			);
 		background-size:
 			4px 4px,
 			4px 4px;
@@ -745,10 +769,22 @@
 			2px 2px;
 	}
 	.desktop[data-wallpaper='pink'] {
-		background-color: #ff79c6;
+		background-color: var(--wallpaper-pink-base);
 		background-image:
-			linear-gradient(45deg, #ee63b3 25%, transparent 25%, transparent 75%, #ee63b3 75%),
-			linear-gradient(45deg, #ee63b3 25%, transparent 25%, transparent 75%, #ee63b3 75%);
+			linear-gradient(
+				45deg,
+				var(--wallpaper-pink-dither) 25%,
+				transparent 25%,
+				transparent 75%,
+				var(--wallpaper-pink-dither) 75%
+			),
+			linear-gradient(
+				45deg,
+				var(--wallpaper-pink-dither) 25%,
+				transparent 25%,
+				transparent 75%,
+				var(--wallpaper-pink-dither) 75%
+			);
 		background-size:
 			4px 4px,
 			4px 4px;
@@ -757,10 +793,22 @@
 			2px 2px;
 	}
 	.desktop[data-wallpaper='navy'] {
-		background-color: #0e1a2b;
+		background-color: var(--wallpaper-navy-base);
 		background-image:
-			linear-gradient(45deg, #16243a 25%, transparent 25%, transparent 75%, #16243a 75%),
-			linear-gradient(45deg, #16243a 25%, transparent 25%, transparent 75%, #16243a 75%);
+			linear-gradient(
+				45deg,
+				var(--wallpaper-navy-dither) 25%,
+				transparent 25%,
+				transparent 75%,
+				var(--wallpaper-navy-dither) 75%
+			),
+			linear-gradient(
+				45deg,
+				var(--wallpaper-navy-dither) 25%,
+				transparent 25%,
+				transparent 75%,
+				var(--wallpaper-navy-dither) 75%
+			);
 		background-size:
 			4px 4px,
 			4px 4px;
