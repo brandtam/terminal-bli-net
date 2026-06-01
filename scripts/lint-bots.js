@@ -75,8 +75,24 @@ try {
 		const metaPath = join(groupDir, '_meta.json');
 		try {
 			const meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
-			if (!meta.slug || !meta.name || !meta.schedule || !Array.isArray(meta.schedule)) {
-				console.error(`\n❌ ${group}/_meta.json: Missing required fields (slug, name, schedule)`);
+			if (
+				!meta.slug ||
+				!meta.name ||
+				!meta.description ||
+				!meta.setting ||
+				!meta.era ||
+				!meta.image ||
+				typeof meta.active !== 'boolean'
+			) {
+				console.error(
+					`\n❌ ${group}/_meta.json: Missing required fields (slug, name, description, setting, era, image, active)`
+				);
+				errorCount++;
+			}
+			if ('schedule' in meta) {
+				console.error(
+					`\n❌ ${group}/_meta.json: Legacy weekly schedule field is retired; use channels/*.json schedules`
+				);
 				errorCount++;
 			}
 		} catch {

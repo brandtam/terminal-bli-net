@@ -7,18 +7,6 @@
 	"image": "/bots/mash/group-icon.png",
 	"active": true,
 	"color": "#556b2f",
-	"schedule": [
-		{ "day": "mon", "start": "00:00", "duration": 240 },
-		{ "day": "mon", "start": "19:00", "duration": 180 },
-		{ "day": "tue", "start": "16:00", "duration": 180 },
-		{ "day": "wed", "start": "04:00", "duration": 180 },
-		{ "day": "wed", "start": "19:00", "duration": 180 },
-		{ "day": "fri", "start": "07:00", "duration": 180 },
-		{ "day": "fri", "start": "22:00", "duration": 180 },
-		{ "day": "sat", "start": "00:00", "duration": 240 },
-		{ "day": "sun", "start": "04:00", "duration": 180 },
-		{ "day": "sun", "start": "13:00", "duration": 180 }
-	],
 	"episodes": [
 		{
 			"season": 1,

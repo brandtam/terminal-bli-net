@@ -7,17 +7,6 @@
 	"image": "/bots/seinfeld/group-icon.png",
 	"active": true,
 	"color": "#f5c518",
-	"schedule": [
-		{ "day": "tue", "start": "04:00", "duration": 180 },
-		{ "day": "tue", "start": "19:00", "duration": 180 },
-		{ "day": "wed", "start": "16:00", "duration": 180 },
-		{ "day": "thu", "start": "07:00", "duration": 180 },
-		{ "day": "thu", "start": "22:00", "duration": 180 },
-		{ "day": "fri", "start": "00:00", "duration": 240 },
-		{ "day": "fri", "start": "10:00", "duration": 180 },
-		{ "day": "sat", "start": "13:00", "duration": 180 },
-		{ "day": "sat", "start": "19:00", "duration": 180 }
-	],
 	"episodes": [
 		{
 			"season": 1,

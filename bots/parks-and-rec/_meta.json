@@ -7,17 +7,6 @@
 	"image": "/bots/parks-and-rec/group-icon.png",
 	"active": true,
 	"color": "#2e86de",
-	"schedule": [
-		{ "day": "mon", "start": "16:00", "duration": 180 },
-		{ "day": "tue", "start": "07:00", "duration": 180 },
-		{ "day": "wed", "start": "13:00", "duration": 180 },
-		{ "day": "thu", "start": "04:00", "duration": 180 },
-		{ "day": "thu", "start": "10:00", "duration": 180 },
-		{ "day": "fri", "start": "16:00", "duration": 180 },
-		{ "day": "sat", "start": "07:00", "duration": 180 },
-		{ "day": "sat", "start": "16:00", "duration": 180 },
-		{ "day": "sun", "start": "19:00", "duration": 180 }
-	],
 	"episodes": [
 		{
 			"season": 2,

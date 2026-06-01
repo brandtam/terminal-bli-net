@@ -1,11 +1,3 @@
-export type DayOfWeek = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
-
-export interface Slot {
-	day: DayOfWeek;
-	start: string;
-	duration: number;
-}
-
 export interface Episode {
 	season: number;
 	episode: number;
@@ -36,7 +28,6 @@ export interface GroupMeta {
 	era: string;
 	image: string;
 	active: boolean;
-	schedule?: Slot[];
 	color?: string;
 	episodes?: Episode[];
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import type { Episode, ChannelSlot, Channel, Show, GroupMeta } from './types';
 
 describe('Episode type', () => {
@@ -105,18 +105,7 @@ describe('Show / GroupMeta type', () => {
 		expect(show.slug).toBe('friends');
 	});
 
-	it('allows optional schedule field for backward compat', () => {
-		const group: GroupMeta = {
-			slug: 'cheers',
-			name: 'Cheers',
-			description: 'A Boston bar.',
-			setting: 'Boston',
-			era: '1980s',
-			image: '/images/cheers.png',
-			active: true,
-			schedule: [{ day: 'mon', start: '20:00', duration: 60 }]
-		};
-
-		expect(group.schedule).toHaveLength(1);
+	it('does not include the retired weekly schedule field', () => {
+		expectTypeOf<Extract<'schedule', keyof GroupMeta>>().toEqualTypeOf<never>();
 	});
 });
