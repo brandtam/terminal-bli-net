@@ -3,7 +3,6 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { Channel, ChannelSlot } from './types';
 
-/* eslint-disable no-undef */
 const CHANNELS_DIR = join(process.cwd(), 'channels');
 const BOTS_DIR = join(process.cwd(), 'bots');
 

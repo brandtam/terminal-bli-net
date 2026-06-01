@@ -17,7 +17,7 @@ interface Meta {
 }
 
 function loadAllMetas(): Meta[] {
-	const botsDir = resolve(process.cwd(), 'bots'); // eslint-disable-line no-undef
+	const botsDir = resolve(process.cwd(), 'bots');
 	const dirs = readdirSync(botsDir).filter((d) => statSync(join(botsDir, d)).isDirectory());
 	return dirs.map((d) => JSON.parse(readFileSync(join(botsDir, d, '_meta.json'), 'utf-8')));
 }
