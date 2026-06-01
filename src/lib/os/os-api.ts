@@ -1,5 +1,5 @@
 import type { WindowState, TweaksState, GroupMeta } from '$lib/types';
-import type { FsFile } from '$lib/terminalos';
+import type { BodyGcReport, FsFile, FsResult } from '$lib/terminalos';
 import { synthWindowAppMap, synthWindowAppId } from '$lib/terminalos/apps/app-catalog';
 
 export interface AboutSection {
@@ -97,6 +97,7 @@ export interface OsApi {
 	openDocument: (file: FsFile) => void;
 
 	openSystemPreferences: () => void;
+	openSystemMaintenance: () => void;
 	openPreferences: (appId: string) => void;
 	openAbout: (appId: string | null) => void;
 
@@ -115,6 +116,7 @@ export interface OsApi {
 	startNewConversation: () => void;
 
 	emptyTrash: () => Promise<void>;
+	collectFilesystemGarbage: () => Promise<FsResult<BodyGcReport>>;
 	exportBackup: () => void;
 	restoreBackup: () => void;
 	reinstallOS: () => void;

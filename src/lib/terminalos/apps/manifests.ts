@@ -170,17 +170,17 @@ export const MANIFESTS = [
 	}),
 
 	// The system app owns the OS chrome dialogs — Welcome, About This Terminal,
-	// the per-app About boxes (about:<id>), and System Preferences. They render
-	// through the flat Window Host like any other window, and the menu bar reads
-	// this app's name ("Terminal") whenever one of them is focused. It folds away
-	// the old `system-prefs` + `about-terminal` pseudo-manifests. None of its
-	// windows declare `opens`, so the system app is not a document handler.
+	// the per-app About boxes (about:<id>), System Preferences, and maintenance.
+	// They render through the flat Window Host like any other window, and the menu
+	// bar reads this app's name ("Terminal") whenever one of them is focused. It
+	// folds away the old `system-prefs` + `about-terminal` pseudo-manifests. None
+	// of its windows declare `opens`, so the system app is not a document handler.
 	defineApp({
 		id: 'system',
 		name: 'Terminal',
 		fileName: 'Terminal',
 		category: 'system',
-		description: 'System chrome — About, Welcome, System Preferences',
+		description: 'System chrome — About, Welcome, System Preferences, Maintenance',
 		icon: ':)',
 		removable: false,
 		desktopAliasByDefault: false,
@@ -220,6 +220,13 @@ export const MANIFESTS = [
 				title: () => 'System Preferences',
 				size: () => ({ w: 380, h: 360 }),
 				component: () => import('$lib/components/TerminalPrefs.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'system-maintenance' },
+				role: 'chrome',
+				title: () => 'System Maintenance',
+				size: () => ({ w: 520, h: 460, minW: 460, minH: 390 }),
+				component: () => import('$lib/components/SystemMaintenance.svelte')
 			}
 		],
 		// A non-empty aboutSpec.title is what puts an app in APPS (the hasRegistryEntry
