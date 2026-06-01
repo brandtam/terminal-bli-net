@@ -148,7 +148,8 @@
 						}
 						return m;
 					}),
-					sessionId: getSessionId()
+					sessionId: getSessionId(),
+					timezone: os.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 				})
 			});
 

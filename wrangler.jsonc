@@ -20,19 +20,18 @@
 	// ],
 	// "send_email": [{ "name": "SEND_EMAIL" }],
 	// Secrets (set via `wrangler secret put`):
-	// ANTHROPIC_API_KEY
-	// OPENAI_API_KEY (optional)
-	// PROVIDER: "claude" uses Anthropic (needs ANTHROPIC_API_KEY).
-	//           "openai" uses OpenAI (needs OPENAI_API_KEY).
+	// ANTHROPIC_API_KEY and/or OPENAI_API_KEY.
 	//
-	// MODEL: optional, overrides the default model for the chosen provider.
-	//   Claude options:  claude-haiku-4-5-20251001 (default), claude-sonnet-4-6-20261001, claude-opus-4-7
-	//   OpenAI options:  gpt-4o-mini (default), gpt-4o, gpt-4.1-mini, gpt-4.1
+	// LLM_PROVIDER_ORDER is an ordered fallback list. A configured provider is skipped
+	// once its monthly spend reaches its provider-specific cap.
+	// Claude options:  claude-haiku-4-5-20251001 (default), claude-sonnet-4-6
+	// OpenAI options:  gpt-4o-mini (default), gpt-4o, gpt-4.1-mini, gpt-4.1
 	"vars": {
-		"PROVIDER": "openai",
-		"MODEL": "gpt-4o-mini",
-		"MONTHLY_SPEND_CAP": "50",
-		"RATE_LIMIT_PER_HOUR": "30",
-		"SESSION_MESSAGE_CAP": "50"
+		"LLM_PROVIDER_ORDER": "openai,claude",
+		"OPENAI_MODEL": "gpt-4o-mini",
+		"ANTHROPIC_MODEL": "claude-haiku-4-5-20251001",
+		"OPENAI_MONTHLY_SPEND_CAP": "25",
+		"ANTHROPIC_MONTHLY_SPEND_CAP": "25",
+		"RATE_LIMIT_PER_HOUR": "30"
 	}
 }

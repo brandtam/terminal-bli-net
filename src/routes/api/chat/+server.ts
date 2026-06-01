@@ -3,13 +3,82 @@ import type { RequestHandler } from './$types';
 import { streamCompletion } from '$lib/server/llm';
 import { canRespond, recordTokens, recordMessage } from '$lib/server/spend';
 import { getBotById, loadChannels, loadGroups } from '$lib/server/bots';
-import { buildSystemPrompt } from '$lib/server/prompt';
-import type { ChatMessage } from '$lib/types';
+import { createChatSession, validateChatTimezone } from '$lib/server/chat-session';
+import type { ChatMessage, LlmProvider } from '$lib/types';
+import type { LlmProviderConfig } from '$lib/server/llm';
 
 const VALID_ROLES = new Set(['user', 'assistant']);
 const MAX_MESSAGES = 20;
 const MAX_CONTENT_LENGTH = 2000;
-const SESSION_ID_RE = /^[a-f0-9-]{36}$/;
+
+interface ChatEnv {
+	KV: KVNamespace;
+	ANTHROPIC_API_KEY?: string;
+	OPENAI_API_KEY?: string;
+	LLM_PROVIDER_ORDER?: string;
+	ANTHROPIC_MODEL?: string;
+	OPENAI_MODEL?: string;
+	ANTHROPIC_MONTHLY_SPEND_CAP?: string;
+	OPENAI_MONTHLY_SPEND_CAP?: string;
+	RATE_LIMIT_PER_HOUR?: string;
+	PROVIDER?: string;
+	MONTHLY_SPEND_CAP?: string;
+	MODEL?: string;
+}
+
+function parseProviderOrder(raw: string | undefined): LlmProvider[] {
+	const providerOrder = (raw ?? 'claude')
+		.split(',')
+		.map((provider) => provider.trim())
+		.filter(Boolean);
+
+	if (providerOrder.length === 0) {
+		throw error(500, 'LLM provider order is empty');
+	}
+
+	const providers: LlmProvider[] = [];
+	for (const provider of providerOrder) {
+		if (provider !== 'claude' && provider !== 'openai') {
+			throw error(500, `Unsupported LLM provider "${provider}"`);
+		}
+		if (!providers.includes(provider)) {
+			providers.push(provider);
+		}
+	}
+
+	return providers;
+}
+
+function parseBudget(raw: string | undefined): number | undefined {
+	if (raw === undefined || raw.trim() === '') return undefined;
+	const budget = Number(raw);
+	if (!Number.isFinite(budget) || budget < 0) {
+		throw error(500, `Invalid LLM monthly spend cap "${raw}"`);
+	}
+	return budget;
+}
+
+function resolveLlmProviders(env: ChatEnv): LlmProviderConfig[] {
+	const legacyProvider =
+		env.PROVIDER === 'claude' || env.PROVIDER === 'openai' ? env.PROVIDER : undefined;
+	const providerOrder = parseProviderOrder(env.LLM_PROVIDER_ORDER ?? legacyProvider);
+
+	return providerOrder.flatMap((provider) => {
+		const apiKey = provider === 'claude' ? env.ANTHROPIC_API_KEY : env.OPENAI_API_KEY;
+		if (!apiKey) return [];
+
+		const model =
+			provider === 'claude'
+				? (env.ANTHROPIC_MODEL ?? (legacyProvider === 'claude' ? env.MODEL : undefined))
+				: (env.OPENAI_MODEL ?? (legacyProvider === 'openai' ? env.MODEL : undefined));
+		const monthlyBudget =
+			provider === 'claude'
+				? parseBudget(env.ANTHROPIC_MONTHLY_SPEND_CAP ?? env.MONTHLY_SPEND_CAP)
+				: parseBudget(env.OPENAI_MONTHLY_SPEND_CAP ?? env.MONTHLY_SPEND_CAP);
+
+		return [{ provider, apiKey, model, monthlyBudget }];
+	});
+}
 
 function validateMessages(raw: unknown): ChatMessage[] {
 	if (!Array.isArray(raw)) throw error(400, 'messages must be an array');
@@ -51,59 +120,61 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		throw error(400, 'Request body must be a JSON object');
 	}
 
-	const { botId, messages: rawMessages, sessionId } = body as Record<string, unknown>;
+	const { botId, messages: rawMessages, timezone: rawTimezone } = body as Record<string, unknown>;
 
 	if (typeof botId !== 'string' || !botId) {
 		throw error(400, 'botId is required');
 	}
-	if (typeof sessionId !== 'string' || !SESSION_ID_RE.test(sessionId)) {
-		throw error(400, 'sessionId must be a valid UUID');
-	}
 
 	const messages = validateMessages(rawMessages);
+	let timezone: string;
+	try {
+		timezone = validateChatTimezone(rawTimezone);
+	} catch (e) {
+		throw error(400, e instanceof Error ? e.message : 'timezone is invalid');
+	}
 
 	const bot = getBotById(botId);
 	if (!bot) {
 		throw error(404, `Bot "${botId}" not found`);
 	}
 
-	const systemPrompt = buildSystemPrompt(
-		bot.prompt,
-		bot.group,
-		loadChannels(),
-		loadGroups(),
-		new Date()
-	);
+	const chatSession = createChatSession({
+		bot,
+		channels: loadChannels(),
+		shows: loadGroups(),
+		now: new Date(),
+		timezone
+	});
+
+	if (!chatSession.allowed || !chatSession.systemPrompt) {
+		throw error(chatSession.status, chatSession.reason ?? 'Chat is not available');
+	}
 
 	const spendConfig = {
 		kv: env.KV,
-		monthlyCap: parseInt(env.MONTHLY_SPEND_CAP || '50'),
-		rateLimitPerHour: parseInt(env.RATE_LIMIT_PER_HOUR || '30'),
-		sessionCap: parseInt(env.SESSION_MESSAGE_CAP || '50')
+		rateLimitPerHour: parseInt(env.RATE_LIMIT_PER_HOUR || '30')
 	};
 
-	// Session message count is tracked server-side per IP, not client-supplied
-	const gate = await canRespond(spendConfig, ip, sessionId);
+	const gate = await canRespond(spendConfig, ip);
 	if (!gate.allowed) {
 		throw error(429, gate.reason || 'Rate limited');
 	}
 
-	const provider = (env.PROVIDER as 'claude' | 'openai') || 'claude';
-	const apiKey = provider === 'claude' ? env.ANTHROPIC_API_KEY : env.OPENAI_API_KEY;
-
-	if (!apiKey) {
-		throw error(500, `API key not configured for provider "${provider}"`);
+	const providers = resolveLlmProviders(env);
+	if (providers.length === 0) {
+		throw error(503, 'No LLM providers are configured');
 	}
 
 	const stream = await streamCompletion({
-		systemPrompt,
+		systemPrompt: chatSession.systemPrompt,
 		messages,
-		provider,
-		apiKey,
-		options: { maxTokens: 300, temperature: 0.8, model: env.MODEL || undefined }
+		providers,
+		kv: env.KV,
+		options: { maxTokens: 300, temperature: 0.8 }
 	});
 
-	await recordMessage(env.KV, ip, sessionId);
+	await recordMessage(env.KV, ip);
 
 	const encoder = new TextEncoder();
 	const sseStream = new ReadableStream({
@@ -114,11 +185,17 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 					const { done, value } = await reader.read();
 					if (done) break;
 
-					const data = `data: ${JSON.stringify(value)}\n\n`;
-					controller.enqueue(encoder.encode(data));
+					if (value.type !== 'usage') {
+						const data = `data: ${JSON.stringify(value)}\n\n`;
+						controller.enqueue(encoder.encode(data));
+					}
 
-					if (value.type === 'done' && value.tokenCount) {
-						await recordTokens(env.KV, value.tokenCount);
+					if (value.usage) {
+						try {
+							await recordTokens(env.KV, value.usage);
+						} catch (recordError) {
+							console.error('[chat SSE] token accounting failed:', recordError);
+						}
 					}
 				}
 			} catch (e) {

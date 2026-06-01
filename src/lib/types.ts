@@ -59,6 +59,18 @@ export interface ChatMessage {
 	content: string;
 }
 
+export type LlmProvider = 'claude' | 'openai';
+
+export interface LlmTokenUsage {
+	provider: LlmProvider;
+	model: string;
+	inputTokens: number;
+	outputTokens: number;
+	cacheCreationInputTokens?: number;
+	cacheReadInputTokens?: number;
+	estimated?: boolean;
+}
+
 export interface Conversation {
 	botId: string;
 	group: string;
@@ -74,10 +86,12 @@ export interface Subscriber {
 }
 
 export interface TextChunk {
-	type: 'text' | 'done' | 'error';
+	type: 'text' | 'done' | 'error' | 'usage';
 	text?: string;
 	tokenCount?: number;
+	usage?: LlmTokenUsage;
 	error?: string;
+	retryable?: boolean;
 }
 
 export interface WindowState {

@@ -3,22 +3,52 @@
 /**
  * Spend control / kill-switch module.
  *
- * Tracks monthly token spend, per-IP hourly rate limits, and per-session
- * message caps via Cloudflare KV.  When the monthly spend crosses the hard
- * cap the kill switch activates until the 1st of the next calendar month.
+ * Tracks per-provider monthly token spend and per-IP hourly rate limits via
+ * Cloudflare KV. Provider budgets are soft fallback controls: once a provider
+ * reaches its monthly cap, callers should skip it and try the next provider.
  */
+
+import type { LlmProvider, LlmTokenUsage } from '$lib/types';
 
 // ---------------------------------------------------------------------------
 // Cost constants
 // ---------------------------------------------------------------------------
 
+export interface ModelPricing {
+	input: number;
+	output: number;
+	cacheCreationInput?: number;
+	cacheReadInput?: number;
+}
+
 /**
- * Dollars per token.  We count every token at the *output* rate because
- * output tokens dominate cost for chat workloads.
- *
- * Claude 3.5 Haiku output pricing: $1.25 / 1 000 000 tokens.
+ * USD per 1M tokens. Unknown models intentionally fail loud so spend accounting
+ * cannot silently drift when MODEL is changed.
  */
-const DOLLARS_PER_TOKEN = 1.25 / 1_000_000;
+export const MODEL_PRICING_USD_PER_MILLION: Record<string, ModelPricing> = {
+	'gpt-4o-mini': { input: 0.15, cacheReadInput: 0.075, output: 0.6 },
+	'gpt-4o': { input: 2.5, cacheReadInput: 1.25, output: 10 },
+	'gpt-4.1-mini': { input: 0.4, cacheReadInput: 0.1, output: 1.6 },
+	'gpt-4.1': { input: 2, cacheReadInput: 0.5, output: 8 },
+	'claude-haiku-4-5-20251001': {
+		input: 1,
+		output: 5,
+		cacheCreationInput: 1.25,
+		cacheReadInput: 0.1
+	},
+	'claude-sonnet-4-6': {
+		input: 3,
+		output: 15,
+		cacheCreationInput: 3.75,
+		cacheReadInput: 0.3
+	},
+	'claude-3-5-haiku-20241022': {
+		input: 0.8,
+		output: 4,
+		cacheCreationInput: 1,
+		cacheReadInput: 0.08
+	}
+};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,12 +56,8 @@ const DOLLARS_PER_TOKEN = 1.25 / 1_000_000;
 
 export interface SpendConfig {
 	kv: KVNamespace;
-	/** Hard monthly spend cap in USD (default $50). */
-	monthlyCap: number;
 	/** Max messages per IP per clock-hour (default 30). */
 	rateLimitPerHour: number;
-	/** Max messages per session lifetime (default 50). */
-	sessionCap: number;
 }
 
 export interface CanRespondResult {
@@ -43,11 +69,11 @@ export interface CanRespondResult {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** "spend:2026-05" */
-export function monthlySpendKey(now: Date = new Date()): string {
+/** "spend:openai:2026-05" */
+export function monthlySpendKey(provider: LlmProvider, now: Date = new Date()): string {
 	const yyyy = now.getUTCFullYear();
 	const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-	return `spend:${yyyy}-${mm}`;
+	return `spend:${provider}:${yyyy}-${mm}`;
 }
 
 /** "rate:203.0.113.42:2026-05-23-14" */
@@ -74,45 +100,13 @@ function secondsUntilNextHour(now: Date = new Date()): number {
 // Public API
 // ---------------------------------------------------------------------------
 
-/** "session:<uuid>" */
-export function sessionKey(sessionId: string): string {
-	return `session:${sessionId}`;
-}
-
 /**
  * Check whether the request should be allowed to proceed.
  *
- * Checks are evaluated in this order (cheapest first):
- *   1. Per-session message cap  (server-side via KV)
- *   2. Monthly spend kill-switch
- *   3. Per-IP hourly rate limit
+ * This is only a request throttle. Per-provider budget gates are checked by
+ * the shared LLM client so it can fall back provider-by-provider.
  */
-export async function canRespond(
-	config: SpendConfig,
-	ip: string,
-	sessionId: string
-): Promise<CanRespondResult> {
-	// 1. Session cap (tracked server-side in KV, not client-supplied)
-	const sessionRaw = await config.kv.get(sessionKey(sessionId));
-	const sessionCount = sessionRaw ? parseInt(sessionRaw, 10) : 0;
-	if (sessionCount >= config.sessionCap) {
-		return {
-			allowed: false,
-			reason: `Session message limit reached (${config.sessionCap} messages). Please start a new session.`
-		};
-	}
-
-	// 2. Monthly spend kill-switch
-	const spendRaw = await config.kv.get(monthlySpendKey());
-	const currentSpend = spendRaw ? parseFloat(spendRaw) : 0;
-	if (currentSpend >= config.monthlyCap) {
-		return {
-			allowed: false,
-			reason: `Monthly spend cap ($${config.monthlyCap}) reached. Service resumes on the 1st of next month.`
-		};
-	}
-
-	// 3. Per-IP hourly rate limit
+export async function canRespond(config: SpendConfig, ip: string): Promise<CanRespondResult> {
 	const rateRaw = await config.kv.get(rateLimitKey(ip));
 	const currentRate = rateRaw ? parseInt(rateRaw, 10) : 0;
 	if (currentRate >= config.rateLimitPerHour) {
@@ -125,46 +119,66 @@ export async function canRespond(
 	return { allowed: true };
 }
 
-/** TTL for session keys — 24 hours. */
-const SESSION_TTL = 86400;
-
 /**
- * Increment the per-IP rate counter for the current clock-hour and the
- * per-session message counter.
- * Call this when a message is accepted (before or after the LLM responds).
+ * Increment the per-IP rate counter for the current clock-hour.
+ * Call this when a message is accepted.
  */
-export async function recordMessage(kv: KVNamespace, ip: string, sid: string): Promise<void> {
+export async function recordMessage(kv: KVNamespace, ip: string): Promise<void> {
 	const rateKey = rateLimitKey(ip);
 	const rateRaw = await kv.get(rateKey);
 	const rateCount = rateRaw ? parseInt(rateRaw, 10) : 0;
 	const ttl = secondsUntilNextHour();
 
-	const sessKey = sessionKey(sid);
-	const sessRaw = await kv.get(sessKey);
-	const sessCount = sessRaw ? parseInt(sessRaw, 10) : 0;
+	await kv.put(rateKey, String(rateCount + 1), { expirationTtl: ttl });
+}
 
-	await Promise.all([
-		kv.put(rateKey, String(rateCount + 1), { expirationTtl: ttl }),
-		kv.put(sessKey, String(sessCount + 1), { expirationTtl: SESSION_TTL })
-	]);
+export function getModelPricing(model: string): ModelPricing {
+	const pricing = MODEL_PRICING_USD_PER_MILLION[model];
+	if (!pricing) {
+		throw new Error(`No token pricing configured for model "${model}"`);
+	}
+	return pricing;
+}
+
+export function calculateTokenCostUsd(usage: LlmTokenUsage): number {
+	const pricing = getModelPricing(usage.model);
+	return (
+		(usage.inputTokens * pricing.input) / 1_000_000 +
+		(usage.outputTokens * pricing.output) / 1_000_000 +
+		((usage.cacheCreationInputTokens ?? 0) * (pricing.cacheCreationInput ?? pricing.input * 1.25)) /
+			1_000_000 +
+		((usage.cacheReadInputTokens ?? 0) * (pricing.cacheReadInput ?? pricing.input * 0.1)) /
+			1_000_000
+	);
 }
 
 /**
  * Record tokens consumed after a response has been generated.
  * Converts the token count to USD and adds it to the monthly spend counter.
  */
-export async function recordTokens(kv: KVNamespace, tokenCount: number): Promise<void> {
-	const key = monthlySpendKey();
+export async function recordTokens(kv: KVNamespace, usage: LlmTokenUsage): Promise<number> {
+	const key = monthlySpendKey(usage.provider);
 	const raw = await kv.get(key);
 	const current = raw ? parseFloat(raw) : 0;
-	const cost = tokenCount * DOLLARS_PER_TOKEN;
+	const cost = calculateTokenCostUsd(usage);
 	await kv.put(key, String(current + cost));
+	return cost;
 }
 
 /**
- * Return the current monthly spend in USD.
+ * Return the current monthly spend in USD for a provider.
  */
-export async function getMonthlySpend(kv: KVNamespace): Promise<number> {
-	const raw = await kv.get(monthlySpendKey());
+export async function getMonthlySpend(kv: KVNamespace, provider: LlmProvider): Promise<number> {
+	const raw = await kv.get(monthlySpendKey(provider));
 	return raw ? parseFloat(raw) : 0;
+}
+
+export async function isProviderOverBudget(
+	kv: KVNamespace,
+	provider: LlmProvider,
+	monthlyBudget: number
+): Promise<boolean> {
+	if (!Number.isFinite(monthlyBudget)) return false;
+	const spend = await getMonthlySpend(kv, provider);
+	return spend >= monthlyBudget;
 }

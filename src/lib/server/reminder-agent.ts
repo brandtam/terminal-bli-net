@@ -19,10 +19,12 @@ interface Env {
 	ANTHROPIC_API_KEY: string;
 	OPENAI_API_KEY?: string;
 	EMAIL_SECRET: string;
-	PROVIDER: string;
-	MONTHLY_SPEND_CAP: string;
+	LLM_PROVIDER_ORDER?: string;
+	ANTHROPIC_MODEL?: string;
+	OPENAI_MODEL?: string;
+	ANTHROPIC_MONTHLY_SPEND_CAP?: string;
+	OPENAI_MONTHLY_SPEND_CAP?: string;
 	RATE_LIMIT_PER_HOUR: string;
-	SESSION_MESSAGE_CAP: string;
 }
 
 // ---------------------------------------------------------------------------

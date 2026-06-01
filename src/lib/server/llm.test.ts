@@ -1,5 +1,8 @@
+/// <reference types="@cloudflare/workers-types" />
+/* eslint-disable no-undef */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { TextChunk } from '$lib/types';
+import { monthlySpendKey } from './spend';
 
 // --- Anthropic mock ---
 const mockAnthropicMessagesStream = vi.fn();
@@ -39,6 +42,35 @@ async function collectChunks(stream: ReadableStream<TextChunk>): Promise<TextChu
 		if (value) chunks.push(value);
 	}
 	return chunks;
+}
+
+function createMockKV(initial?: Record<string, string>): KVNamespace {
+	const store = new Map(Object.entries(initial ?? {}));
+	return {
+		async get(key: string): Promise<string | null> {
+			return store.get(key) ?? null;
+		},
+		async put(key: string, value: string): Promise<void> {
+			store.set(key, value);
+		},
+		async delete(key: string): Promise<void> {
+			store.delete(key);
+		},
+		async list() {
+			return {
+				keys: [],
+				list_complete: true,
+				cacheStatus: null
+			} as unknown as KVNamespaceListResult<unknown, string>;
+		},
+		async getWithMetadata() {
+			return {
+				value: null,
+				metadata: null,
+				cacheStatus: null
+			} as unknown as KVNamespaceGetWithMetadataResult<string, unknown>;
+		}
+	} as unknown as KVNamespace;
 }
 
 describe('streamCompletion', () => {
@@ -90,7 +122,16 @@ describe('streamCompletion', () => {
 			expect(chunks).toHaveLength(3);
 			expect(chunks[0]).toEqual({ type: 'text', text: 'Hello' });
 			expect(chunks[1]).toEqual({ type: 'text', text: ' world' });
-			expect(chunks[2]).toEqual({ type: 'done', tokenCount: 5 });
+			expect(chunks[2]).toEqual({
+				type: 'done',
+				tokenCount: 15,
+				usage: {
+					provider: 'claude',
+					model: 'claude-haiku-4-5-20251001',
+					inputTokens: 10,
+					outputTokens: 5
+				}
+			});
 		});
 
 		it('uses prompt caching for the system prompt', async () => {
@@ -124,6 +165,53 @@ describe('streamCompletion', () => {
 					]
 				})
 			);
+		});
+
+		it('includes Anthropic prompt-cache usage fields in the done chunk', async () => {
+			const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+			mockAnthropicMessagesStream.mockReturnValue({
+				on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+					if (!handlers[event]) handlers[event] = [];
+					handlers[event].push(handler);
+				})
+			});
+
+			const { streamCompletion } = await import('./llm');
+
+			const stream = await streamCompletion({
+				systemPrompt: 'You are a cached character.',
+				messages: [{ role: 'user', content: 'Hi' }],
+				provider: 'claude',
+				apiKey: 'test-key'
+			});
+
+			await new Promise((r) => setTimeout(r, 0));
+			for (const h of handlers['finalMessage'] ?? [])
+				h({
+					usage: {
+						input_tokens: 12,
+						output_tokens: 6,
+						cache_creation_input_tokens: 100,
+						cache_read_input_tokens: 200
+					}
+				});
+			for (const h of handlers['end'] ?? []) h();
+
+			const chunks = await collectChunks(stream);
+			expect(chunks).toEqual([
+				{
+					type: 'done',
+					tokenCount: 318,
+					usage: {
+						provider: 'claude',
+						model: 'claude-haiku-4-5-20251001',
+						inputTokens: 12,
+						outputTokens: 6,
+						cacheCreationInputTokens: 100,
+						cacheReadInputTokens: 200
+					}
+				}
+			]);
 		});
 
 		it('uses default model claude-haiku-4-5-20251001', async () => {
@@ -179,7 +267,10 @@ describe('streamCompletion', () => {
 			const chunks = await collectChunks(stream);
 
 			expect(chunks).toHaveLength(1);
-			expect(chunks[0]).toEqual({ type: 'error', error: 'internal error' });
+			expect(chunks[0]).toEqual({
+				type: 'error',
+				error: 'All LLM providers are unavailable or over budget'
+			});
 		});
 
 		it('handles constructor errors', async () => {
@@ -199,7 +290,7 @@ describe('streamCompletion', () => {
 			const chunks = await collectChunks(stream);
 
 			expect(chunks).toHaveLength(1);
-			expect(chunks[0]).toEqual({ type: 'error', error: 'internal error' });
+			expect(chunks[0]).toEqual({ type: 'error', error: 'LLM provider unavailable' });
 		});
 	});
 
@@ -221,7 +312,12 @@ describe('streamCompletion', () => {
 				},
 				{
 					choices: [],
-					usage: { completion_tokens: 7, prompt_tokens: 12, total_tokens: 19 }
+					usage: {
+						completion_tokens: 7,
+						prompt_tokens: 12,
+						total_tokens: 19,
+						prompt_tokens_details: { cached_tokens: 4 }
+					}
 				}
 			];
 
@@ -247,7 +343,17 @@ describe('streamCompletion', () => {
 			expect(chunks).toHaveLength(3);
 			expect(chunks[0]).toEqual({ type: 'text', text: 'Hello' });
 			expect(chunks[1]).toEqual({ type: 'text', text: ' world' });
-			expect(chunks[2]).toEqual({ type: 'done', tokenCount: 7 });
+			expect(chunks[2]).toEqual({
+				type: 'done',
+				tokenCount: 19,
+				usage: {
+					provider: 'openai',
+					model: 'gpt-4o-mini',
+					inputTokens: 8,
+					cacheReadInputTokens: 4,
+					outputTokens: 7
+				}
+			});
 		});
 
 		it('uses default model gpt-4o-mini', async () => {
@@ -262,12 +368,13 @@ describe('streamCompletion', () => {
 
 			const { streamCompletion } = await import('./llm');
 
-			await streamCompletion({
+			const stream = await streamCompletion({
 				systemPrompt: 'Test',
 				messages: [{ role: 'user', content: 'Hi' }],
 				provider: 'openai',
 				apiKey: 'test-key'
 			});
+			await collectChunks(stream);
 
 			expect(mockOpenAIChatCompletionsCreate).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -291,7 +398,7 @@ describe('streamCompletion', () => {
 			const chunks = await collectChunks(stream);
 
 			expect(chunks).toHaveLength(1);
-			expect(chunks[0]).toEqual({ type: 'error', error: 'internal error' });
+			expect(chunks[0]).toEqual({ type: 'error', error: 'LLM provider unavailable' });
 		});
 	});
 
@@ -331,12 +438,13 @@ describe('streamCompletion', () => {
 
 			const { streamCompletion } = await import('./llm');
 
-			await streamCompletion({
+			const stream = await streamCompletion({
 				systemPrompt: 'Test',
 				messages: [{ role: 'user', content: 'Hi' }],
 				provider: 'openai',
 				apiKey: 'test-key'
 			});
+			await collectChunks(stream);
 
 			expect(mockOpenAIChatCompletionsCreate).toHaveBeenCalled();
 			expect(mockAnthropicMessagesStream).not.toHaveBeenCalled();
@@ -357,7 +465,7 @@ describe('streamCompletion', () => {
 				systemPrompt: 'Test',
 				messages: [{ role: 'user', content: 'Hi' }],
 				provider: 'claude',
-				options: { model: 'claude-3-5-sonnet-latest' },
+				options: { model: 'claude-sonnet-4-6' },
 				apiKey: 'test-key'
 			});
 
@@ -365,9 +473,203 @@ describe('streamCompletion', () => {
 
 			expect(mockAnthropicMessagesStream).toHaveBeenCalledWith(
 				expect.objectContaining({
-					model: 'claude-3-5-sonnet-latest'
+					model: 'claude-sonnet-4-6'
 				})
 			);
+		});
+	});
+
+	describe('Fallback client', () => {
+		it('falls back when the primary provider fails before any tokens stream', async () => {
+			mockOpenAIChatCompletionsCreate.mockRejectedValue(
+				Object.assign(new Error('rate limit'), { status: 429 })
+			);
+
+			const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+			mockAnthropicMessagesStream.mockReturnValue({
+				on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+					if (!handlers[event]) handlers[event] = [];
+					handlers[event].push(handler);
+				})
+			});
+
+			const { streamCompletion } = await import('./llm');
+
+			const stream = await streamCompletion({
+				systemPrompt: 'Test',
+				messages: [{ role: 'user', content: 'Hi' }],
+				providers: [
+					{ provider: 'openai', apiKey: 'openai-key', model: 'gpt-4o-mini' },
+					{ provider: 'claude', apiKey: 'anthropic-key', model: 'claude-haiku-4-5-20251001' }
+				]
+			});
+			const chunksPromise = collectChunks(stream);
+
+			await new Promise((r) => setTimeout(r, 0));
+			for (const h of handlers['text'] ?? []) h('Fallback works');
+			for (const h of handlers['finalMessage'] ?? [])
+				h({ usage: { input_tokens: 10, output_tokens: 2 } });
+			for (const h of handlers['end'] ?? []) h();
+
+			const chunks = await chunksPromise;
+			expect(mockOpenAIChatCompletionsCreate).toHaveBeenCalled();
+			expect(mockAnthropicMessagesStream).toHaveBeenCalled();
+			expect(chunks).toEqual([
+				{ type: 'text', text: 'Fallback works' },
+				{
+					type: 'done',
+					tokenCount: 12,
+					usage: {
+						provider: 'claude',
+						model: 'claude-haiku-4-5-20251001',
+						inputTokens: 10,
+						outputTokens: 2
+					}
+				}
+			]);
+		});
+
+		it('skips a provider that is over its monthly budget', async () => {
+			const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+			mockAnthropicMessagesStream.mockReturnValue({
+				on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+					if (!handlers[event]) handlers[event] = [];
+					handlers[event].push(handler);
+				})
+			});
+
+			const { streamCompletion } = await import('./llm');
+
+			const stream = await streamCompletion({
+				systemPrompt: 'Test',
+				messages: [{ role: 'user', content: 'Hi' }],
+				kv: createMockKV({ [monthlySpendKey('openai')]: '25' }),
+				providers: [
+					{ provider: 'openai', apiKey: 'openai-key', model: 'gpt-4o-mini', monthlyBudget: 25 },
+					{ provider: 'claude', apiKey: 'anthropic-key', model: 'claude-haiku-4-5-20251001' }
+				]
+			});
+			const chunksPromise = collectChunks(stream);
+
+			await new Promise((r) => setTimeout(r, 0));
+			for (const h of handlers['text'] ?? []) h('Budget fallback');
+			for (const h of handlers['finalMessage'] ?? [])
+				h({ usage: { input_tokens: 8, output_tokens: 3 } });
+			for (const h of handlers['end'] ?? []) h();
+
+			const chunks = await chunksPromise;
+			expect(mockOpenAIChatCompletionsCreate).not.toHaveBeenCalled();
+			expect(mockAnthropicMessagesStream).toHaveBeenCalled();
+			expect(chunks[0]).toEqual({ type: 'text', text: 'Budget fallback' });
+		});
+
+		it('keeps partial text, appends a notice, and retries once after mid-stream failure', async () => {
+			mockOpenAIChatCompletionsCreate.mockResolvedValue({
+				[Symbol.asyncIterator]: async function* () {
+					yield {
+						choices: [{ delta: { content: 'Partial answer.' }, finish_reason: null, index: 0 }],
+						usage: null
+					};
+					throw Object.assign(new Error('overload'), { status: 503 });
+				}
+			});
+
+			const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+			mockAnthropicMessagesStream.mockReturnValue({
+				on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+					if (!handlers[event]) handlers[event] = [];
+					handlers[event].push(handler);
+				})
+			});
+
+			const { streamCompletion } = await import('./llm');
+
+			const stream = await streamCompletion({
+				systemPrompt: 'Test',
+				messages: [{ role: 'user', content: 'Hi' }],
+				providers: [
+					{ provider: 'openai', apiKey: 'openai-key', model: 'gpt-4o-mini' },
+					{ provider: 'claude', apiKey: 'anthropic-key', model: 'claude-haiku-4-5-20251001' }
+				]
+			});
+			const chunksPromise = collectChunks(stream);
+
+			await new Promise((r) => setTimeout(r, 0));
+			for (const h of handlers['text'] ?? []) h('Fresh answer.');
+			for (const h of handlers['finalMessage'] ?? [])
+				h({ usage: { input_tokens: 6, output_tokens: 2 } });
+			for (const h of handlers['end'] ?? []) h();
+
+			const chunks = await chunksPromise;
+			expect(chunks[0]).toEqual({ type: 'text', text: 'Partial answer.' });
+			expect(chunks[1]).toMatchObject({
+				type: 'usage',
+				usage: {
+					provider: 'openai',
+					model: 'gpt-4o-mini',
+					estimated: true
+				}
+			});
+			expect(chunks[2]).toMatchObject({ type: 'text' });
+			expect(chunks[2].text).toContain('Oops, brain fart');
+			expect(chunks[3]).toEqual({ type: 'text', text: 'Fresh answer.' });
+			expect(chunks[4]).toMatchObject({
+				type: 'done',
+				usage: { provider: 'claude', model: 'claude-haiku-4-5-20251001' }
+			});
+		});
+
+		it('keeps partial text and notice when the mid-stream retry fails before text', async () => {
+			mockOpenAIChatCompletionsCreate
+				.mockResolvedValueOnce({
+					[Symbol.asyncIterator]: async function* () {
+						yield {
+							choices: [{ delta: { content: 'Partial answer.' }, finish_reason: null, index: 0 }],
+							usage: null
+						};
+						throw Object.assign(new Error('overload'), { status: 503 });
+					}
+				})
+				.mockRejectedValueOnce(Object.assign(new Error('rate limit'), { status: 429 }));
+
+			const { streamCompletion } = await import('./llm');
+
+			const stream = await streamCompletion({
+				systemPrompt: 'Test',
+				messages: [{ role: 'user', content: 'Hi' }],
+				providers: [
+					{ provider: 'openai', apiKey: 'primary-key', model: 'gpt-4o-mini' },
+					{ provider: 'openai', apiKey: 'secondary-key', model: 'gpt-4o-mini' }
+				]
+			});
+
+			const chunks = await collectChunks(stream);
+			expect(chunks[0]).toEqual({ type: 'text', text: 'Partial answer.' });
+			expect(chunks[1]).toMatchObject({
+				type: 'usage',
+				usage: { provider: 'openai', model: 'gpt-4o-mini', estimated: true }
+			});
+			expect(chunks[2]).toMatchObject({ type: 'text' });
+			expect(chunks[2].text).toContain('Oops, brain fart');
+			expect(chunks).toHaveLength(3);
+		});
+
+		it('returns a clean error when all providers are unavailable or over budget', async () => {
+			const { streamCompletion } = await import('./llm');
+
+			const stream = await streamCompletion({
+				systemPrompt: 'Test',
+				messages: [{ role: 'user', content: 'Hi' }],
+				kv: createMockKV({ [monthlySpendKey('openai')]: '25' }),
+				providers: [
+					{ provider: 'openai', apiKey: 'openai-key', model: 'gpt-4o-mini', monthlyBudget: 25 }
+				]
+			});
+
+			const chunks = await collectChunks(stream);
+			expect(chunks).toEqual([
+				{ type: 'error', error: 'All LLM providers are unavailable or over budget' }
+			]);
 		});
 	});
 });
