@@ -12,9 +12,8 @@
 	import type { FsNode, FsFile, FsAlias } from '$lib/terminalos';
 	import { getSystem } from '$lib/os/os-context';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
-	import { getAppWindowId, getAppIconKind } from '$lib/terminalos/apps/app-install';
-	import { getAppDef } from '$lib/terminalos/apps/app-library';
-	import { isInstalled } from '$lib/terminalos/apps/software-shop';
+	import { getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import { openFilesystemNode } from '$lib/os/filesystem-open';
 
 	// Zero-prop: os/fs come from the host context. The starting folder is an
 	// explicit static arg on the matched window (finder → ROOT_ID, trash → TRASH_ID)
@@ -93,86 +92,16 @@
 		selectedId = id;
 	}
 
-	function openDocFile(file: FsFile) {
-		if (file.appId === 'textedit') {
-			os.openWindow(`textedit:${file.id}`);
-		} else if (file.appId === 'recorder') {
-			// Route through the single document-open rule: a recording is tagged
-			// opensWith:'player', so it opens in the system Player (which reads the
-			// blob via readBody) instead of the old inline branch that called
-			// readText() and showed "Recording not found." for blob bodies.
-			os.openDocument(file);
-		} else if (file.appId === 'stickies') {
-			// Open THIS note (the file id is the note id), not a new blank one — the
-			// flat sticky:<noteId> window is a live view of its own file.
-			os.openWindow(`sticky:${file.id}`);
-		}
-	}
-
 	function handleOpen(node: FsNode) {
-		if (node.kind === 'folder') {
-			currentFolderId = node.id;
-			selectedId = null;
-			return;
-		}
-		if (node.kind === 'alias') {
-			const target = resolveNode(node);
-			if (target) handleOpen(target);
-			return;
-		}
-		const file = node as FsFile;
-		const appId = file.appId;
-		if (!appId) {
-			os.openWindow(file.id);
-			return;
-		}
-
-		// A document whose handler is a SYSTEM app (e.g. a recording tagged
-		// opensWith:'player') opens through the single open rule regardless of
-		// whether its *creator* app is installed — the handler is always present.
-		// Gate on the handler, not the creator. Only when the creator IS the
-		// handler (textedit, stickies → opensWith === appId) does the
-		// install gate below still apply.
-		if (file.opensWith && file.opensWith !== appId) {
-			const handler = getAppDef(file.opensWith);
-			if (handler?.isSystem) {
-				os.openDocument(file);
-				return;
-			}
-		}
-
-		// For document-type files, check if the owning app is still installed
-		const docApps = new Set(['textedit', 'recorder', 'stickies']);
-		if (docApps.has(appId)) {
-			const appDef = getAppDef(appId);
-			if (appDef) {
-				const nodes = fs.getAllNodes();
-				if (!isInstalled(appId, nodes)) {
-					os.alert({
-						title: `${appDef.name} is not installed`,
-						body: `The ${appDef.name} application has been uninstalled. You can reinstall it from My Shelf.`,
-						buttons: [
-							{
-								label: 'Open My Shelf',
-								action: () => os.openWindow('software-shop')
-							},
-							{ label: 'OK', primary: true }
-						]
-					});
-				} else {
-					openDocFile(file);
-				}
-				return;
-			}
-		}
-
-		// Generic: look up window ID from AppLibrary
-		const windowId = getAppWindowId(appId);
-		if (windowId) {
-			os.openWindow(windowId);
-			return;
-		}
-		os.openWindow(file.id);
+		openFilesystemNode(node, {
+			resolveAlias: (alias) => resolveNode(alias),
+			openFolder: (folder) => {
+				currentFolderId = folder.id;
+				selectedId = null;
+			},
+			launchApp: (appId) => os.launchApp(appId),
+			openDocument: (file) => os.openDocument(file)
+		});
 	}
 
 	function navigateTo(id: string) {
