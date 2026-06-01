@@ -5,6 +5,8 @@ declare global {
 		interface Platform {
 			env: {
 				KV: KVNamespace;
+				REMINDER_SERVICE?: Fetcher;
+				REMINDER_SUBSCRIBE_RATE_LIMIT_PER_HOUR?: string;
 				ANTHROPIC_API_KEY?: string;
 				OPENAI_API_KEY?: string;
 				LLM_PROVIDER_ORDER?: string;

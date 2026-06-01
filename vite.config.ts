@@ -1,6 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import { readFileSync } from 'fs';
 import { visualizer } from 'rollup-plugin-visualizer';
 
@@ -48,7 +48,12 @@ export default defineConfig(({ mode }) => {
 			chunkSizeWarningLimit: 250
 		},
 		test: {
-			include: ['src/**/*.{test,spec}.{js,ts}']
+			// The "node" project: app + server code, jsdom/node with the Svelte plugin.
+			name: 'unit',
+			include: ['src/**/*.{test,spec}.{js,ts}', 'workers/**/*.{test,spec}.{js,ts}'],
+			// The Durable Object suite needs the real Workers runtime — it runs in the
+			// Cloudflare pool project instead (workers/reminder-agent/vitest.config.ts).
+			exclude: [...configDefaults.exclude, 'workers/reminder-agent/test/**']
 		}
 	};
 });
