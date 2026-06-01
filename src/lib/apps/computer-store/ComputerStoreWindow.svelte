@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getOwnedAppIds, getAppDef } from '$lib/terminalos';
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 	import TopBar from './TopBar.svelte';
 	import AisleView from './AisleView.svelte';
 	import CategoryCloseup from './CategoryCloseup.svelte';
@@ -10,7 +10,7 @@
 	import { CATEGORIES, APP_BY_ID, type StoreApp, type CategoryId } from './store-data';
 
 	// Zero-prop: reads os/fs from the host-provided context, no props.
-	const { os, fs } = getSystem();
+	const { os, fs } = getAppContext();
 
 	let view = $state<string>('aisle');
 	let cart = $state<string[]>([]);

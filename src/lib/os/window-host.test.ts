@@ -68,11 +68,15 @@ describe('matchWindow', () => {
 	});
 
 	it('claims the system chrome dialogs for the system app (Slice 5)', () => {
-		// welcome / about / terminal-prefs are exact-id windows on the system app;
-		// they used to render through bespoke Desktop arms and now resolve here.
-		for (const id of ['welcome', 'about', 'terminal-prefs']) {
+		// about / terminal-prefs are exact-id windows on the system app; they used
+		// to render through bespoke Desktop arms and now resolve here.
+		for (const id of ['about', 'terminal-prefs']) {
 			expect(matchWindow(id)?.appId, id).toBe('system');
 		}
+	});
+
+	it('claims Welcome as its own reference app', () => {
+		expect(matchWindow('welcome')?.appId).toBe('welcome');
 	});
 
 	it('claims the fixed store-shell windows once migrated (Slice 6)', () => {
@@ -84,8 +88,8 @@ describe('matchWindow', () => {
 
 	it('delivers static args on an exact window (finder/trash → folder, #35)', () => {
 		// Finder and Trash are the same component on two folders. The static-arg
-		// mechanism puts the folder on the exact match, flowing into win.args exactly
-		// like a prefix window's parsed args — so FinderWindow stays zero-id-branch.
+		// mechanism puts the folder on the exact match, flowing into ctx.window.args
+		// exactly like a prefix window's parsed args — so FinderWindow stays zero-id-branch.
 		expect(matchWindow('finder')).toMatchObject({
 			appId: 'finder',
 			args: { folder: 'root_terminal_hd' }

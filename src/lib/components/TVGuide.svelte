@@ -10,7 +10,7 @@
 		formatGuideDate,
 		formatLiveClock
 	} from './tv-guide-utils';
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 	import { onMount, untrack } from 'svelte';
 
 	// Zero-prop window-host app (Slice 4). Everything the guide shows — the
@@ -18,7 +18,7 @@
 	// the schedule rolls forward in real time as os.slotNow/os.now advance with
 	// no props threaded through Desktop. Opening/focusing chats goes straight
 	// through os (chat windows are keyed `chat:<slug>`).
-	const { os } = getSystem();
+	const { os } = getAppContext();
 
 	const COLUMN_WIDTH_PX = 140;
 	const CHANNEL_COL_PX = 72;

@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 	import { APPS } from '$lib/os/app-registry';
 
 	// Window components take no props. This shared component renders the per-app
 	// About box for whichever app the window-id names: openAbout('vcr') opens
-	// 'about:vcr', and the matcher parses that into win.args.appId === 'vcr'. The
+	// 'about:vcr', and the matcher parses that into ctx.window.args.appId === 'vcr'. The
 	// AboutSpec comes from the app registry (APPS[id].about), so one component
 	// serves every app's About dialog.
-	const { win } = getSystem();
-	const about = $derived(APPS[win.args.appId ?? '']?.about ?? null);
+	const { window: appWindow } = getAppContext();
+	const about = $derived(APPS[appWindow.args.appId ?? '']?.about ?? null);
 </script>
 
 {#if about}

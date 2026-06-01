@@ -2,7 +2,7 @@
 	import type { WindowState } from '$lib/types';
 	import type { OsApiClass } from '$lib/os/os-api.svelte';
 	import type { TerminalFS } from '$lib/terminalos';
-	import { setSystem, type WindowHandle } from '$lib/os/os-context';
+	import { setAppContext, type WindowHandle } from '$lib/os/os-context';
 	import { resolveWindow } from '$lib/os/window-host';
 
 	let { win, os, fs }: { win: WindowState; os: OsApiClass; fs: TerminalFS } = $props();
@@ -26,14 +26,25 @@
 		focus: () => os.focusWindow(win.id)
 	};
 
-	setSystem({
+	setAppContext({
 		get os() {
 			return os;
 		},
 		get fs() {
 			return fs;
 		},
-		win: handle
+		window: handle,
+		storage: {
+			get appId() {
+				return resolved?.appId ?? 'unknown';
+			},
+			get namespace() {
+				return `app:${resolved?.appId ?? 'unknown'}`;
+			},
+			status: 'reserved'
+		},
+		capabilities: {},
+		lifecycle: {}
 	});
 </script>
 

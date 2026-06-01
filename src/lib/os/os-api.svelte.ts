@@ -104,7 +104,7 @@ export class OsApiClass implements OsApi {
 			this.windows = saved;
 			this.normalizeZOrder();
 		} else if (isFirstVisit()) {
-			this.openWindow('welcome');
+			this.launchApp('welcome');
 		}
 
 		// Handle hash routing
@@ -297,8 +297,8 @@ export class OsApiClass implements OsApi {
 	isKnownWindowId(id: string): boolean {
 		// A window-id is known iff a manifest claims it via windows[] — matchWindow
 		// is the single gate. Fixed, prefix (chat:, textedit:, sticky:, player:,
-		// about:) and the system chrome (welcome, about, terminal-prefs) all resolve
-		// here. A stale `-`-separated id (chat-<slug>, sticky-<id>) or a legacy
+		// about:) and the system chrome (about, terminal-prefs) all resolve here.
+		// A stale `-`-separated id (chat-<slug>, sticky-<id>) or a legacy
 		// about-<id> / recorder-<id> from before the flat cutover is *unknown* and
 		// drops on restore (see init()'s saved-window filter); those clips reopen in
 		// the Player by content-type anyway.

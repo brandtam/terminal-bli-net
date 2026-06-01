@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { DiskUsage } from '$lib/terminalos';
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 
 	// Window components take no props — they read the shared context. This dialog
 	// only needs the filesystem (disk-usage bars); it never touched `os`.
-	const { fs } = getSystem();
+	const { fs } = getAppContext();
 
 	const version = __APP_VERSION__;
 

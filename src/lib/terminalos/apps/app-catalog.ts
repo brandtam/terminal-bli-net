@@ -17,9 +17,9 @@ import { MANIFESTS } from './manifests';
  * The one window-id whose menu-bar identity matchWindow can't supply. `error`'s
  * flat window has appId `error`, but the System Error dialog reads as Finder
  * chrome, so synthWindowAppId checks this override before matchWindow. Everything
- * else — including `trash` (its flat window lives on the finder manifest) and the
- * `about:`/`welcome`/`terminal-prefs` system windows — gets its identity straight
- * from matchWindow.
+ * else — including `trash` (its flat window lives on the finder manifest), the
+ * `welcome` app window, and the `about:`/`terminal-prefs` system windows — gets
+ * its identity straight from matchWindow.
  */
 const WINDOW_APP_OVERRIDES: Record<string, AppId> = {
 	error: 'finder'
@@ -140,7 +140,7 @@ export function synthWindowAppId(windowId: string): AppId {
 	const mapped = WINDOW_APP_MAP[windowId];
 	if (mapped) return mapped;
 	// Every window reports its owning app through matchWindow — fixed, prefix, and
-	// the system chrome (about:, welcome, terminal-prefs) alike. Unknown → finder.
+	// the system chrome (about:, terminal-prefs) alike. Unknown → finder.
 	const matched = matchWindow(windowId);
 	if (matched) return matched.appId;
 	return 'finder';

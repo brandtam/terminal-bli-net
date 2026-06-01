@@ -23,8 +23,8 @@ import type { FileType } from '../filesystem/types';
 export type WindowMatch =
 	// `args` lets an exact window declare static params (e.g. Finder and Trash are
 	// the same component pointed at different folders: { folder: ROOT_ID } vs
-	// { folder: TRASH_ID }). They flow into win.args exactly like a prefix window's
-	// parsed args, so the component stays zero-id-branch.
+	// { folder: TRASH_ID }). They flow into ctx.window.args exactly like a prefix
+	// window's parsed args, so the component stays zero-id-branch.
 	| { kind: 'exact'; id: string; args?: Record<string, string> }
 	| { kind: 'prefix'; prefix: string; arg: string };
 
@@ -45,7 +45,7 @@ export type WindowRole = 'app' | 'prefs' | 'about' | 'chrome';
  * One window an app owns. Every entry is uniform — a fixed window, a minted
  * instance, a prefs dialog and an about dialog differ only in `match`/`role`,
  * not in shape. Every window has a `component`; there is no "no component" arm.
- * Window components take ZERO props — they read the shared context (getSystem)
+ * Window components take ZERO props — they read the shared context (getAppContext)
  * and derive what they need — so the host renders them all identically.
  */
 export type WindowSpec = {

@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { MANIFESTS } from './manifests';
 import { matchWindow, synthAboutWindowId } from './app-catalog';
 import type { WindowSpec } from './app-manifest';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
+import type { AppContext, AppStorageHandle, WindowHandle } from '$lib/os/os-context';
 
 /**
  * Conformance test: the manifest list is the single source of truth, so every
@@ -41,6 +42,15 @@ const windowed = MANIFESTS.filter((m) => m.windows && m.windows.length > 0);
 describe('manifest conformance', () => {
 	it('covers every windowed app', () => {
 		expect(windowed.length).toBeGreaterThan(0);
+	});
+
+	it('defines the AppContext every window receives', () => {
+		expectTypeOf<AppContext>().toHaveProperty('os');
+		expectTypeOf<AppContext>().toHaveProperty('fs');
+		expectTypeOf<AppContext>().toHaveProperty('window').toMatchTypeOf<WindowHandle>();
+		expectTypeOf<AppContext>().toHaveProperty('storage').toMatchTypeOf<AppStorageHandle>();
+		expectTypeOf<AppContext>().toHaveProperty('capabilities');
+		expectTypeOf<AppContext>().toHaveProperty('lifecycle');
 	});
 
 	describe.each(windowed.map((m) => [m.id, m] as const))('%s', (_id, manifest) => {

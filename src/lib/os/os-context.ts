@@ -17,21 +17,51 @@ export type WindowHandle = {
 };
 
 /**
- * The single context every window receives. `os` and `fs` are stable singletons
- * — `os` is the live OsApiClass instance, so its `$state` fields (now, slotNow,
- * groups, …) stay reactive when a window reads them through here. `win` is this
- * window's handle. No window is given props: it reads what it needs from this
- * context and derives the rest itself, which is what lets the OS render every
- * window identically without knowing any app's prop shape.
+ * Reserved for #29. The host provides this handle now so every app receives the
+ * final AppContext shape, but it deliberately exposes no persistence methods
+ * until the scoped storage design lands.
  */
-export type SystemContext = {
-	os: OsApiClass;
-	fs: TerminalFS;
-	win: WindowHandle;
+export type AppStorageHandle = {
+	readonly appId: string;
+	readonly namespace: string;
+	readonly status: 'reserved';
 };
 
 /**
- * `setSystem` is called once per window (in WindowHost); `getSystem` is read by
- * the window's component and any descendant. Typed pair — no string keys.
+ * Typed documentation seam for a future iframe-sandbox capability list. These
+ * values are not enforced today; do not treat them as a security guarantee.
  */
-export const [getSystem, setSystem] = createContext<SystemContext>();
+export type AppCapabilities = {
+	readonly declared?: readonly string[];
+};
+
+/**
+ * Typed documentation seam for #30, where the games SDK can design focus and
+ * visibility hooks against a real requestAnimationFrame loop. Svelte lifecycle
+ * remains the only active component lifecycle today.
+ */
+export type AppLifecycle = {
+	readonly focusAware?: boolean;
+};
+
+/**
+ * The single typed context every app window receives. `os` and `fs` are stable
+ * singletons — `os` is the live OsApiClass instance, so its `$state` fields stay
+ * reactive when a window reads them through here. `window` is this window's
+ * handle. No app window is given bespoke props: it reads this context and
+ * derives the rest itself, which lets the OS render every app identically.
+ */
+export type AppContext = {
+	os: OsApiClass;
+	fs: TerminalFS;
+	window: WindowHandle;
+	storage: AppStorageHandle;
+	capabilities?: AppCapabilities;
+	lifecycle?: AppLifecycle;
+};
+
+/**
+ * `setAppContext` is called once per window (in WindowHost); `getAppContext` is
+ * read by the window's component and any descendant. Typed pair — no string keys.
+ */
+export const [getAppContext, setAppContext] = createContext<AppContext>();

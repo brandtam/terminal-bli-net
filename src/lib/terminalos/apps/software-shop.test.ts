@@ -25,6 +25,7 @@ describe('getShopCatalog', () => {
 		expect(ids).not.toContain('finder');
 		expect(ids).not.toContain('trash');
 		expect(ids).not.toContain('system');
+		expect(ids).not.toContain('welcome');
 		expect(ids).not.toContain('software-shop');
 		expect(ids).not.toContain('computer-store');
 		expect(ids).not.toContain('textedit');

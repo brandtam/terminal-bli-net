@@ -99,17 +99,19 @@ describe('TerminalFS.createCleanDisk', () => {
 		const fs = createDisk();
 		const nodes = fs.getAllNodes();
 
-		// finder, trash and system (OS chrome owner) must NOT have file nodes
+		// finder, trash, system (OS chrome owner), and welcome must NOT have file nodes
 		// anywhere — `system` is isSystem, so without the NON_FILE_APPS exclusion it
 		// would otherwise seed a "Terminal" icon into /Applications.
 		const allFiles = Array.from(nodes.values()).filter((n): n is FsFile => n.kind === 'file');
 		const finderFiles = allFiles.filter((f) => f.appId === 'finder');
 		const trashFiles = allFiles.filter((f) => f.appId === 'trash');
 		const systemFiles = allFiles.filter((f) => f.appId === 'system' || f.name === 'Terminal');
+		const welcomeFiles = allFiles.filter((f) => f.appId === 'welcome' || f.name === 'Welcome.app');
 
 		expect(finderFiles).toHaveLength(0);
 		expect(trashFiles).toHaveLength(0);
 		expect(systemFiles).toHaveLength(0);
+		expect(welcomeFiles).toHaveLength(0);
 	});
 
 	it('desktop aliases point to correct app files', async () => {

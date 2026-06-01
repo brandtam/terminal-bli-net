@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 
 	// Window components take no props — they read the shared context and derive
 	// what they need. The counts come straight off the live OS state (reactive).
-	const { os } = getSystem();
+	const { os } = getAppContext();
 	const showCount = $derived(os.groups.filter((g) => g.active).length);
 	const botCount = $derived(os.bots.length);
 </script>

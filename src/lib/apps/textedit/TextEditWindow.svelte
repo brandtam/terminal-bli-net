@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 
 	// Zero-prop: fs + this window's handle come from the host context; the document
 	// id is the matcher-parsed arg from textedit:<fileId>. (Slice 6 migration.)
-	const { fs, win } = getSystem();
-	const docId = win.args.fileId;
+	const { fs, window: appWindow } = getAppContext();
+	const docId = appWindow.args.fileId;
 
 	// docId is fixed for this window (the matcher-parsed arg never changes), so the
 	// document is read once at init, not in an $effect — there's nothing to react to.

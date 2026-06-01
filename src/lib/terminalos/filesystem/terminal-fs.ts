@@ -146,12 +146,12 @@ SHOWRUNNER — $29/mo
 Cancel any time. Pricing in fake dollars. Real dollars also fine.`;
 
 /**
- * Apps that exist as concepts (shell, folder, OS chrome) but not as installable
- * file nodes. `system` is the chrome-dialog owner (About / Welcome / System
+ * Apps that exist as concepts (shell, folder, OS chrome, onboarding) but not as
+ * installable file nodes. `system` is the chrome-dialog owner (About / System
  * Preferences) — it is isSystem like the others but must never get a "Terminal"
  * icon in /Applications, so it is excluded from seeding here just like finder.
  */
-const NON_FILE_APPS = new Set(['finder', 'trash', 'system']);
+const NON_FILE_APPS = new Set(['finder', 'trash', 'system', 'welcome']);
 
 /**
  * Generate a copy name: "Foo" -> "Foo copy", "Foo copy 2", etc.

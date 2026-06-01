@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 
 	// The Player is a generic video document handler. It takes no props: the OS
-	// hands it the shared context, and it pulls the file to play from win.args
+	// hands it the shared context, and it pulls the file to play from ctx.window.args
 	// (the fileId the matcher parsed out of the `player:<fileId>` window-id).
-	const { fs, win } = getSystem();
+	const { fs, window: appWindow } = getAppContext();
 
 	let src = $state<string | null>(null);
 	let status = $state<'loading' | 'ready' | 'missing' | 'empty'>('loading');
@@ -12,12 +12,12 @@
 	$effect(() => {
 		// Bare launch — Player.app opened from Applications with no document.
 		// args.fileId is absent (this is the exact 'player' window, not player:<id>).
-		if (!win.args.fileId) {
+		if (!appWindow.args.fileId) {
 			status = 'empty';
 			return;
 		}
 
-		const node = fs.peekNode(win.args.fileId);
+		const node = fs.peekNode(appWindow.args.fileId);
 		if (!node || node.kind !== 'file' || !node.bodyRef) {
 			status = 'missing';
 			return;

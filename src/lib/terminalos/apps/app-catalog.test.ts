@@ -15,11 +15,12 @@ import {
  */
 
 describe('synthAppLibrary', () => {
-	it('produces all 20 apps in original order', () => {
+	it('produces all 21 apps in manifest order', () => {
 		const ids = synthAppLibrary().map((a) => a.id);
 		expect(ids).toEqual([
 			'finder',
 			'system',
+			'welcome',
 			'software-shop',
 			'computer-store',
 			'trash',
@@ -59,6 +60,7 @@ describe('synthApps', () => {
 			[
 				'finder',
 				'system',
+				'welcome',
 				'tvguide',
 				'chatrbot',
 				'stats',
@@ -99,6 +101,7 @@ describe('synthWindowAppMap', () => {
 
 describe('synthWindowAppId', () => {
 	it('routes flat windows to their app via matchWindow', () => {
+		expect(synthWindowAppId('welcome')).toBe('welcome');
 		expect(synthWindowAppId('chat:seinfeld')).toBe('chatrbot');
 		expect(synthWindowAppId('sticky:123')).toBe('stickies');
 		expect(synthWindowAppId('textedit:readme')).toBe('textedit');
@@ -115,9 +118,8 @@ describe('synthWindowAppId', () => {
 	});
 
 	it('routes the OS chrome dialogs to the system app', () => {
-		// welcome / about / terminal-prefs are owned by the `system` app via its
-		// flat windows[], so the menu bar reads "Terminal" while one is focused.
-		expect(synthWindowAppId('welcome')).toBe('system');
+		// about / terminal-prefs are owned by the `system` app via its flat
+		// windows[], so the menu bar reads "Terminal" while one is focused.
 		expect(synthWindowAppId('about')).toBe('system');
 		expect(synthWindowAppId('terminal-prefs')).toBe('system');
 		// Per-app About boxes are minted as about:<id>; the about: prefix is the
@@ -143,6 +145,7 @@ describe('synthAppWindowId', () => {
 		expect(synthAppWindowId('error')).toBe('error');
 		expect(synthAppWindowId('software-shop')).toBe('software-shop');
 		expect(synthAppWindowId('computer-store')).toBe('computer-store');
+		expect(synthAppWindowId('welcome')).toBe('welcome');
 		expect(synthAppWindowId('finder')).toBe('finder');
 	});
 

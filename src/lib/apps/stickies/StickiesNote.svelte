@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 	import { stickyFromFile, updateSticky, deleteStickyNote } from './stickies-manager.svelte';
 
 	const COLORS: { label: string; bg: string }[] = [
@@ -13,8 +13,8 @@
 	// Zero-prop: the host gives us fs + this window's handle. The note id is the
 	// arg the matcher parsed from `sticky:<noteId>`. The file is the source of
 	// truth — read it once for the initial values.
-	const { fs, win } = getSystem();
-	const noteId = win.args.noteId;
+	const { fs, window: appWindow } = getAppContext();
+	const noteId = appWindow.args.noteId;
 
 	const initial = stickyFromFile(fs.peekNode(noteId));
 	// There is no UI to edit the title (only the body textarea), so it is read
@@ -66,7 +66,7 @@
 
 	async function handleDelete() {
 		await deleteStickyNote(fs, noteId);
-		win.close();
+		appWindow.close();
 	}
 
 	const colorDef = $derived(getColorDef(color));

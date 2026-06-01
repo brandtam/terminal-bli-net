@@ -169,8 +169,8 @@ export const MANIFESTS = [
 		statusExtra: () => null
 	}),
 
-	// The system app owns the OS chrome dialogs — Welcome, About This Terminal,
-	// the per-app About boxes (about:<id>), System Preferences, and maintenance.
+	// The system app owns the OS chrome dialogs — About This Terminal, the
+	// per-app About boxes (about:<id>), System Preferences, and maintenance.
 	// They render through the flat Window Host like any other window, and the menu
 	// bar reads this app's name ("Terminal") whenever one of them is focused. It
 	// folds away the old `system-prefs` + `about-terminal` pseudo-manifests. None
@@ -180,20 +180,13 @@ export const MANIFESTS = [
 		name: 'Terminal',
 		fileName: 'Terminal',
 		category: 'system',
-		description: 'System chrome — About, Welcome, System Preferences, Maintenance',
+		description: 'System chrome — About, System Preferences, Maintenance',
 		icon: ':)',
 		removable: false,
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'hd',
 		windows: [
-			{
-				match: { kind: 'exact', id: 'welcome' },
-				role: 'chrome',
-				title: () => 'Welcome.app',
-				size: () => ({ w: 460, h: 540 }),
-				component: () => import('$lib/apps/welcome/WelcomeWindow.svelte')
-			},
 			{
 				match: { kind: 'exact', id: 'about' },
 				role: 'about',
@@ -249,8 +242,59 @@ export const MANIFESTS = [
 				label: 'Help',
 				items: [
 					{ type: 'action', label: 'About Terminal', action: () => os.openAbout(null) },
-					{ type: 'action', label: 'Welcome', action: () => os.openWindow('welcome') }
+					{ type: 'action', label: 'Welcome', action: () => os.launchApp('welcome') }
 				]
+			}
+		],
+		statusExtra: () => null
+	}),
+
+	defineApp({
+		id: 'welcome',
+		name: 'Welcome',
+		fileName: 'Welcome.app',
+		category: 'system',
+		description: 'Guided tour and reference app',
+		icon: '★',
+		removable: false,
+		desktopAliasByDefault: false,
+		isSystem: true,
+		iconKind: 'doc',
+		windows: [
+			{
+				match: { kind: 'exact', id: 'welcome' },
+				role: 'app',
+				title: () => 'Welcome.app',
+				size: () => ({ w: 460, h: 540 }),
+				component: () => import('$lib/apps/welcome/WelcomeWindow.svelte')
+			}
+		],
+		aboutSpec: {
+			title: 'Welcome',
+			version: 'v1.0',
+			tagline: 'the AppContext reference app',
+			glyph: '★',
+			glyphBg: 'var(--accent)',
+			glyphFg: 'var(--paper)',
+			sections: [
+				{
+					h: 'WHAT IT IS',
+					body: 'The first app Terminal opens. It is also the small worked example for the app host: one manifest window, one AppContext, no bespoke props.'
+				},
+				{
+					h: 'HOW IT WORKS',
+					body: 'Its buttons drive the real OS through ctx.os, so the tour is the same path any app author can use.'
+				}
+			]
+		},
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }]
+			},
+			{
+				label: 'Help',
+				items: [{ type: 'action', label: 'About Welcome', action: () => os.openAbout('welcome') }]
 			}
 		],
 		statusExtra: () => null
@@ -267,7 +311,7 @@ export const MANIFESTS = [
 		desktopAliasByDefault: true,
 		isSystem: true,
 		iconKind: 'floppy',
-		// One fixed window; SoftwareShopWindow reads os/fs off getSystem(), no props.
+		// One fixed window; SoftwareShopWindow reads os/fs off getAppContext(), no props.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'software-shop' },
@@ -325,7 +369,7 @@ export const MANIFESTS = [
 		desktopAliasByDefault: false,
 		isSystem: true,
 		iconKind: 'floppy',
-		// ComputerStoreWindow reads os/fs off getSystem(), no props.
+		// ComputerStoreWindow reads os/fs off getAppContext(), no props.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'computer-store' },
@@ -597,7 +641,7 @@ export const MANIFESTS = [
 		status: 'released',
 		iconKind: 'tvguide',
 		// A fixed main window + a prefs dialog. TVGuide / TVGuidePrefs read
-		// everything (channels, clock, tweaks) off getSystem(), so neither takes props.
+		// everything (channels, clock, tweaks) off getAppContext(), so neither takes props.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'tv-guide' },
@@ -971,7 +1015,7 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'calc',
-		// One fixed window; StatsWindow reads its counts off getSystem(), no props.
+		// One fixed window; StatsWindow reads its counts off getAppContext(), no props.
 		windows: [
 			{
 				match: { kind: 'exact', id: 'stats' },
@@ -1028,7 +1072,7 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'floppy',
-		// ErrorDialog reads its close action off getSystem().win, no props. role:'app'
+		// ErrorDialog reads its close action off getAppContext().window, no props. role:'app'
 		// because this is a launchable window (error has a desktop alias, so
 		// getAppWindowId('error') must resolve to it). Its menu-bar identity reads as
 		// Finder via the one remaining WINDOW_APP_OVERRIDES entry (checked before

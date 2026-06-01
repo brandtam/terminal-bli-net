@@ -10,7 +10,7 @@
 		createFolderView
 	} from '$lib/terminalos';
 	import type { FsNode, FsFile, FsAlias } from '$lib/terminalos';
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
 	import { getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import { openFilesystemNode } from '$lib/os/filesystem-open';
@@ -19,8 +19,8 @@
 	// explicit static arg on the matched window (finder → ROOT_ID, trash → TRASH_ID)
 	// — no default and no per-id branch. ROOT_ID/TRASH_ID stay imported for the
 	// navigation comparisons below (e.g. inTrash), just not as a prop fallback.
-	const { os, fs, win } = getSystem();
-	const folderId = win.args.folder;
+	const { os, fs, window: appWindow } = getAppContext();
+	const folderId = appWindow.args.folder;
 
 	let currentFolderId = $state(folderId);
 	let selectedId = $state<string | null>(null);

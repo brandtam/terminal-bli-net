@@ -1,12 +1,12 @@
 <script lang="ts">
 	import type { TweaksState } from '$lib/types';
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 	import { SYS7_PATTERNS } from './wallpaper-patterns';
 
 	// Zero-prop window component: reads tweaks off the live OS context and writes
 	// them back through os.setTweak. SYS7_PATTERNS is the static wallpaper list,
 	// imported directly rather than threaded in as a prop.
-	const { os } = getSystem();
+	const { os } = getAppContext();
 	const tweaks = $derived(os.tweaks);
 	const onSetTweak = (key: keyof TweaksState, value: TweaksState[keyof TweaksState]) =>
 		os.setTweak(key, value);

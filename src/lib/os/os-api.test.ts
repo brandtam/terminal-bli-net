@@ -736,10 +736,10 @@ describe('derived state', () => {
 		expect(os.activeAppId).toBe('system');
 	});
 
-	it('activeAppId returns system for the Welcome window', () => {
+	it('activeAppId returns welcome for the Welcome app window', () => {
 		const { os } = createOs();
 		os.openWindow('welcome');
-		expect(os.activeAppId).toBe('system');
+		expect(os.activeAppId).toBe('welcome');
 	});
 
 	it('activeAppId returns system for System Preferences', () => {
@@ -887,6 +887,7 @@ describe('timezone', () => {
 
 describe('windowAppId', () => {
 	it('maps store app window IDs to their app IDs', () => {
+		expect(windowAppId('welcome')).toBe('welcome');
 		expect(windowAppId('tv-guide')).toBe('tvguide');
 		expect(windowAppId('recorder')).toBe('recorder');
 		expect(windowAppId('vcr')).toBe('vcr');

@@ -14,6 +14,8 @@ export { invalidateWindow } from './window-host-cache';
 export type WindowComponentLoader = () => Promise<{ default: Component }>;
 
 export type ResolvedWindow = {
+	/** App that owns this window. */
+	appId: string;
 	/** Args the matcher parsed from the id (empty for an exact window with none). */
 	args: Record<string, string>;
 	/** The matched spec. resolveWindow returns null rather than a null spec. */
@@ -39,7 +41,7 @@ export function resolveWindow(id: string): ResolvedWindow | null {
 
 	const m = matchWindow(id);
 	const resolved: ResolvedWindow | null = m
-		? { args: m.args, spec: m.spec, load: m.spec.component }
+		? { appId: m.appId, args: m.args, spec: m.spec, load: m.spec.component }
 		: null;
 	cache.set(id, resolved);
 	return resolved;

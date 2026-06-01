@@ -2,13 +2,13 @@
 	import { onMount, onDestroy } from 'svelte';
 	import type { FsFile } from '$lib/terminalos';
 	import { RECORDINGS_ID } from '$lib/terminalos';
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 	import { recorderState } from './recorder-state.svelte';
 
 	// Zero-prop: fs comes from the host context. The global "● REC" menu-bar badge
 	// is driven by recorderState (read through this app's statusExtra), set on
 	// start/stop/cleanup below — no bindable prop threaded through Desktop.
-	const { fs } = getSystem();
+	const { fs } = getAppContext();
 
 	const MAX_DURATION = 60;
 

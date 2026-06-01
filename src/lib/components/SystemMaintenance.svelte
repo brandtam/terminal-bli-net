@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 	import type { BodyGcReport, FsError } from '$lib/terminalos';
 	import BodyGcReportPanel from './BodyGcReportPanel.svelte';
 
-	const { os } = getSystem();
+	const { os } = getAppContext();
 
 	let report = $state<BodyGcReport | null>(null);
 	let error = $state<FsError | null>(null);

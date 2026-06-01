@@ -1,3 +1,20 @@
+<script lang="ts">
+	import { getAppContext } from '$lib/os/os-context';
+	import { runWelcomeTourAction } from './welcome-tour';
+
+	const ctx = getAppContext();
+	const openWindowCount = $derived(ctx.os.windows.length);
+	const installedAppCount = $derived(ctx.fs.getInstalledApps().length);
+
+	function openComputerStore() {
+		runWelcomeTourAction(ctx, 'computer-store');
+	}
+
+	function openShelf() {
+		runWelcomeTourAction(ctx, 'software-shop');
+	}
+</script>
+
 <div class="welcome">
 	<h1>terminal<span class="accent">.bli.net</span><span class="blink-cursor"></span></h1>
 	<div class="lede">
@@ -8,6 +25,20 @@
 	<p class="tagline">
 		Follow along. It takes about a minute, and there's a working VCR at the end of it.
 	</p>
+
+	<div class="tour-panel">
+		<div>
+			<div class="panel-label">LIVE TOUR</div>
+			<div class="panel-copy">
+				{openWindowCount} windows open · {installedAppCount} apps available ·
+				{ctx.storage.status} storage seam
+			</div>
+		</div>
+		<div class="tour-actions">
+			<button onclick={openComputerStore}>Computer Store</button>
+			<button onclick={openShelf}>My Shelf</button>
+		</div>
+	</div>
 
 	<ol class="steps">
 		<li>Click the <b>icon</b> in the <b>top-left corner</b> of the menu bar.</li>
@@ -79,6 +110,45 @@
 		background: var(--accent-2);
 		padding: 10px 12px;
 		border: 2px solid var(--ink);
+	}
+	.tour-panel {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 10px;
+		margin: 0 0 18px;
+		padding: 10px;
+		border: 2px solid var(--ink);
+		background: var(--paper-soft);
+		box-shadow: 3px 3px 0 var(--shadow);
+	}
+	.panel-label {
+		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
+		font-size: 10px;
+		margin-bottom: 6px;
+		color: var(--accent);
+	}
+	.panel-copy {
+		font-size: 18px;
+		line-height: 1.2;
+	}
+	.tour-actions {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 8px;
+	}
+	.tour-actions button {
+		border: 2px solid var(--ink);
+		background: var(--paper);
+		color: var(--ink);
+		box-shadow: 2px 2px 0 var(--ink);
+		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
+		font-size: 16px;
+		padding: 7px 8px;
+		cursor: pointer;
+	}
+	.tour-actions button:active {
+		transform: translate(2px, 2px);
+		box-shadow: none;
 	}
 	.tagline {
 		font-size: 22px;

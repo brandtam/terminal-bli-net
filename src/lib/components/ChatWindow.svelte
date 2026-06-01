@@ -3,17 +3,17 @@
 	import type { ChatMessage, TextChunk } from '$lib/types';
 	import { loadConversations, saveConversation, getSessionId } from '$lib/persistence';
 	import { formatTimeUntil, isShowOnAir, minutesUntilSlotEnd } from '$lib/schedule';
-	import { getSystem } from '$lib/os/os-context';
+	import { getAppContext } from '$lib/os/os-context';
 	import Dropdown from './Dropdown.svelte';
 
 	type ChatMode = 'group' | string; // 'group' or a botId
 
 	// Zero-prop window-host app (Slice 4). The show identity comes from the
-	// window-id (`chat:<slug>` → win.args.slug). Everything else — the cast and
+	// window-id (`chat:<slug>` → ctx.window.args.slug). Everything else — the cast and
 	// the ticking on-air state — is derived off the live OS, so a window left
 	// open keeps counting down as os.now advances. No props bag ever freezes it.
-	const { os, win } = getSystem();
-	const showSlug = win.args.slug ?? '';
+	const { os, window: appWindow } = getAppContext();
+	const showSlug = appWindow.args.slug ?? '';
 
 	const group = $derived(os.groups.find((g) => g.slug === showSlug));
 	const showName = $derived(group?.name ?? 'Chat');
