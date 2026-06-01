@@ -70,7 +70,7 @@
 			<rect x="3" y="2" width="10" height="12" fill="#dcd6c8" stroke="#0a0a0a" />
 			<rect x="4" y="3" width="8" height="3" fill="#a6f000" stroke="#0a0a0a" />
 			<rect x="9" y="4" width="2" height="1" fill="#0a0a0a" />
-			{#each [0, 1, 2] as r}{#each [0, 1, 2] as c}<rect
+			{#each [0, 1, 2] as r (r)}{#each [0, 1, 2] as c (c)}<rect
 						x={4 + c * 3}
 						y={7 + r * 2}
 						width="2"

@@ -65,7 +65,7 @@
 >
 	<div class="dock-handle" title="drag to move">⋮⋮</div>
 	{#if !collapsed}
-		{#each items as it}
+		{#each items as it (it.id)}
 			<button
 				class="dock-item"
 				class:active={openIds.includes(it.id)}

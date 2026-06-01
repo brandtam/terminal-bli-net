@@ -175,7 +175,7 @@ export class LibraryStore {
 		// Defense in depth: the keyed {#each ep (ep.id)} block in the page silently freezes
 		// reactive updates on a duplicate key. Catch producer bugs here so the user sees a
 		// real error instead of a confusing "added N episodes" flash with an empty list.
-		const existing = new Set(this.episodes.map((e) => e.id));
+		const existing = new SvelteSet(this.episodes.map((e) => e.id));
 		for (const ep of toAdd) {
 			if (existing.has(ep.id)) {
 				this.saveResult = { ok: false, msg: `Internal: duplicate episode id "${ep.id}"` };
@@ -293,7 +293,7 @@ export class LibraryStore {
 		});
 		const showSlug = slugify(this.showId || cluster.name) || 'show';
 		const toAdd: Episode[] = [];
-		const taken = new Set(this.episodes.map((e) => e.id));
+		const taken = new SvelteSet(this.episodes.map((e) => e.id));
 		for (const item of cluster.items) {
 			if (this.isStandaloneDuplicate(item.identifier)) continue;
 			const se = parseSE(item.title || '');

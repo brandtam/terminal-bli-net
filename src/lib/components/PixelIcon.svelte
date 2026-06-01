@@ -77,8 +77,8 @@
 		<rect x="2" y="2" width="11" height="12" fill="#dcd6c8" stroke="#0a0a0a" />
 		<rect x="3" y="3" width="9" height="3" fill="#a6f000" stroke="#0a0a0a" />
 		<rect x="9" y="4" width="2" height="1" fill="#0a0a0a" />
-		{#each [0, 1, 2] as r}
-			{#each [0, 1, 2] as c}
+		{#each [0, 1, 2] as r (r)}
+			{#each [0, 1, 2] as c (c)}
 				<rect x={3 + c * 3} y={7 + r * 2} width="2" height="1" fill="#0a0a0a" />
 			{/each}
 		{/each}

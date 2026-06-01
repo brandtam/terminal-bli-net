@@ -1,4 +1,5 @@
 import type { WindowState, TweaksState, GroupMeta, PublicBot, Channel } from '$lib/types';
+import { SvelteDate, SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { OsApi, AlertSpec, GuideApi, ShowInfo } from './os-api';
 import { windowAppId } from './os-api';
 import { APPS } from './app-registry';
@@ -41,8 +42,8 @@ export class OsApiClass implements OsApi {
 		tvPauseOnHover: false
 	});
 	timezone = $state<string | undefined>(undefined);
-	now = $state(new Date());
-	slotNow = $state(new Date());
+	now = $state(new SvelteDate());
+	slotNow = $state(new SvelteDate());
 	groups = $state<GroupMeta[]>([]);
 	bots = $state<PublicBot[]>([]);
 	channels = $state<Channel[]>([]);
@@ -56,7 +57,7 @@ export class OsApiClass implements OsApi {
 	private tickInterval?: ReturnType<typeof setInterval>;
 	private resizeCleanup?: () => void;
 	private keydownCleanup?: () => void;
-	private launchHandlers = new Map<string, (payload?: Record<string, unknown>) => void>();
+	private launchHandlers = new SvelteMap<string, (payload?: Record<string, unknown>) => void>();
 
 	// ── Dock alias map ────────────────────────────────────────────────────
 	private DOCK_ALIASES: Record<string, () => void> = {};
@@ -114,12 +115,12 @@ export class OsApiClass implements OsApi {
 		}
 
 		// Start clock
-		const initialNow = new Date();
+		const initialNow = new SvelteDate();
 		this.lastSlotIdx = getSlotIndex(initialNow, this.timezone);
 		this.slotNow = initialNow;
 
 		this.tickInterval = setInterval(() => {
-			this.now = new Date();
+			this.now = new SvelteDate();
 			const idx = getSlotIndex(this.now, this.timezone);
 			if (idx !== this.lastSlotIdx) {
 				this.lastSlotIdx = idx;
@@ -354,7 +355,7 @@ export class OsApiClass implements OsApi {
 			},
 			liveCount: () => {
 				const slotIdx = getSlotIndex(this.now, this.timezone);
-				const liveShowSlugs = new Set(
+				const liveShowSlugs = new SvelteSet(
 					this.channels.map((ch) => ch.schedule[slotIdx]?.showSlug).filter(Boolean)
 				);
 				return liveShowSlugs.size;
@@ -487,7 +488,7 @@ export class OsApiClass implements OsApi {
 			}
 			const json = JSON.stringify(result.value, null, 2);
 			const blob = new Blob([json], { type: 'application/octet-stream' });
-			const filename = `terminal-hd-${new Date().toISOString().slice(0, 10)}.terminal-hd`;
+			const filename = `terminal-hd-${new SvelteDate().toISOString().slice(0, 10)}.terminal-hd`;
 			this.showAlert({
 				title: 'Backup Complete',
 				body: 'Terminal HD has been saved. This file is readable JSON — anyone who has it can see your files.',
@@ -537,7 +538,7 @@ export class OsApiClass implements OsApi {
 					}
 					const p = preview.value;
 					const lines = [
-						`${p.diskName} — exported ${new Date(p.exportedAt).toLocaleDateString()}`,
+						`${p.diskName} — exported ${new SvelteDate(p.exportedAt).toLocaleDateString()}`,
 						`${p.fileCount} files, ${p.folderCount} folders, ${p.appCount} apps`
 					];
 					if (p.hasPreferences) lines.push('Includes preferences and chat history');

@@ -9,11 +9,13 @@ const mockAnthropicMessagesStream = vi.fn();
 
 vi.mock('@anthropic-ai/sdk', () => {
 	return {
-		default: vi.fn().mockImplementation(() => ({
-			messages: {
-				stream: mockAnthropicMessagesStream
-			}
-		}))
+		default: vi.fn().mockImplementation(function () {
+			return {
+				messages: {
+					stream: mockAnthropicMessagesStream
+				}
+			};
+		})
 	};
 });
 
@@ -22,13 +24,15 @@ const mockOpenAIChatCompletionsCreate = vi.fn();
 
 vi.mock('openai', () => {
 	return {
-		default: vi.fn().mockImplementation(() => ({
-			chat: {
-				completions: {
-					create: mockOpenAIChatCompletionsCreate
+		default: vi.fn().mockImplementation(function () {
+			return {
+				chat: {
+					completions: {
+						create: mockOpenAIChatCompletionsCreate
+					}
 				}
-			}
-		}))
+			};
+		})
 	};
 });
 
@@ -76,6 +80,8 @@ function createMockKV(initial?: Record<string, string>): KVNamespace {
 describe('streamCompletion', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockAnthropicMessagesStream.mockReset();
+		mockOpenAIChatCompletionsCreate.mockReset();
 	});
 
 	describe('AnthropicProvider', () => {

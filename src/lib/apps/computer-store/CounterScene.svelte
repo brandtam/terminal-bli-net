@@ -95,8 +95,8 @@
 		<!-- REGISTER -->
 		<rect x="28" y="102" width="38" height="22" fill="#dcd6c8" stroke="#0a0a0a" stroke-width="2" />
 		<rect x="32" y="105" width="30" height="7" fill="#a6f000" stroke="#0a0a0a" stroke-width="1" />
-		{#each [0, 1, 2] as c}
-			{#each [0, 1] as r}
+		{#each [0, 1, 2] as c (c)}
+			{#each [0, 1] as r (r)}
 				<rect x={34 + c * 9} y={114 + r * 4} width="6" height="2" fill="#0a0a0a" />
 			{/each}
 		{/each}
@@ -106,7 +106,7 @@
 
 		<!-- COUNTER TOP -->
 		<rect x="0" y="124" width="156" height="40" fill="#a06a3a" stroke="#0a0a0a" stroke-width="2" />
-		{#each [20, 50, 90, 130] as lx}
+		{#each [20, 50, 90, 130] as lx (lx)}
 			<line x1={lx} y1="124" x2={lx} y2="164" stroke="#7a4f2a" stroke-width="1" />
 		{/each}
 

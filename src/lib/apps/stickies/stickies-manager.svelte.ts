@@ -37,8 +37,8 @@ export function stickyFromFile(f: Readonly<FsNode> | null | undefined): StickyNo
 export async function createStickyNote(fs: TerminalFS): Promise<string> {
 	let name = 'Untitled Note';
 	let suffix = 1;
-	const names = new Set(fs.findByApp('stickies').map((f) => f.name));
-	while (names.has(name)) {
+	const names = fs.findByApp('stickies').map((f) => f.name);
+	while (names.includes(name)) {
 		suffix++;
 		name = `Untitled Note ${suffix}`;
 	}

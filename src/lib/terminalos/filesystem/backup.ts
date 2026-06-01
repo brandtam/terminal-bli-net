@@ -42,6 +42,7 @@ const backupPreferencesSchema = z.object({
 		.optional(),
 	conversations: z
 		.record(
+			z.string(),
 			z.object({
 				botId: z.string(),
 				group: z.string(),
@@ -142,7 +143,7 @@ const backupSchemaV1 = z.object({
 		name: z.string()
 	}),
 	nodes: z.array(fsNodeSchema),
-	bodies: z.record(z.string())
+	bodies: z.record(z.string(), z.string())
 });
 
 const backupSchemaV2 = z.object({
@@ -155,7 +156,7 @@ const backupSchemaV2 = z.object({
 		ownedApps: z.array(z.string()).optional()
 	}),
 	nodes: z.array(fsNodeSchema),
-	bodies: z.record(z.string()),
+	bodies: z.record(z.string(), z.string()),
 	preferences: backupPreferencesSchema.optional()
 });
 
@@ -169,7 +170,7 @@ const backupSchemaV3 = z.object({
 		ownedApps: z.array(z.string()).optional()
 	}),
 	nodes: z.array(fsNodeSchema),
-	bodies: z.record(z.string()),
+	bodies: z.record(z.string(), z.string()),
 	preferences: backupPreferencesSchema.optional()
 });
 

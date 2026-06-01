@@ -38,7 +38,7 @@
 	<section class="ds-section">
 		<h2>Color Palette</h2>
 		<div class="swatch-grid">
-			{#each colors as c}
+			{#each colors as c (c.name)}
 				<div class="swatch-card">
 					<div class="swatch-block" style="background: {c.cssVar};"></div>
 					<code class="swatch-name">{c.name}</code>
@@ -216,7 +216,7 @@
 		<h2>Icons</h2>
 		<p class="ds-desc">PixelIcon component — 16x16 SVG pixel art icons rendered at 52x52.</p>
 		<div class="icon-grid">
-			{#each iconKinds as kind}
+			{#each iconKinds as kind (kind)}
 				<div class="icon-demo">
 					<PixelIcon {kind} />
 					<code>{kind}</code>

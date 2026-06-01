@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 </script>
 
@@ -8,7 +9,7 @@
 		<div class="error-content">
 			<h1>System Error {page.status}</h1>
 			<p>{page.error?.message ?? 'Something went wrong.'}</p>
-			<a href="/" class="btn">← Back to desktop</a>
+			<a href={resolve('/')} class="btn">← Back to desktop</a>
 		</div>
 	</div>
 </div>

@@ -61,12 +61,11 @@
 		return segments;
 	});
 
-	function resolveNode(node: FsNode, seen?: Set<string>): FsNode | null {
+	function resolveNode(node: FsNode, seen: readonly string[] = []): FsNode | null {
 		if (node.kind !== 'alias') return node;
 		const alias = node as FsAlias;
-		const visited = seen ?? new Set<string>();
-		if (visited.has(alias.id)) return null;
-		visited.add(alias.id);
+		if (seen.includes(alias.id)) return null;
+		const visited = [...seen, alias.id];
 		const target = fs.peekNode(alias.target.nodeId);
 		if (!target) return null;
 		if (target.kind === 'alias') return resolveNode(target, visited);

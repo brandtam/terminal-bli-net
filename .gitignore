@@ -1,6 +1,7 @@
 /local-docs
 .DS_Store
 node_modules
+.pnpm-store
 /build
 /.svelte-kit
 /package

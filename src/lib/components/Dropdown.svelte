@@ -38,7 +38,7 @@
 	</button>
 	{#if open}
 		<div class="dropdown-menu">
-			{#each options as opt}
+			{#each options as opt (opt.value)}
 				<button
 					class="dropdown-item"
 					class:selected={value === opt.value}

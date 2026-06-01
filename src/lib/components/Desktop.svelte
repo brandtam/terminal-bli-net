@@ -60,12 +60,11 @@
 	let desktopDropActive = $state(false);
 	let trashDropActive = $state(false);
 
-	function resolveAliasSync(node: FsNode, seen?: Set<string>): FsNode | null {
+	function resolveAliasSync(node: FsNode, seen: readonly string[] = []): FsNode | null {
 		if (node.kind !== 'alias') return null;
 		const alias = node as FsAlias;
-		const visited = seen ?? new Set<string>();
-		if (visited.has(alias.id)) return null;
-		visited.add(alias.id);
+		if (seen.includes(alias.id)) return null;
+		const visited = [...seen, alias.id];
 		const target = terminalFs.peekNode(alias.target.nodeId);
 		if (!target) return null;
 		if (target.kind === 'alias') return resolveAliasSync(target, visited);

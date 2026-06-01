@@ -178,7 +178,7 @@
 		>
 		{#if openMenu === '__os'}
 			<div class="dropdown">
-				{#each osMenuItems as it}
+				{#each osMenuItems as it, i (it.type === 'separator' ? `separator-${i}` : it.label)}
 					{#if it.type === 'separator'}
 						<div class="dropdown-sep"></div>
 					{:else}
@@ -202,7 +202,7 @@
 	<span class="menu-item app-name" style="cursor: default;">{app.name}</span>
 
 	<!-- App-defined menus from the registry -->
-	{#each appMenus as menu}
+	{#each appMenus as menu (menu.label)}
 		<div
 			class="menu-wrapper"
 			role="none"
@@ -218,7 +218,7 @@
 			>
 			{#if openMenu === menu.label}
 				<div class="dropdown">
-					{#each menu.items as it}
+					{#each menu.items as it, i (it.type === 'separator' ? `separator-${i}` : it.label)}
 						{#if it.type === 'separator'}
 							<div class="dropdown-sep"></div>
 						{:else}
@@ -280,7 +280,7 @@
 					onclick={(e) => e.stopPropagation()}
 				>
 					<div class="tz-picker-head">Time zone</div>
-					{#each TZ_OPTIONS as opt}
+					{#each TZ_OPTIONS as opt (opt.tz)}
 						{@const selected = isSelectedTz(opt.tz, timezone)}
 						<button
 							class="tz-item"
