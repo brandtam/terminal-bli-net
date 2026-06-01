@@ -397,17 +397,16 @@ export const MANIFESTS = [
 		iconKind: 'doc',
 		// One window minted per open document, keyed `textedit:<fileId>`. The `:`
 		// separator matches chat:/player:/about: (file-ids contain `-`; the tail is
-		// sliced by prefix length, unambiguous either way). NO `opens`: TextEdit is
-		// launched (File ▸ New/Open, Finder double-click), not a content-type doc
-		// handler. The title is the file's name, read purely from the fs node since
-		// SpecCtx is {args, fs}.
+		// sliced by prefix length, unambiguous either way). The title is the file's
+		// name, read purely from the fs node since SpecCtx is {args, fs}.
 		windows: [
 			{
 				match: { kind: 'prefix', prefix: 'textedit:', arg: 'fileId' },
 				role: 'app',
 				title: ({ args, fs }) => fs.peekNode(args.fileId)?.name ?? 'Untitled.txt',
 				size: () => ({ w: 420, h: 400 }),
-				component: () => import('$lib/apps/textedit/TextEditWindow.svelte')
+				component: () => import('$lib/apps/textedit/TextEditWindow.svelte'),
+				opens: { fileTypes: ['text'] }
 			}
 		],
 		aboutSpec: {
@@ -495,8 +494,7 @@ export const MANIFESTS = [
 		iconKind: 'stickies',
 		// Each note is a flat prefix window `sticky:<noteId>`. chromeless: true is
 		// spec-driven (Desktop reads it off the resolved spec) — stickies draw their
-		// own chrome, so the title is cosmetic. No `opens`: notes are launched, not
-		// a document handler.
+		// own chrome, so the title is cosmetic.
 		windows: [
 			{
 				match: { kind: 'prefix', prefix: 'sticky:', arg: 'noteId' },
@@ -504,7 +502,8 @@ export const MANIFESTS = [
 				chromeless: true,
 				title: () => 'Stickies',
 				size: () => ({ w: 240, h: 220 }),
-				component: () => import('$lib/apps/stickies/StickiesNote.svelte')
+				component: () => import('$lib/apps/stickies/StickiesNote.svelte'),
+				opens: { fileTypes: ['sticky'] }
 			}
 		],
 		aboutSpec: {
