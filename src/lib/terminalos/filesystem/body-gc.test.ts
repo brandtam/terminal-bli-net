@@ -117,6 +117,152 @@ class OrderedManifestStore extends InMemoryManifestStore {
 }
 
 describe('blob body garbage collection', () => {
+	it('creates a blob-backed file by writing the body before committing the manifest', async () => {
+		const events: string[] = [];
+		const manifest = new OrderedManifestStore(events);
+		const bodies = new OrderedBodyStore(events);
+		const fs = TerminalFS.createCleanDisk(manifest, bodies);
+
+		const result = await fs.createBlobFile(RECORDINGS_ID, 'Create-order.webm', bytes('new'), {
+			appId: 'recorder',
+			opensWith: 'player',
+			fileType: 'recording',
+			contentType: 'video/webm'
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const bodyId = blobBodyId(result.value);
+		const writeIndex = events.indexOf(`write:${bodyId}`);
+		const saveIndex = events.indexOf('saveManifest');
+		expect(writeIndex).toBeGreaterThanOrEqual(0);
+		expect(saveIndex).toBeGreaterThan(writeIndex);
+		expect(events).not.toContain('listBodyIds');
+		await expectBodyText(fs, bodyId, 'new');
+	});
+
+	it('leaves no node and no manifest change when createBlobFile body writing fails', async () => {
+		const events: string[] = [];
+		const manifest = new OrderedManifestStore(events);
+		const bodies = new FailingWriteBodyStore();
+		const fs = await TerminalFS.open(manifest, bodies);
+		events.length = 0;
+
+		bodies.failWrites = true;
+		const result = await fs.createBlobFile(RECORDINGS_ID, 'No-body.webm', bytes('new'), {
+			appId: 'recorder',
+			fileType: 'recording'
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('quota_exceeded');
+		}
+		expect(events).toEqual([]);
+		expect(await bodies.listBodyIds()).toEqual([]);
+
+		const listing = await fs.listFolder(RECORDINGS_ID);
+		expect(listing.ok).toBe(true);
+		if (listing.ok) {
+			expect(listing.value.some((node) => node.name === 'No-body.webm')).toBe(false);
+		}
+
+		const reopened = await TerminalFS.open(manifest, bodies);
+		const persistedListing = await reopened.listFolder(RECORDINGS_ID);
+		expect(persistedListing.ok).toBe(true);
+		if (persistedListing.ok) {
+			expect(persistedListing.value.some((node) => node.name === 'No-body.webm')).toBe(false);
+		}
+	});
+
+	it('rolls back createBlobFile memory and leaves an uncommitted body collectable when manifest commit fails', async () => {
+		const manifest = new FailingManifestStore();
+		const bodies = new ObservableBodyStore();
+		const fs = await TerminalFS.open(manifest, bodies);
+		const existing = await createRecording(fs, 'Existing.webm', bytes('old'));
+		const existingBodyId = blobBodyId(existing);
+
+		manifest.failSaves = true;
+		const result = await fs.createBlobFile(
+			RECORDINGS_ID,
+			'Manifest-fails-create.webm',
+			bytes('new'),
+			{
+				appId: 'recorder',
+				fileType: 'recording'
+			}
+		);
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('quota_exceeded');
+		}
+		expect(bodies.deleteCalls).toEqual([]);
+
+		const listing = await fs.listFolder(RECORDINGS_ID);
+		expect(listing.ok).toBe(true);
+		if (listing.ok) {
+			expect(listing.value.some((node) => node.name === 'Manifest-fails-create.webm')).toBe(false);
+		}
+		await expectBodyText(fs, existingBodyId, 'old');
+
+		const storedBeforeGc = await bodies.listBodyIds();
+		expect(storedBeforeGc).toHaveLength(2);
+		expect(storedBeforeGc).toContain(existingBodyId);
+
+		manifest.failSaves = false;
+		const collected = await fs.collectGarbage();
+		expect(collected.ok).toBe(true);
+		if (!collected.ok) return;
+		expect(collected.value.deleted).toBe(1);
+		await expectBodyText(fs, existingBodyId, 'old');
+		expect(await bodies.listBodyIds()).toEqual([existingBodyId]);
+	});
+
+	it('preserves blob-retaining undo state when a createBlobFile manifest commit fails', async () => {
+		const manifest = new FailingManifestStore();
+		const bodies = new ObservableBodyStore();
+		const fs = await TerminalFS.open(manifest, bodies);
+		const deletedFile = await createRecording(fs, 'Undo-source.webm', bytes('undo body'));
+		const retainedBodyId = blobBodyId(deletedFile);
+
+		const deleted = await fs.deleteNode(deletedFile.id);
+		expect(deleted.ok).toBe(true);
+
+		manifest.failSaves = true;
+		const failedCreate = await fs.createBlobFile(
+			RECORDINGS_ID,
+			'Failed-undo-replacement.webm',
+			bytes('orphan'),
+			{
+				appId: 'recorder',
+				fileType: 'recording'
+			}
+		);
+
+		expect(failedCreate.ok).toBe(false);
+
+		const undoLabel = await fs.getUndoLabel();
+		expect(undoLabel.ok).toBe(true);
+		if (undoLabel.ok) {
+			expect(undoLabel.value).toBe('Delete "Undo-source.webm"');
+		}
+
+		const collected = await fs.collectGarbage();
+		expect(collected.ok).toBe(true);
+		if (!collected.ok) return;
+		expect(collected.value.deleted).toBe(1);
+		await expectBodyText(fs, retainedBodyId, 'undo body');
+
+		manifest.failSaves = false;
+		const undone = await fs.undoLast();
+		expect(undone.ok).toBe(true);
+		const restored = await fs.getNode(deletedFile.id);
+		expect(restored.ok).toBe(true);
+		await expectBodyText(fs, retainedBodyId, 'undo body');
+	});
+
 	it('replaces a blob-backed file by writing a new body before committing the manifest', async () => {
 		const events: string[] = [];
 		const manifest = new OrderedManifestStore(events);
@@ -208,6 +354,34 @@ describe('blob body garbage collection', () => {
 		if (persisted.ok && persisted.value.kind === 'file') {
 			expect(blobBodyId(persisted.value)).toBe(oldBodyId);
 		}
+	});
+
+	it('rolls back blob-to-inline writes and skips unsafe GC when the manifest commit fails', async () => {
+		const manifest = new FailingManifestStore();
+		const bodies = new ObservableBodyStore();
+		const fs = await TerminalFS.open(manifest, bodies);
+		const file = await createRecording(fs, 'Inline-fails.webm', bytes('old'));
+		const oldBodyId = blobBodyId(file);
+
+		manifest.failSaves = true;
+		const result = await fs.writeText(file.id, 'inline replacement');
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('quota_exceeded');
+		}
+
+		const current = await fs.getNode(file.id);
+		expect(current.ok).toBe(true);
+		if (!current.ok || current.value.kind !== 'file') return;
+		expect(blobBodyId(current.value)).toBe(oldBodyId);
+		expect(bodies.deleteCalls).toEqual([]);
+
+		const collected = await fs.collectGarbage();
+		expect(collected.ok).toBe(true);
+		if (!collected.ok) return;
+		expect(collected.value.deleted).toBe(0);
+		await expectBodyText(fs, oldBodyId, 'old');
 	});
 
 	it('uses copy-on-write when replacing one file that shares a body with a duplicate', async () => {
