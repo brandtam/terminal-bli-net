@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TerminalFS, DOCUMENTS_ID, RECORDINGS_ID } from './terminal-fs';
-import { InMemoryBodyStore } from './storage/storage-types';
+import { InMemoryBodyStore, InMemoryManifestStore } from './storage/storage-types';
 import type { BodyId, FsFile } from './types';
 
 function blobBodyId(file: FsFile): BodyId {
@@ -8,6 +8,17 @@ function blobBodyId(file: FsFile): BodyId {
 		throw new Error(`Expected "${file.name}" to be blob-backed`);
 	}
 	return file.bodyRef.bodyId;
+}
+
+function bytes(text: string): ArrayBuffer {
+	return new TextEncoder().encode(text).buffer as ArrayBuffer;
+}
+
+async function expectBodyText(fs: TerminalFS, bodyId: BodyId, expected: string): Promise<void> {
+	const read = await fs.readBody(bodyId);
+	expect(read.ok).toBe(true);
+	if (!read.ok) return;
+	expect(new TextDecoder().decode(read.value)).toBe(expected);
 }
 
 async function createRecording(
@@ -36,7 +47,222 @@ class FailingDeleteBodyStore extends InMemoryBodyStore {
 	}
 }
 
+class FailingWriteBodyStore extends InMemoryBodyStore {
+	failWrites = false;
+
+	async write(bodyId: BodyId, data: ArrayBuffer) {
+		if (this.failWrites) {
+			return {
+				ok: false as const,
+				error: { code: 'quota_exceeded' as const, message: `No space for ${bodyId}` }
+			};
+		}
+		return super.write(bodyId, data);
+	}
+}
+
+class ObservableBodyStore extends InMemoryBodyStore {
+	readonly deleteCalls: BodyId[] = [];
+
+	async delete(bodyId: BodyId): Promise<void> {
+		this.deleteCalls.push(bodyId);
+		await super.delete(bodyId);
+	}
+}
+
+class FailingManifestStore extends InMemoryManifestStore {
+	failSaves = false;
+
+	async save(...args: Parameters<InMemoryManifestStore['save']>) {
+		if (this.failSaves) {
+			return {
+				ok: false as const,
+				error: { code: 'quota_exceeded' as const, message: 'Manifest quota exceeded' }
+			};
+		}
+		return super.save(...args);
+	}
+}
+
+class OrderedBodyStore extends InMemoryBodyStore {
+	constructor(private readonly events: string[]) {
+		super();
+	}
+
+	async write(bodyId: BodyId, data: ArrayBuffer) {
+		this.events.push(`write:${bodyId}`);
+		return super.write(bodyId, data);
+	}
+
+	async listBodyIds() {
+		this.events.push('listBodyIds');
+		return super.listBodyIds();
+	}
+
+	async delete(bodyId: BodyId): Promise<void> {
+		this.events.push(`delete:${bodyId}`);
+		await super.delete(bodyId);
+	}
+}
+
+class OrderedManifestStore extends InMemoryManifestStore {
+	constructor(private readonly events: string[]) {
+		super();
+	}
+
+	async save(...args: Parameters<InMemoryManifestStore['save']>) {
+		this.events.push('saveManifest');
+		return super.save(...args);
+	}
+}
+
 describe('blob body garbage collection', () => {
+	it('replaces a blob-backed file by writing a new body before committing the manifest', async () => {
+		const events: string[] = [];
+		const manifest = new OrderedManifestStore(events);
+		const bodies = new OrderedBodyStore(events);
+		const fs = TerminalFS.createCleanDisk(manifest, bodies);
+		const file = await createRecording(fs, 'Replace.webm', bytes('old'));
+		const oldBodyId = blobBodyId(file);
+		events.length = 0;
+
+		const result = await fs.replaceBlobFileBody(file.id, bytes('new'), {
+			contentType: 'video/mp4'
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+
+		const newBodyId = blobBodyId(result.value);
+		expect(newBodyId).not.toBe(oldBodyId);
+		expect(result.value.bodyRef).toMatchObject({
+			kind: 'indexeddb-blob',
+			bodyId: newBodyId,
+			size: 3,
+			contentType: 'video/mp4'
+		});
+		await expectBodyText(fs, newBodyId, 'new');
+
+		const writeIndex = events.findIndex((event) => event.startsWith(`write:${newBodyId}`));
+		const saveIndex = events.indexOf('saveManifest');
+		const scanIndex = events.indexOf('listBodyIds');
+		const deleteIndex = events.indexOf(`delete:${oldBodyId}`);
+		expect(writeIndex).toBeGreaterThanOrEqual(0);
+		expect(saveIndex).toBeGreaterThan(writeIndex);
+		expect(scanIndex).toBeGreaterThan(saveIndex);
+		expect(deleteIndex).toBeGreaterThan(scanIndex);
+
+		const oldBody = await fs.readBody(oldBodyId);
+		expect(oldBody.ok).toBe(false);
+	});
+
+	it('leaves the manifest unchanged when replacement body writing fails', async () => {
+		const bodies = new FailingWriteBodyStore();
+		const fs = TerminalFS.createCleanDisk(undefined, bodies);
+		const file = await createRecording(fs, 'Body-write-fails.webm', bytes('old'));
+		const oldBodyId = blobBodyId(file);
+
+		bodies.failWrites = true;
+		const result = await fs.replaceBlobFileBody(file.id, bytes('new'));
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('quota_exceeded');
+		}
+
+		const current = await fs.getNode(file.id);
+		expect(current.ok).toBe(true);
+		if (!current.ok || current.value.kind !== 'file') return;
+		expect(blobBodyId(current.value)).toBe(oldBodyId);
+		await expectBodyText(fs, oldBodyId, 'old');
+		expect(await bodies.listBodyIds()).toEqual([oldBodyId]);
+	});
+
+	it('rolls the in-memory file back and skips GC when replacement manifest commit fails', async () => {
+		const manifest = new FailingManifestStore();
+		const bodies = new ObservableBodyStore();
+		const fs = TerminalFS.createCleanDisk(manifest, bodies);
+		const file = await createRecording(fs, 'Manifest-fails.webm', bytes('old'));
+		const oldBodyId = blobBodyId(file);
+
+		manifest.failSaves = true;
+		const result = await fs.replaceBlobFileBody(file.id, bytes('new'));
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error.code).toBe('quota_exceeded');
+		}
+
+		const current = await fs.getNode(file.id);
+		expect(current.ok).toBe(true);
+		if (!current.ok || current.value.kind !== 'file') return;
+		expect(blobBodyId(current.value)).toBe(oldBodyId);
+		await expectBodyText(fs, oldBodyId, 'old');
+		expect(bodies.deleteCalls).toEqual([]);
+		expect((await bodies.listBodyIds()).length).toBe(2);
+
+		manifest.failSaves = false;
+		const reopened = await TerminalFS.open(manifest, bodies);
+		const persisted = await reopened.getNode(file.id);
+		expect(persisted.ok).toBe(true);
+		if (persisted.ok && persisted.value.kind === 'file') {
+			expect(blobBodyId(persisted.value)).toBe(oldBodyId);
+		}
+	});
+
+	it('uses copy-on-write when replacing one file that shares a body with a duplicate', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		const original = await createRecording(fs, 'Shared-replace.webm', bytes('old'));
+		const oldBodyId = blobBodyId(original);
+		const duplicate = await fs.duplicate(original.id);
+		expect(duplicate.ok).toBe(true);
+		if (!duplicate.ok || duplicate.value.kind !== 'file') return;
+		expect(blobBodyId(duplicate.value)).toBe(oldBodyId);
+
+		const replaced = await fs.replaceBlobFileBody(original.id, bytes('new'));
+		expect(replaced.ok).toBe(true);
+		if (!replaced.ok) return;
+
+		const newBodyId = blobBodyId(replaced.value);
+		expect(newBodyId).not.toBe(oldBodyId);
+		await expectBodyText(fs, newBodyId, 'new');
+		await expectBodyText(fs, oldBodyId, 'old');
+
+		const duplicateAfterReplace = await fs.getNode(duplicate.value.id);
+		expect(duplicateAfterReplace.ok).toBe(true);
+		if (duplicateAfterReplace.ok && duplicateAfterReplace.value.kind === 'file') {
+			expect(blobBodyId(duplicateAfterReplace.value)).toBe(oldBodyId);
+		}
+	});
+
+	it('retains an old replaced body while pending undo can restore it', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		const original = await createRecording(fs, 'Undo-retained-replace.webm', bytes('old'));
+		const oldBodyId = blobBodyId(original);
+		const duplicate = await fs.duplicate(original.id);
+		expect(duplicate.ok).toBe(true);
+		if (!duplicate.ok || duplicate.value.kind !== 'file') return;
+
+		const deleted = await fs.deleteNode(duplicate.value.id);
+		expect(deleted.ok).toBe(true);
+
+		const replaced = await fs.replaceBlobFileBody(original.id, bytes('new'));
+		expect(replaced.ok).toBe(true);
+		if (!replaced.ok) return;
+		await expectBodyText(fs, blobBodyId(replaced.value), 'new');
+
+		await expectBodyText(fs, oldBodyId, 'old');
+
+		const replacementUndo = await fs.createFolder(DOCUMENTS_ID, 'Clear replacement undo');
+		expect(replacementUndo.ok).toBe(true);
+
+		const collected = await fs.readBody(oldBodyId);
+		expect(collected.ok).toBe(false);
+		if (!collected.ok) {
+			expect(collected.error.code).toBe('not_found');
+		}
+	});
+
 	it('duplicates blob-backed files by sharing the same body id', async () => {
 		const fs = TerminalFS.createCleanDisk();
 		const original = await createRecording(fs, 'Shared.webm');
