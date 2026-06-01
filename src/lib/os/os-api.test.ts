@@ -260,6 +260,28 @@ describe('system actions', () => {
 		expect(spy).toHaveBeenCalledOnce();
 	});
 
+	it('collectFilesystemGarbage delegates to fs.collectGarbage', async () => {
+		const { os, fs } = createOs();
+		const report = {
+			stored: 3,
+			reachable: 1,
+			unreachable: 2,
+			deleted: 1,
+			failed: 1,
+			failedBodyIds: ['body_failed']
+		};
+		const spy = vi.spyOn(fs, 'collectGarbage').mockResolvedValue({
+			ok: true,
+			value: report
+		});
+
+		await expect(os.collectFilesystemGarbage()).resolves.toEqual({
+			ok: true,
+			value: report
+		});
+		expect(spy).toHaveBeenCalledOnce();
+	});
+
 	it('exportBackup collects preferences and passes them to fs', async () => {
 		const { os, fs } = createOs();
 		const spy = vi.spyOn(fs, 'exportBackup');
@@ -504,6 +526,7 @@ describe('isKnownWindowId', () => {
 			'welcome',
 			'about',
 			'terminal-prefs',
+			'system-maintenance',
 			'tv-guide',
 			'tvguide-prefs',
 			'chatrbot-prefs',
@@ -590,6 +613,12 @@ describe('navigation routing', () => {
 		const { os } = createOs();
 		os.openSystemPreferences();
 		expect(os.windows.some((w) => w.id === 'terminal-prefs')).toBe(true);
+	});
+
+	it('openSystemMaintenance opens system-maintenance window', () => {
+		const { os } = createOs();
+		os.openSystemMaintenance();
+		expect(os.windows.some((w) => w.id === 'system-maintenance')).toBe(true);
 	});
 
 	it('closeFocused closes the active window', () => {
@@ -716,6 +745,12 @@ describe('derived state', () => {
 	it('activeAppId returns system for System Preferences', () => {
 		const { os } = createOs();
 		os.openSystemPreferences();
+		expect(os.activeAppId).toBe('system');
+	});
+
+	it('activeAppId returns system for System Maintenance', () => {
+		const { os } = createOs();
+		os.openSystemMaintenance();
 		expect(os.activeAppId).toBe('system');
 	});
 
@@ -874,6 +909,7 @@ describe('windowAppId', () => {
 		expect(windowAppId('about:vcr')).toBe('system');
 		expect(windowAppId('about:chatrbot')).toBe('system');
 		expect(windowAppId('about:tvguide')).toBe('system');
+		expect(windowAppId('system-maintenance')).toBe('system');
 	});
 
 	it('falls back to finder for unknown IDs', () => {

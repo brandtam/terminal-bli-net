@@ -23,7 +23,7 @@ import {
 	matchWindow
 } from '$lib/terminalos/apps/app-catalog';
 import { resolveOpenTarget } from './window-host';
-import type { TerminalFS, FsFile } from '$lib/terminalos';
+import type { BodyGcReport, FsResult, TerminalFS, FsFile } from '$lib/terminalos';
 
 const RESTORE_RECOVERY_HINT =
 	'Your current disk should be unchanged. Try the restore again from the same backup file. If Terminal OS will not boot cleanly after a crash or tab kill, reinstall or clear Terminal OS site data, then restore from the backup file again.';
@@ -380,6 +380,10 @@ export class OsApiClass implements OsApi {
 		this.openWindow('terminal-prefs');
 	}
 
+	openSystemMaintenance(): void {
+		this.openWindow('system-maintenance');
+	}
+
 	openPreferences(appId: string): void {
 		// The prefs window-id comes straight from the app's manifest (prefs.id),
 		// or null when the app has no Preferences dialog.
@@ -449,6 +453,10 @@ export class OsApiClass implements OsApi {
 
 	async emptyTrash(): Promise<void> {
 		await this.fs.emptyTrash();
+	}
+
+	async collectFilesystemGarbage(): Promise<FsResult<BodyGcReport>> {
+		return this.fs.collectGarbage();
 	}
 
 	exportBackup(): void {

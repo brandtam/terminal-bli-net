@@ -62,6 +62,11 @@
 			shortcut: '⌘,',
 			action: (os) => os.openSystemPreferences()
 		},
+		{
+			type: 'action',
+			label: 'System Maintenance…',
+			action: (os) => os.openSystemMaintenance()
+		},
 		{ type: 'separator' },
 		{
 			type: 'action',
