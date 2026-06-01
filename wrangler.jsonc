@@ -7,18 +7,9 @@
 	// or uncomment below with your own namespace ID from `wrangler kv namespace create KV`.
 	// Local dev (miniflare) creates an in-memory KV automatically.
 	// "kv_namespaces": [{ "binding": "KV", "id": "YOUR_KV_NAMESPACE_ID" }],
-	// ReminderAgent DO + send_email are a future feature.
-	// Cloudflare Pages (adapter-cloudflare) can't export DO classes from _worker.js,
-	// so these must be deployed as a separate Worker when ready.
-	// Commented out to eliminate startup warnings.
-	//
-	// "durable_objects": {
-	// 	"bindings": [{ "name": "REMINDER_AGENT", "class_name": "ReminderAgent" }]
-	// },
-	// "migrations": [
-	// 	{ "tag": "v1", "new_sqlite_classes": ["ReminderAgent"] }
-	// ],
-	// "send_email": [{ "name": "SEND_EMAIL" }],
+	// ReminderAgent runs as a separate Worker because Cloudflare Pages cannot
+	// export Durable Object classes from the Pages adapter output.
+	"services": [{ "binding": "REMINDER_SERVICE", "service": "terminal-reminder-agent" }],
 	// Secrets (set via `wrangler secret put`):
 	// ANTHROPIC_API_KEY and/or OPENAI_API_KEY.
 	//
@@ -32,6 +23,7 @@
 		"ANTHROPIC_MODEL": "claude-haiku-4-5-20251001",
 		"OPENAI_MONTHLY_SPEND_CAP": "25",
 		"ANTHROPIC_MONTHLY_SPEND_CAP": "25",
-		"RATE_LIMIT_PER_HOUR": "30"
+		"RATE_LIMIT_PER_HOUR": "30",
+		"REMINDER_SUBSCRIBE_RATE_LIMIT_PER_HOUR": "5"
 	}
 }

@@ -1,0 +1,23 @@
+{
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "terminal-reminder-agent",
+	"main": "src/index.ts",
+	"workers_dev": false,
+	"compatibility_date": "2026-06-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"durable_objects": {
+		"bindings": [{ "name": "REMINDER_AGENT", "class_name": "ReminderAgent" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["ReminderAgent"] }],
+	"send_email": [{ "name": "SEND_EMAIL" }],
+	"observability": { "enabled": true },
+	// EMAIL_SECRET is a secret, not a var — set it with:
+	//   wrangler secret put EMAIL_SECRET --config workers/reminder-agent/wrangler.jsonc
+	"vars": {
+		"REMINDER_CONFIRM_URL": "https://bli.net/api/subscribe/confirm",
+		"REMINDER_CONTENT_URL": "https://bli.net/api/data",
+		"REMINDER_FROM_EMAIL": "reminders@bli.net",
+		"REMINDER_FROM_NAME": "Terminal Bli Net",
+		"REMINDER_LEAD_MINUTES": "30"
+	}
+}

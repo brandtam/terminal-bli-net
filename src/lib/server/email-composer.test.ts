@@ -2,8 +2,9 @@
 import { describe, it, expect } from 'vitest';
 import {
 	composeReminder,
+	createEmailActionToken,
+	extractUnsubscribeToken,
 	signUnsubscribeAddress,
-	verifyUnsubscribeAddress,
 	type ComposeReminderParams
 } from './email-composer';
 
@@ -18,7 +19,7 @@ const DEFAULT_PARAMS: ComposeReminderParams = {
 	characterName: 'Hawkeye',
 	characterPrompt: 'greeting": "Well, hello there. Pull up a martini, soldier." voice: sardonic',
 	recipientEmail: 'fan@example.com',
-	signedReplyAddr: 'unsub+abc123--fan@example.com@bli.net',
+	signedReplyAddr: 'unsub+0123456789abcdefghijklmnopqrstuv@bli.net',
 	nextAirTime: '7:00 PM EST'
 };
 
@@ -59,62 +60,78 @@ describe('composeReminder', () => {
 
 	it('sets List-Unsubscribe header with mailto format', () => {
 		const { headers } = composeReminder(DEFAULT_PARAMS);
-		expect(headers['List-Unsubscribe']).toBe('<mailto:unsub+abc123--fan@example.com@bli.net>');
+		expect(headers['List-Unsubscribe']).toBe(
+			'<mailto:unsub+0123456789abcdefghijklmnopqrstuv@bli.net>'
+		);
 	});
 
-	it('sets List-Unsubscribe-Post header for one-click unsubscribe', () => {
+	it('does not advertise one-click unsubscribe without an HTTPS unsubscribe URL', () => {
 		const { headers } = composeReminder(DEFAULT_PARAMS);
-		expect(headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
+		expect(headers).not.toHaveProperty('List-Unsubscribe-Post');
 	});
 });
 
 // ---------------------------------------------------------------------------
-// HMAC sign / verify round-trip
+// HMAC tokens
 // ---------------------------------------------------------------------------
 
-describe('signUnsubscribeAddress / verifyUnsubscribeAddress', () => {
-	it('round-trips: sign then verify returns valid with correct email', async () => {
-		const email = 'viewer@example.com';
-		const signed = await signUnsubscribeAddress(email, TEST_SECRET);
-		const result = await verifyUnsubscribeAddress(signed, TEST_SECRET);
+describe('createEmailActionToken / signUnsubscribeAddress / extractUnsubscribeToken', () => {
+	it('creates deterministic compact tokens for a payload and secret', async () => {
+		const token = await createEmailActionToken('unsubscribe:viewer@example.com', TEST_SECRET);
+		const repeated = await createEmailActionToken('unsubscribe:viewer@example.com', TEST_SECRET);
 
-		expect(result.valid).toBe(true);
-		expect(result.email).toBe(email);
+		expect(token).toBe(repeated);
+		expect(token).toMatch(/^[A-Za-z0-9_-]{32}$/);
 	});
 
-	it('signed address has the expected format', async () => {
-		const signed = await signUnsubscribeAddress('a@b.com', TEST_SECRET);
-		expect(signed).toMatch(/^unsub\+[0-9a-f]+--a@b\.com@bli\.net$/);
+	it('changes tokens when the payload or secret changes', async () => {
+		const token = await createEmailActionToken('unsubscribe:viewer@example.com', TEST_SECRET);
+		const differentPayload = await createEmailActionToken(
+			'confirm:viewer@example.com',
+			TEST_SECRET
+		);
+		const differentSecret = await createEmailActionToken(
+			'unsubscribe:viewer@example.com',
+			'other-secret'
+		);
+
+		expect(differentPayload).not.toBe(token);
+		expect(differentSecret).not.toBe(token);
 	});
 
-	it('rejects when the signature is tampered with', async () => {
-		const email = 'viewer@example.com';
-		const signed = await signUnsubscribeAddress(email, TEST_SECRET);
-		// Flip a hex digit in the signature
-		const tampered = signed.replace(/^(unsub\+)([0-9a-f])/, (_, prefix, first) => {
-			const flipped = first === '0' ? '1' : '0';
-			return prefix + flipped;
-		});
-		const result = await verifyUnsubscribeAddress(tampered, TEST_SECRET);
-		expect(result.valid).toBe(false);
+	it('signed address has a short SMTP-safe local part', async () => {
+		const signed = await signUnsubscribeAddress('viewer@example.com', TEST_SECRET);
+		const [localPart] = signed.split('@');
+
+		expect(signed).toMatch(/^unsub\+[A-Za-z0-9_-]{32}@bli\.net$/);
+		expect(localPart.length).toBeLessThanOrEqual(64);
+		expect(signed).not.toContain('viewer@example.com');
 	});
 
-	it('rejects when the secret is different', async () => {
-		const email = 'viewer@example.com';
-		const signed = await signUnsubscribeAddress(email, TEST_SECRET);
-		const result = await verifyUnsubscribeAddress(signed, 'wrong-secret');
-		expect(result.valid).toBe(false);
+	it('extracts the unsubscribe token from a signed address', async () => {
+		const signed = await signUnsubscribeAddress('viewer@example.com', TEST_SECRET);
+		const expected = await createEmailActionToken('unsubscribe:viewer@example.com', TEST_SECRET);
+
+		expect(extractUnsubscribeToken(signed)).toBe(expected);
 	});
 
 	it('rejects when the address has no unsub+ prefix', async () => {
-		const result = await verifyUnsubscribeAddress('bad+stuff@bli.net', TEST_SECRET);
-		expect(result.valid).toBe(false);
-		expect(result.email).toBe('');
+		expect(extractUnsubscribeToken('bad+stuff@bli.net')).toBeNull();
 	});
 
-	it('rejects when the address has no separator', async () => {
-		const result = await verifyUnsubscribeAddress('unsub+noseparator@bli.net', TEST_SECRET);
-		expect(result.valid).toBe(false);
-		expect(result.email).toBe('');
+	it('rejects addresses outside the reminder domain', async () => {
+		expect(
+			extractUnsubscribeToken('unsub+0123456789abcdefghijklmnopqrstuv@example.com')
+		).toBeNull();
+		expect(extractUnsubscribeToken('unsub+0123456789abcdefghijklmnopqrstuv')).toBeNull();
+	});
+
+	it('rejects malformed tokens', async () => {
+		expect(extractUnsubscribeToken('unsub+noseparator@bli.net')).toBeNull();
+		expect(extractUnsubscribeToken('unsub+not-hex--payload@bli.net')).toBeNull();
+	});
+
+	it('rejects tokens with invalid characters', async () => {
+		expect(extractUnsubscribeToken('unsub+0123456789abcdefghijklmnopqrstu/@bli.net')).toBeNull();
 	});
 });

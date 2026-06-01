@@ -5,3 +5,7 @@ allowBuilds:
   sharp: true
   svelte-preprocess: set this to true or false
   workerd: true
+minimumReleaseAgeExclude:
+  - '@cloudflare/vitest-pool-workers@0.16.11'
+  - miniflare@4.20260529.0
+  - wrangler@4.96.0

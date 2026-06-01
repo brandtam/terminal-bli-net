@@ -8,76 +8,65 @@
 // ---------------------------------------------------------------------------
 
 const ALGO = { name: 'HMAC', hash: 'SHA-256' } as const;
-const SEPARATOR = '--';
+const TOKEN_BYTES = 24;
+const DOMAIN = 'bli.net';
 
 async function importKey(secret: string): Promise<CryptoKey> {
 	const enc = new TextEncoder();
 	return crypto.subtle.importKey('raw', enc.encode(secret), ALGO, false, ['sign', 'verify']);
 }
 
-function bufToHex(buf: ArrayBuffer): string {
-	return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-function hexToBuf(hex: string): ArrayBuffer {
-	const bytes = new Uint8Array(hex.length / 2);
-	for (let i = 0; i < hex.length; i += 2) {
-		bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-	}
-	return bytes.buffer;
+function bytesToBase64Url(bytes: Uint8Array): string {
+	const bin = [...bytes].map((byte) => String.fromCharCode(byte)).join('');
+	return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**
- * Produce an HMAC-signed unsubscribe address.
+ * Produce a compact deterministic token for email ownership flows.
  *
- * Format: `unsub+<hex-signature>--<email>@bli.net`
- *
- * The signature covers the subscriber email so that only a valid signature
- * can trigger an unsubscribe (prevents spoofed unsubscribe requests).
+ * The token is HMAC-backed and stored with the subscriber record before it is
+ * accepted again from email routing or confirmation links.
  */
-export async function signUnsubscribeAddress(email: string, secret: string): Promise<string> {
+export async function createEmailActionToken(payload: string, secret: string): Promise<string> {
 	const key = await importKey(secret);
 	const enc = new TextEncoder();
-	const sig = await crypto.subtle.sign('HMAC', key, enc.encode(email));
-	const hex = bufToHex(sig);
-	return `unsub+${hex}${SEPARATOR}${email}@bli.net`;
+	const sig = await crypto.subtle.sign('HMAC', key, enc.encode(payload));
+	return bytesToBase64Url(new Uint8Array(sig).slice(0, TOKEN_BYTES));
 }
 
 /**
- * Verify an HMAC-signed unsubscribe address and extract the subscriber email.
+ * Produce an unsubscribe address.
+ *
+ * Format: `unsub+<token>@bli.net`
+ *
+ * The local part is intentionally short enough for SMTP limits. The token maps
+ * back to a subscriber row; the email address itself is not embedded.
  */
-export async function verifyUnsubscribeAddress(
-	signedAddr: string,
-	secret: string
-): Promise<{ valid: boolean; email: string }> {
+export async function signUnsubscribeAddress(email: string, secret: string): Promise<string> {
+	return `unsub+${await createEmailActionToken(`unsubscribe:${email}`, secret)}@${DOMAIN}`;
+}
+
+/**
+ * Extract the compact unsubscribe token from an inbound email address.
+ */
+export function extractUnsubscribeToken(signedAddr: string): string | null {
 	// Strip the @domain portion
 	const atIdx = signedAddr.lastIndexOf('@');
-	const localPart = atIdx !== -1 ? signedAddr.substring(0, atIdx) : signedAddr;
+	if (atIdx === -1) return null;
+
+	const domain = signedAddr.substring(atIdx + 1).toLowerCase();
+	if (domain !== DOMAIN) return null;
+
+	const localPart = signedAddr.substring(0, atIdx);
 
 	// Strip the `unsub+` prefix
 	const PREFIX = 'unsub+';
 	if (!localPart.startsWith(PREFIX)) {
-		return { valid: false, email: '' };
+		return null;
 	}
 
-	const payload = localPart.substring(PREFIX.length);
-	const sepIdx = payload.indexOf(SEPARATOR);
-	if (sepIdx === -1) {
-		return { valid: false, email: '' };
-	}
-
-	const hex = payload.substring(0, sepIdx);
-	const email = payload.substring(sepIdx + SEPARATOR.length);
-
-	if (!hex || !email) {
-		return { valid: false, email: '' };
-	}
-
-	const key = await importKey(secret);
-	const enc = new TextEncoder();
-	const valid = await crypto.subtle.verify('HMAC', key, hexToBuf(hex), enc.encode(email));
-
-	return { valid, email };
+	const token = localPart.substring(PREFIX.length);
+	return /^[A-Za-z0-9_-]{32}$/.test(token) ? token : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,8 +85,7 @@ export interface ComposeReminderParams {
 /**
  * Compose a reminder email in the character's voice.
  *
- * Returns the subject line, plain-text body, and RFC 8058 List-Unsubscribe
- * headers so mailbox providers can surface a one-click unsubscribe button.
+ * Returns the subject line, plain-text body, and List-Unsubscribe mailto header.
  */
 export function composeReminder(params: ComposeReminderParams): {
 	subject: string;
@@ -126,8 +114,7 @@ export function composeReminder(params: ComposeReminderParams): {
 	].join('\n');
 
 	const headers: Record<string, string> = {
-		'List-Unsubscribe': `<mailto:${signedReplyAddr}>`,
-		'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+		'List-Unsubscribe': `<mailto:${signedReplyAddr}>`
 	};
 
 	return { subject, body, headers };
