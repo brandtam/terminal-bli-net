@@ -24,11 +24,7 @@
 	import PixelIcon from './PixelIcon.svelte';
 	import Dock from './Dock.svelte';
 	import BootScreen from './BootScreen.svelte';
-	import {
-		createStickyNote,
-		seedDefaultStickies,
-		setStickyColor
-	} from '$lib/apps/stickies/stickies-manager.svelte';
+	import { seedDefaultStickies } from '$lib/apps/stickies/stickies-manager.svelte';
 	import DesktopContextMenu from './DesktopContextMenu.svelte';
 	import { getAppIconKind } from '$lib/terminalos/apps/app-install';
 	import { matchWindow } from '$lib/terminalos/apps/app-catalog';
@@ -43,6 +39,7 @@
 		writeFilesystemDragNode,
 		type FilesystemDropTarget
 	} from '$lib/os/filesystem-drag';
+	import { deriveDockOpenIds } from './dock-state';
 
 	// matchWindow is the sole render gate: a window-id renders iff a manifest claims
 	// it via windows[]. Every window goes through the one WindowHost path, which
@@ -75,7 +72,7 @@
 		openFilesystemNode(node, {
 			resolveAlias: (alias) => resolveAliasSync(alias),
 			openFolder: (folder) => {
-				os.openWindow(folder.id === TRASH_ID ? 'trash' : 'finder');
+				os.openFolder(folder.id);
 			},
 			launchApp: (appId) => os.launchApp(appId),
 			openDocument: (file) => os.openDocument(file)
@@ -182,7 +179,7 @@
 
 	function targetAllowsDrop(e: DragEvent, target: FilesystemDropTarget): boolean {
 		const node = draggedNode(e);
-		return node ? canDropFilesystemNode(node, target) : false;
+		return node ? canDropFilesystemNode(node, target, terminalFs) : false;
 	}
 
 	function dropOriginIsDesktopSurface(e: DragEvent): boolean {
@@ -281,67 +278,6 @@
 		seedDefaultStickies(fs);
 		desktopView = createFolderView(fs, DESKTOP_ID);
 
-		// Register app launch handlers
-		os.registerLaunchHandler('stickies', async (payload) => {
-			if (payload?.action === 'new') {
-				const id = await createStickyNote(terminalFs);
-				if (id) os.openWindow(`sticky:${id}`);
-				return;
-			}
-			if (payload?.action === 'color' && payload?.color) {
-				if (os.activeId?.startsWith('sticky:')) {
-					const noteId = os.activeId.replace('sticky:', '');
-					setStickyColor(terminalFs, noteId, payload.color as string);
-				}
-				return;
-			}
-			const id = await createStickyNote(terminalFs);
-			if (id) os.openWindow(`sticky:${id}`);
-		});
-
-		os.registerLaunchHandler('textedit', (payload) => {
-			if (payload?.action === 'new') {
-				const base = 'Untitled';
-				const ext = '.txt';
-				let name = `${base}${ext}`;
-				if (terminalFs.exists(DOCUMENTS_ID, name)) {
-					let i = 2;
-					while (terminalFs.exists(DOCUMENTS_ID, `${base} ${i}${ext}`)) i++;
-					name = `${base} ${i}${ext}`;
-				}
-				terminalFs.createTextFile(DOCUMENTS_ID, name, '').then((result) => {
-					if (result.ok) os.openWindow(`textedit:${result.value.id}`);
-				});
-				return;
-			}
-			if (payload?.action === 'open') {
-				const docs = terminalFs.findByApp('textedit', DOCUMENTS_ID);
-				const buttons = docs.map((d) => ({
-					label: d.name,
-					action: () => os.openWindow(`textedit:${d.id}`)
-				}));
-				os.alert({
-					title: 'Open Document',
-					body: docs.length > 0 ? 'Choose a document to open:' : 'No documents found.',
-					buttons: [...buttons, { label: 'Cancel', primary: true }]
-				});
-				return;
-			}
-			if (payload?.open) {
-				openTextEditFile(payload.open as string);
-				return;
-			}
-			openTextEditFile('README.TXT');
-		});
-
-		os.registerLaunchHandler('chatrbot', (payload) => {
-			if (payload?.showId) {
-				const showId = payload.showId as string;
-				const group = os.groups.find((g) => g.slug === showId);
-				if (group) os.openChat(group);
-			}
-		});
-
 		// Init dock aliases (for symbolic dock IDs like 'pricing', 'readme')
 		os.initDockAliases(openTextEditFile);
 
@@ -409,7 +345,7 @@
 	/** Map real window IDs back to symbolic Dock item IDs for active indicators */
 	const dockOpenIds = $derived.by(() => {
 		if (!booted) return [];
-		const ids = os.windows.map((w) => w.id);
+		const ids = deriveDockOpenIds(os.windows, terminalFs.getInstalledApps());
 		if (os.windows.some((w) => w.id.startsWith('chat:'))) ids.push('chat');
 		if (
 			os.windows.some((w) => {
@@ -497,8 +433,8 @@
 						onselect={() => {
 							selectedIconId = 'hd';
 						}}
-						ondblclick={() => os.openWindow('finder')}
-						oncontextmenu={(e) => showDesktopCtx(e, { open: () => os.openWindow('finder') })}
+						ondblclick={() => os.openFolder(ROOT_ID)}
+						oncontextmenu={(e) => showDesktopCtx(e, { open: () => os.openFolder(ROOT_ID) })}
 					>
 						<PixelIcon kind="hd" />
 					</DesktopIcon>
@@ -529,8 +465,8 @@
 						onselect={() => {
 							selectedIconId = 'trash';
 						}}
-						ondblclick={() => os.openWindow('trash')}
-						oncontextmenu={(e) => showDesktopCtx(e, { open: () => os.openWindow('trash') })}
+						ondblclick={() => os.openFolder(TRASH_ID)}
+						oncontextmenu={(e) => showDesktopCtx(e, { open: () => os.openFolder(TRASH_ID) })}
 						ondragover={handleTrashDragOver}
 						ondragleave={handleTrashDragLeave}
 						ondrop={handleTrashDrop}
@@ -589,7 +525,8 @@
 
 			<Dock
 				installedApps={terminalFs.getInstalledApps()}
-				onopen={(id) => os.openWindow(id)}
+				onopenWindow={(id) => os.openWindow(id)}
+				onlaunchApp={(id) => os.launchApp(id)}
 				openIds={dockOpenIds}
 			/>
 

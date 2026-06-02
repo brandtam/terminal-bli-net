@@ -29,7 +29,7 @@
 <div class="scrim" onclick={onclose}>
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="receipt" onclick={(e) => e.stopPropagation()}>
+	<div class="receipt" data-testid="store-receipt" onclick={(e) => e.stopPropagation()}>
 		<div class="receipt-header">{isReturn ? '★ RETURN ★' : '★ THANK YOU ★'}</div>
 
 		<div class="receipt-body">
@@ -74,7 +74,9 @@
 
 		<div class="btn-row">
 			<button class="btn" onclick={onclose}>◂ KEEP BROWSING</button>
-			<button class="btn primary" onclick={onleave}>▸ LEAVE THE STORE</button>
+			<button class="btn primary" data-testid="store-leave" onclick={onleave}
+				>▸ LEAVE THE STORE</button
+			>
 		</div>
 	</div>
 </div>

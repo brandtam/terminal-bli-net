@@ -31,7 +31,7 @@ describe('Finder/Desktop filesystem open policy', () => {
 		const body = functionBody(finderSource, 'handleOpen');
 
 		expect(body).toContain('openFilesystemNode(node');
-		expect(body).toContain('currentFolderId = folder.id');
+		expect(body).toContain('os.openFolder(folder.id, { replaceWindowId: appWindow.id })');
 		expect(body).toContain('os.launchApp(appId)');
 		expect(body).toContain('os.openDocument(file)');
 	});
@@ -40,7 +40,7 @@ describe('Finder/Desktop filesystem open policy', () => {
 		const body = functionBody(desktopSource, 'openDesktopNode');
 
 		expect(body).toContain('openFilesystemNode(node');
-		expect(body).toContain("folder.id === TRASH_ID ? 'trash' : 'finder'");
+		expect(body).toContain('os.openFolder(folder.id)');
 		expect(body).toContain('os.launchApp(appId)');
 		expect(body).toContain('os.openDocument(file)');
 	});

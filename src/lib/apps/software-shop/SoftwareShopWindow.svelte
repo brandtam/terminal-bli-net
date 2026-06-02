@@ -111,7 +111,7 @@
 	{:else}
 		<div class="shop-list">
 			{#each catalog as item (item.app.id)}
-				<div class="shop-item">
+				<div class="shop-item" data-testid={`shelf-item-${item.app.id}`}>
 					<div class="shop-item-icon">{item.app.icon}</div>
 					<div class="shop-item-info">
 						<div class="shop-item-name">{item.app.name}</div>
@@ -123,6 +123,7 @@
 							{#if canUninstall(item.app.id)}
 								<button
 									class="btn"
+									data-testid={`shelf-uninstall-${item.app.id}`}
 									disabled={busy === item.app.id}
 									onclick={() => uninstall(item.app.id, item.app.name)}
 								>
@@ -134,6 +135,7 @@
 						{:else}
 							<button
 								class="btn primary"
+								data-testid={`shelf-install-${item.app.id}`}
 								disabled={busy === item.app.id}
 								onclick={() => install(item.app.id)}
 							>

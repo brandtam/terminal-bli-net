@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { getAppWindowId, getAppIconKind, isSpecialLaunchApp } from './app-install';
+import {
+	getAppWindowId,
+	getAppIconKind,
+	getAppLaunchStrategy,
+	isLaunchableApp,
+	isSpecialLaunchApp
+} from './app-install';
+import { APP_LIBRARY } from './app-library';
 
 describe('getAppWindowId', () => {
 	it('maps tvguide to tv-guide', () => {
@@ -38,6 +45,32 @@ describe('getAppIconKind', () => {
 
 	it('returns doc for unknown app', () => {
 		expect(getAppIconKind('nonexistent')).toBe('doc');
+	});
+});
+
+describe('getAppLaunchStrategy', () => {
+	it('derives fixed-window launch for fixed app windows', () => {
+		expect(getAppLaunchStrategy('tvguide')).toEqual({ kind: 'fixed', windowId: 'tv-guide' });
+		expect(getAppLaunchStrategy('recorder')).toEqual({ kind: 'fixed', windowId: 'recorder' });
+	});
+
+	it('derives custom launch from manifest metadata', () => {
+		expect(getAppLaunchStrategy('stickies').kind).toBe('custom');
+		expect(getAppLaunchStrategy('chatrbot').kind).toBe('custom');
+		expect(getAppLaunchStrategy('textedit').kind).toBe('custom');
+	});
+
+	it('returns none for unknown and catalog-only apps', () => {
+		expect(getAppLaunchStrategy('nonexistent').kind).toBe('none');
+		expect(getAppLaunchStrategy('tetra').kind).toBe('none');
+	});
+
+	it('proves every released app is launchable', () => {
+		const released = APP_LIBRARY.filter((a) => a.status === 'released');
+		expect(released.length).toBeGreaterThan(0);
+		for (const app of released) {
+			expect(isLaunchableApp(app.id), `${app.id} is released but not launchable`).toBe(true);
+		}
 	});
 });
 

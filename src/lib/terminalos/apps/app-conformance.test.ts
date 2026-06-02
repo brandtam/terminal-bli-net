@@ -123,6 +123,42 @@ describe('manifest conformance', () => {
 		expect(duplicates, `duplicate window ids: ${duplicates.join(', ')}`).toEqual([]);
 	});
 
+	it('has no prefix windows that shadow exact ids or narrower prefixes', () => {
+		const windows = MANIFESTS.flatMap((manifest) =>
+			(manifest.windows ?? []).map((window) => ({ manifest, window }))
+		);
+		const prefixes = windows.filter(({ window }) => window.match.kind === 'prefix');
+		const shadowed: string[] = [];
+
+		for (const { manifest: prefixManifest, window: prefixWindow } of prefixes) {
+			if (prefixWindow.match.kind !== 'prefix') continue;
+			for (const { manifest, window } of windows) {
+				if (window === prefixWindow) continue;
+				const target = window.match.kind === 'exact' ? window.match.id : window.match.prefix;
+				if (target.startsWith(prefixWindow.match.prefix)) {
+					shadowed.push(
+						`${prefixManifest.id}:${prefixWindow.match.prefix} shadows ${manifest.id}:${target}`
+					);
+				}
+			}
+		}
+
+		expect(shadowed, `shadowed window ids: ${shadowed.join(', ')}`).toEqual([]);
+	});
+
+	it('uses prefix windows for document handlers', () => {
+		const nonPrefixHandlers = MANIFESTS.flatMap((manifest) =>
+			(manifest.windows ?? [])
+				.filter((window) => window.opens && window.match.kind !== 'prefix')
+				.map((window) => `${manifest.id}:${window.match.kind === 'exact' ? window.match.id : ''}`)
+		);
+
+		expect(
+			nonPrefixHandlers,
+			`document handlers must be invertible prefix windows: ${nonPrefixHandlers.join(', ')}`
+		).toEqual([]);
+	});
+
 	it('lets no two windows claim the same opens content-type/fileType', async () => {
 		// buildOpeners (window-host) throws at module load if two windows claim the
 		// same content-type or fileType, so a collision surfaces as a REJECTED import

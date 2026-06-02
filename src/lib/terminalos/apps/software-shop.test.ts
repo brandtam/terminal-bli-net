@@ -9,7 +9,7 @@ import {
 	deriveOwnedApps
 } from './software-shop';
 import { APP_LIBRARY, getAppDef } from './app-library';
-import { getAppWindowId, isSpecialLaunchApp } from './app-install';
+import { isLaunchableApp } from './app-install';
 
 describe('getShopCatalog', () => {
 	it('returns catalog items', () => {
@@ -252,6 +252,35 @@ describe('deriveOwnedApps', () => {
 	});
 });
 
+describe('getInstalledApps', () => {
+	it('includes fixed-window installed apps with their launch window id', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.installApp('tvguide');
+
+		const app = fs.getInstalledApps().find((item) => item.id === 'tvguide');
+		expect(app).toMatchObject({ id: 'tvguide', name: 'TV Guide', windowId: 'tv-guide' });
+	});
+
+	it('includes installed custom-launch system apps without requiring a fixed window id', () => {
+		const fs = TerminalFS.createCleanDisk();
+
+		const ids = fs.getInstalledApps().map((app) => app.id);
+		expect(ids).toContain('textedit');
+		expect(ids).toContain('stickies');
+		expect(fs.getInstalledApps().find((app) => app.id === 'textedit')?.windowId).toBeUndefined();
+		expect(fs.getInstalledApps().find((app) => app.id === 'stickies')?.windowId).toBeUndefined();
+	});
+
+	it('includes installed custom-launch store apps without requiring a fixed window id', async () => {
+		const fs = TerminalFS.createCleanDisk();
+		await fs.installApp('chatrbot');
+
+		const app = fs.getInstalledApps().find((item) => item.id === 'chatrbot');
+		expect(app).toMatchObject({ id: 'chatrbot', name: 'chatrbot' });
+		expect(app?.windowId).toBeUndefined();
+	});
+});
+
 describe('full lifecycle: buy → install → uninstall → return', () => {
 	it('buy then install puts app on desktop', async () => {
 		const fs = TerminalFS.createCleanDisk();
@@ -435,8 +464,7 @@ describe('app lifecycle data model (issue 25)', () => {
 		const released = APP_LIBRARY.filter((a) => !a.isSystem && a.status === 'released');
 		expect(released.length).toBeGreaterThan(0);
 		for (const app of released) {
-			const launchable = getAppWindowId(app.id) !== undefined || isSpecialLaunchApp(app.id);
-			expect(launchable, `${app.id} has no window or special-launch handler`).toBe(true);
+			expect(isLaunchableApp(app.id), `${app.id} has no launch strategy`).toBe(true);
 		}
 	});
 

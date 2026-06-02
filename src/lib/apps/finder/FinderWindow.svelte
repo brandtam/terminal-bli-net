@@ -106,7 +106,7 @@
 		openFilesystemNode(node, {
 			resolveAlias: (alias) => resolveNode(alias),
 			openFolder: (folder) => {
-				currentFolderId = folder.id;
+				os.openFolder(folder.id, { replaceWindowId: appWindow.id });
 				selectedId = null;
 			},
 			launchApp: (appId) => os.launchApp(appId),
@@ -115,7 +115,7 @@
 	}
 
 	function navigateTo(id: string) {
-		currentFolderId = id;
+		os.openFolder(id, { replaceWindowId: appWindow.id });
 		selectedId = null;
 	}
 
@@ -214,7 +214,7 @@
 
 	function targetAllowsDrop(e: DragEvent, target: FilesystemDropTarget): boolean {
 		const node = draggedNode(e);
-		return node ? canDropFilesystemNode(node, target) : false;
+		return node ? canDropFilesystemNode(node, target, fs) : false;
 	}
 
 	function handleDragStart(e: DragEvent, node: FsNode) {

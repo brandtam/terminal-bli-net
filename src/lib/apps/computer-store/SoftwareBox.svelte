@@ -52,6 +52,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="software-box"
+	data-testid={`store-box-${app.id}`}
 	style:width="{width}px"
 	style:height="{height}px"
 	style:box-shadow={shadow}

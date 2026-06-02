@@ -21,7 +21,7 @@ export type InstalledApp = {
 	id: PersistedAppId;
 	name: string;
 	icon: string;
-	windowId: string;
+	windowId?: string;
 };
 
 export type FsResult<T> = { ok: true; value: T } | { ok: false; error: FsError };

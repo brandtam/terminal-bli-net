@@ -1,7 +1,7 @@
 import type { AppId, PersistedAppId } from './app-ids';
 import type { AppDef } from '$lib/os/os-api';
 import type { TerminalAppDefinition } from './app-types';
-import type { WindowSpec } from './app-manifest';
+import type { AppLaunchHandler, WindowSpec } from './app-manifest';
 import { MANIFESTS } from './manifests';
 
 /**
@@ -160,6 +160,25 @@ export function synthAppWindowId(appId: PersistedAppId): string | undefined {
 	const m = MANIFESTS.find((x) => x.id === appId);
 	const launch = m?.windows?.find((w) => w.match.kind === 'exact' && (w.role ?? 'app') === 'app');
 	return launch && launch.match.kind === 'exact' ? launch.match.id : undefined;
+}
+
+export type SynthAppLaunchStrategy =
+	| { kind: 'fixed'; windowId: string }
+	| { kind: 'custom'; handler: AppLaunchHandler }
+	| { kind: 'none' };
+
+export function synthAppLaunchStrategy(appId: PersistedAppId): SynthAppLaunchStrategy {
+	const m = MANIFESTS.find((x) => x.id === appId);
+	if (!m) return { kind: 'none' };
+	if (m.launch?.kind === 'custom') return { kind: 'custom', handler: m.launch.handler };
+	if (m.launch?.kind === 'none') return { kind: 'none' };
+
+	const windowId = synthAppWindowId(appId);
+	return windowId ? { kind: 'fixed', windowId } : { kind: 'none' };
+}
+
+export function synthIsSpecialLaunchApp(appId: PersistedAppId): boolean {
+	return synthAppLaunchStrategy(appId).kind === 'custom';
 }
 
 // ── App → icon kind (getAppIconKind) ─────────────────────────────────────────

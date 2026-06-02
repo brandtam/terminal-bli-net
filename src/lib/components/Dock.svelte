@@ -3,11 +3,13 @@
 
 	let {
 		installedApps = [],
-		onopen,
+		onopenWindow,
+		onlaunchApp,
 		openIds = []
 	}: {
 		installedApps: InstalledApp[];
-		onopen: (id: string) => void;
+		onopenWindow: (id: string) => void;
+		onlaunchApp: (id: string) => void;
 		openIds: string[];
 	} = $props();
 
@@ -16,14 +18,19 @@
 	let dragRef: { offX: number; offY: number } | null = null;
 
 	const systemItems = [
-		{ id: 'welcome', icon: '★', tip: 'Welcome' },
-		{ id: 'about', icon: 'i', tip: 'About' },
-		{ id: 'trash', icon: 'T', tip: 'Trash' }
+		{ id: 'welcome', icon: '★', tip: 'Welcome', kind: 'window' as const },
+		{ id: 'about', icon: 'i', tip: 'About', kind: 'window' as const },
+		{ id: 'trash', icon: 'T', tip: 'Trash', kind: 'window' as const }
 	];
 
 	const items = $derived([
 		...systemItems,
-		...installedApps.map((app) => ({ id: app.windowId, icon: app.icon, tip: app.name }))
+		...installedApps.map((app) => ({
+			id: app.id,
+			icon: app.icon,
+			tip: app.name,
+			kind: 'app' as const
+		}))
 	]);
 
 	function onPointerDown(e: PointerEvent) {
@@ -69,7 +76,7 @@
 			<button
 				class="dock-item"
 				class:active={openIds.includes(it.id)}
-				onclick={() => onopen(it.id)}
+				onclick={() => (it.kind === 'app' ? onlaunchApp(it.id) : onopenWindow(it.id))}
 				title={it.tip}
 			>
 				<span class="dock-icon">{it.icon}</span>

@@ -41,6 +41,18 @@ export type Geometry = { w: number; h: number; minW?: number; minH?: number };
 /** Routing-only tag (menu bar / active-app), never a render branch. */
 export type WindowRole = 'app' | 'prefs' | 'about' | 'chrome';
 
+export type AppLaunchPayload = Record<string, unknown>;
+export type AppLaunchContext = {
+	os: OsApi;
+	fs: TerminalFS;
+};
+export type AppLaunchHandler = (
+	ctx: AppLaunchContext,
+	payload?: AppLaunchPayload
+) => void | Promise<void>;
+
+export type AppLaunchMetadata = { kind: 'custom'; handler: AppLaunchHandler } | { kind: 'none' };
+
 /**
  * One window an app owns. Every entry is uniform — a fixed window, a minted
  * instance, a prefs dialog and an about dialog differ only in `match`/`role`,
@@ -98,6 +110,12 @@ export type TerminalAppManifest = {
 	 * window lives on the finder manifest; coming-soon games).
 	 */
 	windows?: WindowSpec[];
+
+	/**
+	 * Optional launch override. Apps with a fixed exact `role:'app'` window launch
+	 * through that window by default; prefix-only apps declare custom behavior here.
+	 */
+	launch?: AppLaunchMetadata;
 
 	// ── Menus / about content / status (from APPS) ──────────────────────────
 	menus: (os: OsApi) => AppMenuSpec[];

@@ -102,6 +102,15 @@ describe('matchWindow', () => {
 		});
 	});
 
+	it('parses folder-addressed Finder windows while preserving exact ids', () => {
+		expect(matchWindow('finder:folder_documents')).toMatchObject({
+			appId: 'finder',
+			args: { folder: 'folder_documents' }
+		});
+		expect(matchWindow('finder')?.args.folder).toBe('root_terminal_hd');
+		expect(matchWindow('trash')?.args.folder).toBe('folder_trash');
+	});
+
 	it('claims the exact recorder window for the recorder app (Slice 6)', () => {
 		// Camera migrates exact-only. There is no recorder- / recorder: prefix —
 		// clips open in the Player, so the matcher must NOT claim a recorder- id.
