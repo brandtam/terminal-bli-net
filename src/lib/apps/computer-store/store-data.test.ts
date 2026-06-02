@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { APPS, APP_BY_ID, CATEGORIES, CAT_COLORS, shelfLineup } from './store-data';
+import {
+	APPS,
+	APP_BY_ID,
+	CATEGORIES,
+	CAT_COLORS,
+	STORE_CATALOG_OMISSIONS,
+	shelfLineup
+} from './store-data';
 import { APP_LIBRARY } from '$lib/terminalos/apps/app-library';
 
 describe('store catalog', () => {
@@ -27,6 +34,11 @@ describe('store catalog', () => {
 		}
 	});
 
+	it('has unique app ids so APP_BY_ID cannot mask duplicates', () => {
+		const ids = APPS.map((app) => app.id);
+		expect(new Set(ids).size).toBe(ids.length);
+	});
+
 	it('every store app ID has a matching AppLibrary entry', () => {
 		// Store-catalog ids are plain strings; probe them against the library by
 		// string identity (a Set<AppId>.has() would reject the wider string).
@@ -41,6 +53,45 @@ describe('store catalog', () => {
 		const storeIds = new Set(APPS.map((a) => a.id));
 		for (const id of systemIds) {
 			expect(storeIds.has(id)).toBe(false);
+		}
+	});
+
+	it('represents every sellable released app or explicitly omits it with a reason', () => {
+		const storeIds = new Set(APPS.map((app) => app.id));
+		const omissionIds = new Set(Object.keys(STORE_CATALOG_OMISSIONS));
+		const sellable = APP_LIBRARY.filter((app) => !app.isSystem && app.status === 'released');
+
+		for (const app of sellable) {
+			expect(
+				storeIds.has(app.id) || omissionIds.has(app.id),
+				`${app.id} is released but missing from Computer Store data and omissions`
+			).toBe(true);
+		}
+	});
+
+	it('keeps store omissions explicit and valid', () => {
+		const libraryIds = new Set<string>(APP_LIBRARY.map((app) => app.id));
+		const storeIds = new Set(APPS.map((app) => app.id));
+
+		for (const [id, reason] of Object.entries(STORE_CATALOG_OMISSIONS)) {
+			const app = APP_LIBRARY.find((item) => item.id === id);
+			expect(libraryIds.has(id), `${id} omission must refer to a catalog app`).toBe(true);
+			expect(app?.isSystem, `${id} omission must not refer to a system app`).toBe(false);
+			expect(storeIds.has(id), `${id} must not be both represented and omitted`).toBe(false);
+			expect(reason.trim(), `${id} omission needs a reason`).not.toBe('');
+		}
+	});
+
+	it('hides deprecated apps or lists them as explicit omissions', () => {
+		const storeIds = new Set(APPS.map((app) => app.id));
+		const omissionIds = new Set(Object.keys(STORE_CATALOG_OMISSIONS));
+		const deprecated = APP_LIBRARY.filter((app) => !app.isSystem && app.status === 'deprecated');
+
+		for (const app of deprecated) {
+			expect(
+				!storeIds.has(app.id) || omissionIds.has(app.id),
+				`${app.id} is deprecated but still represented without an omission`
+			).toBe(true);
 		}
 	});
 });

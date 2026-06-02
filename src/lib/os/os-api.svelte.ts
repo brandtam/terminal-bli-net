@@ -1,5 +1,5 @@
 import type { WindowState, TweaksState, GroupMeta, PublicBot, Channel } from '$lib/types';
-import { SvelteDate, SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { SvelteDate, SvelteSet } from 'svelte/reactivity';
 import type { OsApi, AlertSpec, GuideApi, ShowInfo } from './os-api';
 import { windowAppId } from './os-api';
 import { APPS } from './app-registry';
@@ -16,8 +16,9 @@ import {
 	isFirstVisit,
 	clearAllPreferences
 } from '$lib/persistence';
-import { getAppWindowId } from '$lib/terminalos/apps/app-install';
+import { getAppLaunchStrategy } from '$lib/terminalos/apps/app-install';
 import { getAppDef } from '$lib/terminalos/apps/app-library';
+import type { TerminalAppDefinition } from '$lib/terminalos/apps/app-types';
 import {
 	synthAboutWindowId,
 	synthPrefsWindowId,
@@ -25,6 +26,7 @@ import {
 } from '$lib/terminalos/apps/app-catalog';
 import { resolveOpenTarget } from './window-host';
 import type { BodyGcReport, FsResult, TerminalFS, FsFile } from '$lib/terminalos';
+import { TRASH_ID } from '$lib/terminalos/filesystem/well-known-ids';
 
 const RESTORE_RECOVERY_HINT =
 	'Your current disk should be unchanged. Try the restore again from the same backup file. If Terminal OS will not boot cleanly after a crash or tab kill, reinstall or clear Terminal OS site data, then restore from the backup file again.';
@@ -57,7 +59,6 @@ export class OsApiClass implements OsApi {
 	private tickInterval?: ReturnType<typeof setInterval>;
 	private resizeCleanup?: () => void;
 	private keydownCleanup?: () => void;
-	private launchHandlers = new SvelteMap<string, (payload?: Record<string, unknown>) => void>();
 
 	// ── Dock alias map ────────────────────────────────────────────────────
 	private DOCK_ALIASES: Record<string, () => void> = {};
@@ -197,31 +198,7 @@ export class OsApiClass implements OsApi {
 		if (appDef && !appDef.isSystem) {
 			const installed = this.fs.isAppInstalledSync(appId);
 			if (!installed) {
-				const name = appDef.name;
-				const owned = this.fs.isAppOwned(appId);
-				this.alert({
-					title: `${name} is not installed`,
-					body: owned
-						? `"${name}" is on your shelf but not installed. Open My Shelf to install it.`
-						: `"${name}" hasn't been purchased yet. Visit the Computer Store to pick it up.`,
-					buttons: owned
-						? [
-								{
-									label: 'Open My Shelf',
-									primary: true,
-									action: () => this.openWindow('software-shop')
-								},
-								{ label: 'OK' }
-							]
-						: [
-								{
-									label: 'Visit Store',
-									primary: true,
-									action: () => this.openWindow('computer-store')
-								},
-								{ label: 'OK' }
-							]
-				});
+				this.alertAppNotInstalled(appDef);
 				return;
 			}
 		}
@@ -255,8 +232,12 @@ export class OsApiClass implements OsApi {
 	}
 
 	closeWindow(id: string): void {
-		this.windows = this.windows.filter((w) => w.id !== id);
-		if (this.activeId === id) this.activeId = null;
+		const closingActive = this.activeId === id;
+		const remaining = this.windows.filter((w) => w.id !== id);
+		this.windows = remaining;
+		if (closingActive) {
+			this.activeId = [...remaining].sort((a, b) => b.z - a.z)[0]?.id ?? null;
+		}
 	}
 
 	focusWindow(id: string): void {
@@ -306,13 +287,45 @@ export class OsApiClass implements OsApi {
 		return matchWindow(id) !== null;
 	}
 
+	openFolder(folderId: string, opts?: { replaceWindowId?: string }): void {
+		const targetId = folderId === TRASH_ID ? 'trash' : `finder:${folderId}`;
+		const sourceId = opts?.replaceWindowId;
+
+		if (sourceId && sourceId !== targetId) {
+			const source = this.windows.find((w) => w.id === sourceId);
+			if (source) {
+				const existing = this.windows.find((w) => w.id === targetId);
+				if (existing) {
+					this.closeWindow(sourceId);
+					this.focusWindow(targetId);
+					return;
+				}
+
+				this.windows = this.windows.map((w) => (w.id === sourceId ? { ...w, id: targetId } : w));
+				if (this.activeId === sourceId) this.activeId = targetId;
+				return;
+			}
+		}
+
+		this.openWindow(targetId);
+	}
+
 	/**
 	 * Open a document in its handler window — the single open rule. Routing lives
 	 * in resolveOpenTarget (opensWith → content-type → fileType), so the OS never
 	 * switches on a specific app. A recording opens in the system Player this way.
 	 */
 	openDocument(file: FsFile): void {
-		this.openWindow(resolveOpenTarget(file));
+		const targetId = resolveOpenTarget(file);
+		if (!this.isKnownWindowId(targetId)) {
+			this.alert({
+				title: 'No app can open this document',
+				body: `No installed app can open "${file.name}".`,
+				buttons: [{ label: 'OK', primary: true }]
+			});
+			return;
+		}
+		this.openWindow(targetId);
 	}
 
 	// ── Alert system ──────────────────────────────────────────────────────
@@ -408,25 +421,50 @@ export class OsApiClass implements OsApi {
 
 	// ── App launch routing ────────────────────────────────────────────────
 
-	registerLaunchHandler(appId: string, handler: (payload?: Record<string, unknown>) => void): void {
-		this.launchHandlers.set(appId, handler);
-	}
-
 	launchApp(appId: string, payload?: Record<string, unknown>): void {
-		// Apps with custom launch behavior (stickies/textedit/chatrbot) register a
-		// handler at startup; those win. See the registerLaunchHandler call sites
-		// in Desktop.svelte.
-		const handler = this.launchHandlers.get(appId);
-		if (handler) {
-			handler(payload);
+		const strategy = getAppLaunchStrategy(appId);
+		if (strategy.kind === 'none') return;
+
+		const appDef = getAppDef(appId);
+		if (appDef && !appDef.isSystem && !this.fs.isAppInstalledSync(appId)) {
+			this.alertAppNotInstalled(appDef);
 			return;
 		}
 
-		// Everything else is a plain "open the app's window" — the window-id comes
-		// from the manifest (via getAppWindowId). The old per-app chain
-		// (tvguide → tv-guide, recorder, stats, error) only repeated that mapping.
-		const windowId = getAppWindowId(appId);
-		if (windowId) this.openWindow(windowId);
+		if (strategy.kind === 'custom') {
+			void strategy.handler({ os: this, fs: this.fs }, payload);
+			return;
+		}
+
+		this.openWindow(strategy.windowId);
+	}
+
+	private alertAppNotInstalled(appDef: TerminalAppDefinition): void {
+		const name = appDef.name;
+		const owned = this.fs.isAppOwned(appDef.id);
+		this.alert({
+			title: `${name} is not installed`,
+			body: owned
+				? `"${name}" is on your shelf but not installed. Open My Shelf to install it.`
+				: `"${name}" hasn't been purchased yet. Visit the Computer Store to pick it up.`,
+			buttons: owned
+				? [
+						{
+							label: 'Open My Shelf',
+							primary: true,
+							action: () => this.openWindow('software-shop')
+						},
+						{ label: 'OK' }
+					]
+				: [
+						{
+							label: 'Visit Store',
+							primary: true,
+							action: () => this.openWindow('computer-store')
+						},
+						{ label: 'OK' }
+					]
+		});
 	}
 
 	openChat(group: GroupMeta): void {
@@ -448,6 +486,11 @@ export class OsApiClass implements OsApi {
 			return;
 		}
 		this.openWindow(`chat:${group.slug}`);
+	}
+
+	openChatByShowId(showId: string): void {
+		const group = this.groups.find((g) => g.slug === showId);
+		if (group) this.openChat(group);
 	}
 
 	// ── System actions ────────────────────────────────────────────────────

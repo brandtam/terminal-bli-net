@@ -33,6 +33,7 @@
 <div
 	class="hotspot"
 	class:active={isHot}
+	data-testid={`store-hotspot-${id}`}
 	style:left
 	style:top
 	style:width

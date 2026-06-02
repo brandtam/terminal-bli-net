@@ -1,6 +1,6 @@
-import type { TerminalFS } from '$lib/terminalos';
-import type { FsNode } from '$lib/terminalos';
-import { DOCUMENTS_ID } from '$lib/terminalos';
+import type { TerminalFS } from '$lib/terminalos/filesystem/terminal-fs';
+import type { FsNode } from '$lib/terminalos/filesystem/types';
+import { DOCUMENTS_ID } from '$lib/terminalos/filesystem/well-known-ids';
 import type { StickyNote } from './types';
 
 /** Default note color (yellow) — the seed and any unparseable file fall back here. */

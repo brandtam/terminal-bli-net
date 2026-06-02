@@ -12,6 +12,56 @@ async function closeWelcome(page: Page) {
 	}
 }
 
+async function openTerminalHD(page: Page) {
+	await page.dblclick('.desktop-icon:has-text("Terminal HD")');
+	await expect(page.locator('.window .title:has-text("Terminal HD")')).toBeVisible();
+}
+
+async function openFinderFolder(page: Page, name: string) {
+	await page.dblclick(`.finder-item:has-text("${name}")`);
+	await expect(page.locator(`.window .title:has-text("${name}")`)).toBeVisible();
+}
+
+async function openComputerStore(page: Page) {
+	await page.locator('.dock-item[title="Computer Store"]').click();
+	await expect(page.locator('.window .title:has-text("Computer Store")')).toBeVisible();
+}
+
+async function openMyShelf(page: Page) {
+	await page.locator('.dock-item[title="My Shelf"]').click();
+	await expect(page.locator('.window .title:has-text("My Shelf")')).toBeVisible();
+}
+
+async function purchaseStoreApp(page: Page, appId: string, category: string) {
+	await openComputerStore(page);
+	await page.getByTestId(`store-hotspot-${category}`).click();
+	await page.getByTestId(`store-box-${appId}`).first().click();
+	await page.getByTestId(`store-add-${appId}`).click();
+	await page.getByRole('button', { name: /CART/ }).click();
+	await expect(page.getByTestId('store-ring-up')).toBeEnabled();
+	await page.getByTestId('store-ring-up').click();
+	await expect(page.getByTestId('store-receipt')).toBeVisible();
+	await page.getByTestId('store-leave').click();
+	await expect(page.locator('.window .title:has-text("Computer Store")')).not.toBeVisible();
+}
+
+async function installShelfApp(page: Page, appId: string) {
+	await openMyShelf(page);
+	await expect(page.getByTestId(`shelf-item-${appId}`)).toBeVisible();
+	await page.getByTestId(`shelf-install-${appId}`).click();
+	await expect(page.getByRole('alertdialog')).toContainText('Installing');
+	await expect(page.getByRole('alertdialog')).not.toBeVisible({ timeout: 5000 });
+	await expect(page.getByTestId(`shelf-uninstall-${appId}`)).toBeVisible();
+}
+
+async function waitForManifestText(page: Page, text: string) {
+	await page.waitForFunction(
+		(value) => window.localStorage.getItem('terminalos.manifest')?.includes(value),
+		text,
+		{ timeout: 5000 }
+	);
+}
+
 test('desktop loads with menu bar', async ({ page }) => {
 	await loadDesktop(page);
 	await expect(page.locator('.menubar')).toContainText('Welcome');
@@ -73,6 +123,111 @@ test('Computer Store opens from the dock', async ({ page }) => {
 	await loadDesktop(page);
 	await page.getByRole('button', { name: '🏪 Computer Store' }).click();
 	await expect(page.locator('.window .title:has-text("Computer Store")')).toBeVisible();
+});
+
+test('feature readiness: purchase, install, Desktop alias, and launch', async ({ page }) => {
+	await loadDesktop(page);
+	await closeWelcome(page);
+
+	await purchaseStoreApp(page, 'tvguide', 'ent');
+	await installShelfApp(page, 'tvguide');
+
+	await expect(page.locator('.desktop-icon:has-text("TV Guide.app")')).toBeVisible();
+	await page.dblclick('.desktop-icon:has-text("TV Guide.app")');
+	await expect(page.locator('.window .title:has-text("TV Guide.app")')).toBeVisible();
+});
+
+test('feature readiness: uninstall removes installed surfaces but keeps ownership', async ({
+	page
+}) => {
+	await loadDesktop(page);
+	await closeWelcome(page);
+
+	await purchaseStoreApp(page, 'tvguide', 'ent');
+	await installShelfApp(page, 'tvguide');
+
+	await page.getByTestId('shelf-uninstall-tvguide').click();
+	const alert = page.getByRole('alertdialog');
+	await expect(alert).toContainText('Uninstall TV Guide?');
+	await alert.getByRole('button', { name: 'Uninstall' }).click();
+	await expect(page.getByRole('alertdialog')).toContainText('Uninstalling');
+	await expect(page.getByRole('alertdialog')).not.toBeVisible({ timeout: 5000 });
+
+	await expect(page.getByTestId('shelf-item-tvguide')).toBeVisible();
+	await expect(page.getByTestId('shelf-install-tvguide')).toBeVisible();
+	await expect(page.locator('.desktop-icon:has-text("TV Guide.app")')).not.toBeVisible();
+});
+
+test('feature readiness: TextEdit document edits persist across reload', async ({ page }) => {
+	await loadDesktop(page);
+	await closeWelcome(page);
+
+	await page.getByRole('button', { name: 'File' }).click();
+	await page.locator('.dropdown-item:has-text("New Text Document")').click();
+	await expect(page.locator('.window .title:has-text("Untitled.txt")')).toBeVisible();
+
+	const content = `persisted text ${Date.now()}`;
+	await page.locator('.textedit-area').fill(content);
+	await waitForManifestText(page, content);
+
+	await page.reload();
+	await expect(page.locator('.menubar')).toBeVisible();
+	await expect(page.locator('.textedit-area')).toHaveValue(content);
+});
+
+test('feature readiness: Finder opens text documents through TextEdit', async ({ page }) => {
+	await loadDesktop(page);
+	await closeWelcome(page);
+	await openTerminalHD(page);
+	await openFinderFolder(page, 'Documents');
+
+	await page.dblclick('.finder-item:has-text("README.TXT")');
+	await expect(page.locator('.window .title:has-text("README.TXT")')).toBeVisible();
+	await expect(page.locator('.textedit-area')).toHaveValue(/Terminal is a desktop OS/);
+});
+
+test('feature readiness: document aliases use the same handler route', async ({ page }) => {
+	await loadDesktop(page);
+	await closeWelcome(page);
+	await openTerminalHD(page);
+	await openFinderFolder(page, 'Documents');
+
+	await page.locator('.finder-item:has-text("README.TXT")').click({ button: 'right' });
+	await page.locator('.context-menu-item:has-text("Make Alias")').click();
+	await expect(page.locator('.finder-item:has-text("README.TXT alias")')).toBeVisible();
+
+	await page.dblclick('.finder-item:has-text("README.TXT alias")');
+	await expect(page.locator('.window .title:has-text("README.TXT")')).toBeVisible();
+	await expect(page.locator('.textedit-area')).toHaveValue(/Terminal is a desktop OS/);
+});
+
+test('feature readiness: blob-backed recording survives reload and opens in Player', async ({
+	page
+}) => {
+	await loadDesktop(page);
+	await closeWelcome(page);
+
+	await purchaseStoreApp(page, 'recorder', 'ent');
+	await installShelfApp(page, 'recorder');
+
+	await page.dblclick('.desktop-icon:has-text("Camera.app")');
+	await expect(page.locator('.window .title:has-text("Camera.app")')).toBeVisible();
+	await page.getByLabel('Start recording').click();
+	await expect(page.getByLabel('Stop recording')).toBeVisible();
+	await page.waitForTimeout(1200);
+	await page.getByLabel('Stop recording').click();
+	await expect(page.locator('.rec-item-play')).toBeVisible({ timeout: 7000 });
+	const clipName = (await page.locator('.rec-item-play').first().innerText()).trim();
+	await waitForManifestText(page, 'indexeddb-blob');
+
+	await page.reload();
+	await expect(page.locator('.menubar')).toBeVisible();
+	await closeWelcome(page);
+	await openTerminalHD(page);
+	await openFinderFolder(page, 'Recordings');
+	await page.dblclick(`.finder-item:has-text("${clipName}")`);
+	await expect(page.locator(`.window .title:has-text("${clipName}")`)).toBeVisible();
+	await expect(page.locator('.player-video')).toBeVisible();
 });
 
 test('Stickies render without title bar (chromeless)', async ({ page }) => {

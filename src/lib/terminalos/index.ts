@@ -62,7 +62,13 @@ export {
 	getStoreApps
 } from './apps/app-library';
 export type { TerminalAppDefinition, AppCategory, AppStatus } from './apps/app-types';
-export { getAppWindowId, getAppIconKind, isSpecialLaunchApp } from './apps/app-install';
+export {
+	getAppWindowId,
+	getAppIconKind,
+	getAppLaunchStrategy,
+	isLaunchableApp,
+	isSpecialLaunchApp
+} from './apps/app-install';
 export type { SpecialLaunchApp } from './apps/app-install';
 export {
 	getShopCatalog,

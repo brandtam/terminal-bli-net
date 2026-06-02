@@ -124,6 +124,54 @@ describe('filesystem drag/drop policy', () => {
 		if (!result.ok) expect(result.error.code).toBe('invalid_move');
 	});
 
+	it('does not advertise dragging a folder over itself as droppable', async () => {
+		const fs = createDisk();
+		const folder = await fs.createFolder(DOCUMENTS_ID, 'Folder');
+		expect(folder.ok).toBe(true);
+		if (!folder.ok) return;
+
+		expect(
+			canDropFilesystemNode(folder.value, { kind: 'folder', folderId: folder.value.id }, fs)
+		).toBe(false);
+	});
+
+	it('does not advertise dragging a folder over a descendant as droppable', async () => {
+		const fs = createDisk();
+		const parent = await fs.createFolder(DOCUMENTS_ID, 'Parent');
+		expect(parent.ok).toBe(true);
+		if (!parent.ok) return;
+		const child = await fs.createFolder(parent.value.id, 'Child');
+		expect(child.ok).toBe(true);
+		if (!child.ok) return;
+
+		expect(
+			canDropFilesystemNode(parent.value, { kind: 'folder', folderId: child.value.id }, fs)
+		).toBe(false);
+
+		const result = await performFilesystemDrop(fs, parent.value.id, {
+			kind: 'folder',
+			folderId: child.value.id
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('invalid_move');
+	});
+
+	it('advertises valid sibling and unrelated folder targets as droppable', async () => {
+		const fs = createDisk();
+		const source = await fs.createFolder(DOCUMENTS_ID, 'Source');
+		const sibling = await fs.createFolder(DOCUMENTS_ID, 'Sibling');
+		expect(source.ok).toBe(true);
+		expect(sibling.ok).toBe(true);
+		if (!source.ok || !sibling.ok) return;
+
+		expect(
+			canDropFilesystemNode(source.value, { kind: 'folder', folderId: sibling.value.id }, fs)
+		).toBe(true);
+		expect(canDropFilesystemNode(source.value, { kind: 'folder', folderId: DESKTOP_ID }, fs)).toBe(
+			true
+		);
+	});
+
 	it('does not advertise protected nodes as draggable or droppable', async () => {
 		const fs = createDisk();
 		const root = await fs.getNode(ROOT_ID);

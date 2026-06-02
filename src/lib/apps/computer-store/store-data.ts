@@ -19,6 +19,8 @@ export type StoreCategory = {
 	appIds: string[];
 };
 
+export const STORE_CATALOG_OMISSIONS: Record<string, string> = {};
+
 export const APPS: StoreApp[] = [
 	// ─── GAMES ───
 	{

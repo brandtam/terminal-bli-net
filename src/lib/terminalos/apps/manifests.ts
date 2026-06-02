@@ -5,6 +5,9 @@ import { defineApp } from './app-manifest';
 import { ROOT_ID, TRASH_ID } from '../filesystem/well-known-ids';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 import { recorderState } from '$lib/apps/recorder/recorder-state.svelte';
+import { launchTextEdit } from '$lib/apps/textedit/textedit-launch';
+import { launchStickies } from '$lib/apps/stickies/stickies-launch';
+import { launchChatrbot } from '$lib/apps/chatrbot/chatrbot-launch';
 
 /**
  * One manifest per app — the single source of truth for app identity. The
@@ -44,6 +47,13 @@ export const MANIFESTS = [
 				match: { kind: 'exact', id: 'finder', args: { folder: ROOT_ID } },
 				role: 'app',
 				title: () => 'Terminal HD',
+				size: () => ({ w: 480, h: 420 }),
+				component: () => import('$lib/apps/finder/FinderWindow.svelte')
+			},
+			{
+				match: { kind: 'prefix', prefix: 'finder:', arg: 'folder' },
+				role: 'app',
+				title: ({ args, fs }) => fs.peekNode(args.folder)?.name ?? 'Finder',
 				size: () => ({ w: 480, h: 420 }),
 				component: () => import('$lib/apps/finder/FinderWindow.svelte')
 			},
@@ -460,6 +470,7 @@ export const MANIFESTS = [
 				opens: { fileTypes: ['text'] }
 			}
 		],
+		launch: { kind: 'custom', handler: launchTextEdit },
 		aboutSpec: {
 			title: 'TextEdit',
 			version: 'v1.0',
@@ -557,6 +568,7 @@ export const MANIFESTS = [
 				opens: { fileTypes: ['sticky'] }
 			}
 		],
+		launch: { kind: 'custom', handler: launchStickies },
 		aboutSpec: {
 			title: 'Stickies',
 			version: 'v1.0',
@@ -781,6 +793,7 @@ export const MANIFESTS = [
 				component: () => import('$lib/components/ChatrbotPrefs.svelte')
 			}
 		],
+		launch: { kind: 'custom', handler: launchChatrbot },
 		aboutSpec: {
 			title: 'chatrbot',
 			version: 'v1.0',
@@ -909,7 +922,7 @@ export const MANIFESTS = [
 				},
 				{
 					h: 'LIMITS',
-					body: 'Max 10 seconds per clip. Max 5 clips stored. Everything lives in localStorage so keep it short.'
+					body: 'Max 10 seconds per clip. Max 5 clips stored. The disk manifest lives in localStorage; clip bytes live in IndexedDB, so backup before clearing site data.'
 				}
 			]
 		},

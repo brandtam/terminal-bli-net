@@ -107,6 +107,7 @@
 			<button
 				class="ring-btn"
 				class:ring-btn-active={cart.length > 0}
+				data-testid="store-ring-up"
 				disabled={cart.length === 0}
 				onclick={cart.length > 0 ? onringup : undefined}
 			>

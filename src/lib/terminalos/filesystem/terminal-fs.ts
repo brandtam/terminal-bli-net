@@ -119,7 +119,7 @@ its "About" page. That's where the app-specific manual lives — not here.
 
 FAQ
 What's the deal with the airing rule? Open chatrbot's Help menu.
-Where's my data? localStorage. There is no server. Closing the tab loses nothing; clearing site data loses everything.
+Where's my data? In this browser. The disk manifest and preferences live in localStorage; binary file bodies live in IndexedDB. There is no server. Closing the tab loses nothing; clearing site data loses everything.
 Why does it look like this? Because we like it.`;
 
 const PRICING_CONTENT = `Pricing.txt
@@ -1576,8 +1576,8 @@ export class TerminalFS {
 		for (const node of this.nodes.values()) {
 			if (node.kind !== 'file' || node.fileType !== 'app' || !node.appId) continue;
 			const def = getAppDef(node.appId);
+			if (!def) continue;
 			const windowId = getAppWindowId(node.appId);
-			if (!def || !windowId) continue;
 			apps.push({ id: node.appId, name: def.name, icon: def.icon, windowId });
 		}
 		return apps;

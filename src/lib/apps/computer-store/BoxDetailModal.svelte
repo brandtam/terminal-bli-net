@@ -45,7 +45,7 @@
 <div class="scrim" onclick={onclose}>
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="modal" onclick={(e) => e.stopPropagation()}>
+	<div class="modal" data-testid={`store-detail-${app.id}`} onclick={(e) => e.stopPropagation()}>
 		<!-- header -->
 		<div class="header">
 			<span>{owned || inCart ? '◂ DETAILS' : '◂ YOU PICKED IT UP'}</span>
@@ -89,17 +89,25 @@
 		<div class="actions">
 			{#if owned}
 				<div class="chip chip-owned">● ALREADY OWNED</div>
-				<button class="btn btn-warn" onclick={onreturn}>RETURN TO STORE</button>
+				<button class="btn btn-warn" data-testid={`store-return-${app.id}`} onclick={onreturn}
+					>RETURN TO STORE</button
+				>
 				<button class="btn btn-plain ml-auto" onclick={onclose}>× CLOSE</button>
 			{:else if inCart}
 				<div class="chip chip-cart">● IN YOUR CART</div>
-				<button class="btn btn-warn" onclick={onremovefromcart}>TAKE OUT OF CART</button>
+				<button
+					class="btn btn-warn"
+					data-testid={`store-remove-${app.id}`}
+					onclick={onremovefromcart}>TAKE OUT OF CART</button
+				>
 				<button class="btn btn-plain ml-auto" onclick={onclose}>× CLOSE</button>
 			{:else if comingSoon}
 				<div class="chip chip-soon">● NOT YET AVAILABLE</div>
 				<button class="btn btn-plain ml-auto" onclick={onclose}>◂ PUT BACK ON SHELF</button>
 			{:else}
-				<button class="btn btn-primary" onclick={onaddtocart}>▸ ADD TO CART</button>
+				<button class="btn btn-primary" data-testid={`store-add-${app.id}`} onclick={onaddtocart}
+					>▸ ADD TO CART</button
+				>
 				<button class="btn btn-plain ml-auto" onclick={onclose}>◂ PUT BACK ON SHELF</button>
 			{/if}
 		</div>

@@ -12,6 +12,7 @@ export const FILESYSTEM_NODE_DRAG_TYPE = 'application/x-terminal-fs-node';
 let activeFilesystemDragNodeId: NodeId | null = null;
 
 export type FilesystemDropTarget = { kind: 'folder'; folderId: NodeId } | { kind: 'trash' };
+type FilesystemDropLookup = Pick<TerminalFS, 'peekNode'>;
 
 export function canDragFilesystemNode(node: FsNode): boolean {
 	return node.flags?.protected !== true && node.flags?.system !== true;
@@ -35,11 +36,30 @@ export function clearFilesystemDragNode(): void {
 	activeFilesystemDragNodeId = null;
 }
 
-export function canDropFilesystemNode(node: FsNode, target: FilesystemDropTarget): boolean {
+function folderContainsNode(
+	fs: FilesystemDropLookup,
+	ancestorId: NodeId,
+	folderId: NodeId
+): boolean {
+	let current = fs.peekNode(folderId);
+	while (current) {
+		if (current.id === ancestorId) return true;
+		current = current.parentId ? fs.peekNode(current.parentId) : undefined;
+	}
+	return false;
+}
+
+export function canDropFilesystemNode(
+	node: FsNode,
+	target: FilesystemDropTarget,
+	fs?: FilesystemDropLookup
+): boolean {
 	if (!canDragFilesystemNode(node)) return false;
 	if (target.kind === 'trash') return true;
 	if (node.parentId === target.folderId) return false;
 	if (node.kind === 'folder' && node.id === target.folderId) return false;
+	if (node.kind === 'folder' && fs && folderContainsNode(fs, node.id, target.folderId))
+		return false;
 	return true;
 }
 

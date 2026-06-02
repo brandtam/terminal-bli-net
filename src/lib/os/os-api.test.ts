@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { TerminalFS } from '$lib/terminalos';
+import { DOCUMENTS_ID, ROOT_ID, TerminalFS, TRASH_ID, type FsFile } from '$lib/terminalos';
 import { windowAppId } from './os-api';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 
@@ -34,11 +34,40 @@ function createOs() {
 	return { os, fs };
 }
 
+function file(overrides: Partial<FsFile>): FsFile {
+	return {
+		id: 'file_unknown',
+		volumeId: 'volume_terminal_hd',
+		kind: 'file',
+		parentId: DOCUMENTS_ID,
+		name: 'Mystery.bin',
+		fileType: 'data',
+		createdAt: 1,
+		updatedAt: 1,
+		...overrides
+	};
+}
+
 async function createOsWithApp(appId: string) {
 	const { os, fs } = createOs();
 	await fs.buyApp(appId);
 	await fs.installApp(appId);
 	return { os, fs };
+}
+
+async function waitForCondition(assertion: () => void, timeoutMs = 1000): Promise<void> {
+	const startedAt = Date.now();
+	let lastError: unknown;
+	while (Date.now() - startedAt < timeoutMs) {
+		try {
+			assertion();
+			return;
+		} catch (error) {
+			lastError = error;
+			await new Promise((resolve) => setTimeout(resolve, 20));
+		}
+	}
+	if (lastError) throw lastError;
 }
 
 // ── Window management ─────────────────────────────────────────────────────
@@ -91,12 +120,35 @@ describe('window management', () => {
 		expect(os.activeId).toBeNull();
 	});
 
+	it('closeWindow promotes the highest-z remaining window when closing the active window', () => {
+		const { os } = createOs();
+		os.openWindow('finder');
+		os.openWindow('welcome');
+		os.focusWindow('finder');
+		os.openWindow('about');
+
+		os.closeWindow('about');
+
+		expect(os.activeId).toBe('finder');
+	});
+
 	it('closeWindow does not clear activeId when closing a non-active window', () => {
 		const { os } = createOs();
 		os.openWindow('finder');
 		os.openWindow('welcome');
 		os.closeWindow('finder');
 		expect(os.activeId).toBe('welcome');
+	});
+
+	it('active app follows the promoted window after active close', () => {
+		const { os } = createOs();
+		os.openWindow('finder');
+		os.openWindow('welcome');
+
+		os.closeWindow('welcome');
+
+		expect(os.activeId).toBe('finder');
+		expect(os.activeAppId).toBe('finder');
 	});
 
 	it('focusWindow sets activeId and increments z-order', () => {
@@ -213,23 +265,197 @@ describe('tweaks', () => {
 	});
 });
 
+// ── Folder routing ────────────────────────────────────────────────────────
+
+describe('folder routing', () => {
+	it('openFolder opens folder-addressed Finder windows', () => {
+		const { os } = createOs();
+		os.openFolder(DOCUMENTS_ID);
+
+		expect(os.windows).toHaveLength(1);
+		expect(os.windows[0].id).toBe(`finder:${DOCUMENTS_ID}`);
+		expect(os.getWindowDef(os.windows[0].id).title).toBe('Documents');
+	});
+
+	it('openFolder targets Terminal HD independently from another Finder window', () => {
+		const { os } = createOs();
+		os.openFolder(DOCUMENTS_ID);
+		os.openFolder(ROOT_ID);
+
+		expect(os.windows.map((w) => w.id)).toContain(`finder:${DOCUMENTS_ID}`);
+		expect(os.windows.map((w) => w.id)).toContain(`finder:${ROOT_ID}`);
+		expect(os.getWindowDef(`finder:${ROOT_ID}`).title).toBe('Terminal HD');
+	});
+
+	it('openFolder preserves exact Trash routing', () => {
+		const { os } = createOs();
+		os.openFolder(TRASH_ID);
+
+		expect(os.windows[0].id).toBe('trash');
+		expect(os.getWindowDef('trash').title).toBe('Trash');
+	});
+
+	it('openFolder can retarget an existing Finder window id', () => {
+		const { os } = createOs();
+		os.openWindow('finder');
+		const [{ x, y, w, h, z }] = os.windows;
+
+		os.openFolder(DOCUMENTS_ID, { replaceWindowId: 'finder' });
+
+		expect(os.windows).toEqual([{ id: `finder:${DOCUMENTS_ID}`, x, y, w, h, z }]);
+		expect(os.activeId).toBe(`finder:${DOCUMENTS_ID}`);
+	});
+
+	it('keeps exact finder and trash ids compatible', () => {
+		const { os } = createOs();
+
+		expect(os.isKnownWindowId('finder')).toBe(true);
+		expect(os.isKnownWindowId('trash')).toBe(true);
+		expect(os.isKnownWindowId(`finder:${DOCUMENTS_ID}`)).toBe(true);
+	});
+});
+
+// ── Document routing ──────────────────────────────────────────────────────
+
+describe('document routing', () => {
+	it('openDocument opens known text documents through TextEdit', () => {
+		const { os } = createOs();
+		os.openDocument(file({ id: 'readme1', name: 'README.TXT', fileType: 'text' }));
+
+		expect(os.windows.map((w) => w.id)).toContain('textedit:readme1');
+		expect(os.alertSpec).toBeNull();
+	});
+
+	it('openDocument opens sticky notes through Stickies', () => {
+		const { os } = createOs();
+		os.openDocument(file({ id: 'note1', name: 'Note', fileType: 'sticky' }));
+
+		expect(os.windows.map((w) => w.id)).toContain('sticky:note1');
+		expect(os.alertSpec).toBeNull();
+	});
+
+	it('openDocument opens recordings through Player', () => {
+		const { os } = createOs();
+		os.openDocument(file({ id: 'rec1', name: 'Clip.webm', fileType: 'recording' }));
+
+		expect(os.windows.map((w) => w.id)).toContain('player:rec1');
+		expect(os.alertSpec).toBeNull();
+	});
+
+	it('openDocument alerts for unknown documents without opening a dead window', () => {
+		const { os } = createOs();
+		os.openDocument(file({ id: 'mystery1', name: 'Mystery.bin', fileType: 'unknown' }));
+
+		expect(os.windows).toHaveLength(0);
+		expect(os.alertSpec?.title).toBe('No app can open this document');
+		expect(os.alertSpec?.body).toContain('Mystery.bin');
+		expect(os.alertSpec?.body).not.toContain('Coming soon');
+	});
+});
+
 // ── Launch routing ────────────────────────────────────────────────────────
 
 describe('launch routing', () => {
-	it('registerLaunchHandler registers a handler that launchApp calls', () => {
+	it('launchApp textedit creates a new document through the manifest handler', async () => {
 		const { os } = createOs();
-		const handler = vi.fn();
-		os.registerLaunchHandler('custom-app', handler);
-		os.launchApp('custom-app');
-		expect(handler).toHaveBeenCalledOnce();
+		os.launchApp('textedit', { action: 'new' });
+		await waitForCondition(() => expect(os.windows).toHaveLength(1));
+
+		expect(os.windows[0].id).toMatch(/^textedit:/);
+		expect(os.getWindowDef(os.windows[0].id).title).toBe('Untitled.txt');
 	});
 
-	it('launchApp passes payload to the handler', () => {
+	it('launchApp textedit opens the named README document through the manifest handler', async () => {
 		const { os } = createOs();
-		const handler = vi.fn();
-		os.registerLaunchHandler('custom-app', handler);
-		os.launchApp('custom-app', { file: 'test.txt' });
-		expect(handler).toHaveBeenCalledWith({ file: 'test.txt' });
+		os.launchApp('textedit', { open: 'README.TXT' });
+		await waitForCondition(() => expect(os.windows).toHaveLength(1));
+
+		expect(os.windows[0].id).toMatch(/^textedit:/);
+		expect(os.getWindowDef(os.windows[0].id).title).toBe('README.TXT');
+	});
+
+	it('launchApp textedit can present a document picker through the manifest handler', async () => {
+		const { os } = createOs();
+		os.launchApp('textedit', { action: 'open' });
+		await waitForCondition(() => expect(os.alertSpec?.title).toBe('Open Document'));
+
+		expect(os.alertSpec?.buttons?.some((b) => b.label === 'README.TXT')).toBe(true);
+	});
+
+	it('launchApp stickies creates a new note through the manifest handler', async () => {
+		const { os, fs } = createOs();
+		os.launchApp('stickies', { action: 'new' });
+		await waitForCondition(() => expect(os.windows).toHaveLength(1));
+
+		expect(os.windows[0].id).toMatch(/^sticky:/);
+		const noteId = os.windows[0].id.replace('sticky:', '');
+		expect(fs.peekNode(noteId)?.kind).toBe('file');
+	});
+
+	it('launchApp stickies applies color to the active note through the manifest handler', async () => {
+		const { os, fs } = createOs();
+		os.launchApp('stickies', { action: 'new' });
+		await waitForCondition(() => expect(os.windows).toHaveLength(1));
+
+		os.launchApp('stickies', { action: 'color', color: '#6bb5ff' });
+		await waitForCondition(() => {
+			const noteId = os.windows[0].id.replace('sticky:', '');
+			expect(fs.readText(noteId)).toContain('#6bb5ff');
+		});
+
+		const noteId = os.windows[0].id.replace('sticky:', '');
+		expect(fs.readText(noteId)).toContain('#6bb5ff');
+	});
+
+	it('launchApp chatrbot opens a show chat through the manifest handler', async () => {
+		const { os } = await createOsWithApp('chatrbot');
+		const group = {
+			slug: 'seinfeld',
+			name: 'Seinfeld',
+			description: '',
+			setting: '',
+			era: '',
+			image: '',
+			active: true
+		};
+		os.groups = [group];
+		const openChat = vi.spyOn(os, 'openChat').mockImplementation(() => {});
+
+		os.launchApp('chatrbot', { showId: 'seinfeld' });
+
+		expect(openChat).toHaveBeenCalledWith(group);
+	});
+
+	it('launchApp chatrbot without payload opens its custom launch surface when installed', async () => {
+		const { os, fs } = createOs();
+		await fs.buyApp('tvguide');
+		await fs.installApp('tvguide');
+		await fs.buyApp('chatrbot');
+		await fs.installApp('chatrbot');
+
+		os.launchApp('chatrbot');
+
+		expect(os.windows.some((w) => w.id === 'tv-guide')).toBe(true);
+	});
+
+	it('launchApp blocks uninstalled custom store apps before handler side effects', () => {
+		const { os } = createOs();
+		const group = {
+			slug: 'seinfeld',
+			name: 'Seinfeld',
+			description: '',
+			setting: '',
+			era: '',
+			image: '',
+			active: true
+		};
+		os.groups = [group];
+		const openChat = vi.spyOn(os, 'openChat');
+
+		os.launchApp('chatrbot', { showId: 'seinfeld' });
+
+		expect(openChat).not.toHaveBeenCalled();
+		expect(os.alertSpec?.title).toBe('chatrbot is not installed');
 	});
 
 	it('launchApp tvguide opens tv-guide window when installed', async () => {

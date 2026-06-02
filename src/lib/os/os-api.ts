@@ -89,11 +89,13 @@ export interface GuideApi {
 }
 
 export interface OsApi {
+	activeId: string | null;
 	launchApp: (appId: string, payload?: Record<string, unknown>) => void;
 	closeFocused: () => void;
 	closeWindow: (windowId: string) => void;
 	focusWindow: (windowId: string) => void;
 	openWindow: (windowId: string) => void;
+	openFolder: (folderId: string, opts?: { replaceWindowId?: string }) => void;
 	openDocument: (file: FsFile) => void;
 
 	openSystemPreferences: () => void;
@@ -121,16 +123,12 @@ export interface OsApi {
 	restoreBackup: () => void;
 	reinstallOS: () => void;
 
-	registerLaunchHandler: (
-		appId: string,
-		handler: (payload?: Record<string, unknown>) => void
-	) => void;
-
 	moveWindow: (id: string, x: number, y: number) => void;
 	resizeWindow: (id: string, w: number, h: number) => void;
 	getWindowDef: (id: string) => { title: string; w: number; h: number };
 
 	openChat: (group: GroupMeta) => void;
+	openChatByShowId: (showId: string) => void;
 	setTimezone: (tz: string) => void;
 	isAppInstalled: (appId: string) => boolean;
 }

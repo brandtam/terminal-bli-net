@@ -1,5 +1,11 @@
 import type { AppId, PersistedAppId } from '../filesystem/types';
-import { synthAppWindowId, synthAppIconKind } from './app-catalog';
+import {
+	synthAppWindowId,
+	synthAppIconKind,
+	synthAppLaunchStrategy,
+	synthIsSpecialLaunchApp,
+	type SynthAppLaunchStrategy
+} from './app-catalog';
 
 /**
  * Maps an appId to the window ID that should be opened when that app is launched.
@@ -29,13 +35,24 @@ export function getAppIconKind(appId: PersistedAppId): string {
 }
 
 /**
- * Apps that require special launch handling (not just "open window X").
- * - 'stickies' creates a new note
- * - 'chatrbot' needs a show context from TV Guide
- * - 'textedit' opens a specific document or creates a new one
+ * The complete launch strategy for an app. Fixed-window apps open their exact
+ * app window, custom apps run their manifest-owned handler, and catalog-only or
+ * coming-soon apps are not launchable.
  */
-export type SpecialLaunchApp = 'stickies' | 'chatrbot' | 'textedit';
+export function getAppLaunchStrategy(appId: PersistedAppId): SynthAppLaunchStrategy {
+	return synthAppLaunchStrategy(appId);
+}
+
+export function isLaunchableApp(appId: PersistedAppId): boolean {
+	return getAppLaunchStrategy(appId).kind !== 'none';
+}
+
+/**
+ * Apps that require custom launch handling (not just "open window X").
+ * Derived from manifest launch metadata; keep no hardcoded app-id list here.
+ */
+export type SpecialLaunchApp = AppId;
 
 export function isSpecialLaunchApp(appId: AppId): appId is SpecialLaunchApp {
-	return appId === 'stickies' || appId === 'chatrbot' || appId === 'textedit';
+	return synthIsSpecialLaunchApp(appId);
 }
