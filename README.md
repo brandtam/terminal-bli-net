@@ -31,6 +31,7 @@ Clone the **[Hello World example](examples/hello-world/)** to get a working app 
 
 - [TerminalOS architecture](docs/terminalos-architecture.md) maps the browser OS layers, storage model, window host, app manifest/add-on contract, and current follow-ups.
 - [Feature-readiness PRD](docs/prd/terminalos-feature-readiness.md) defines the remaining work before the next app/game push.
+- [Changeset and release process](docs/changesets.md) explains how release-worthy PRs become changelog entries, version bumps, tags, and GitHub Releases.
 - [ADRs](docs/adr/) record load-bearing decisions, including manifest-driven apps, LaunchServices document routing, backup/restore atomicity, and blob body lifecycle.
 
 Terminal HD stores its filesystem manifest and preferences in localStorage, with binary file bodies in IndexedDB. Clearing browser site data removes both; use the in-OS backup/restore flow before clearing storage.
@@ -38,6 +39,33 @@ Terminal HD stores its filesystem manifest and preferences in localStorage, with
 ## Deploy
 
 Deployed to Cloudflare Pages. Secrets (`ANTHROPIC_API_KEY`, optionally `OPENAI_API_KEY`) are set via the Pages dashboard or `wrangler secret put`.
+
+## Release notes
+
+Release-worthy PRs include one `.changeset/*.md` file. The agent-first workflow is:
+
+```text
+$write-change-set
+```
+
+For manual validation, preview pending release notes with:
+
+```bash
+pnpm changeset:status
+```
+
+For release-worthy PRs, validate the branch-local changeset with
+`pnpm changeset:check-pr`.
+
+When preparing a release, use:
+
+```text
+$prepare-release
+```
+
+For manual release preparation, run `pnpm changeset:version -- --dry-run`, then
+`pnpm changeset:version -- --yes` from a clean working tree. Consumed changesets
+are archived under `.changeset/released/<version>/`.
 
 ## License
 

@@ -1,0 +1,1624 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>ChangeSet Architecture</title>
+		<style>
+			:root {
+				color-scheme: light;
+				--paper: #f8f5ee;
+				--paper-strong: #fffdf8;
+				--ink: #181713;
+				--muted: #69655c;
+				--line: #d9d0c0;
+				--line-strong: #332f28;
+				--nav: #24231f;
+				--nav-ink: #fff8e8;
+				--accent: #0f6f74;
+				--accent-ink: #073b3e;
+				--amber: #b96d16;
+				--rose: #a93f54;
+				--green: #466f3f;
+				--blue: #2b5f91;
+				--shadow: 0 18px 50px rgb(38 31 20 / 12%);
+				font-family:
+					'Avenir Next',
+					'Segoe UI',
+					ui-sans-serif,
+					system-ui,
+					-apple-system,
+					BlinkMacSystemFont,
+					sans-serif;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			html {
+				scroll-behavior: smooth;
+			}
+
+			body {
+				margin: 0;
+				background:
+					linear-gradient(90deg, rgb(24 23 19 / 4%) 1px, transparent 1px) 0 0 / 28px 28px,
+					linear-gradient(rgb(24 23 19 / 3%) 1px, transparent 1px) 0 0 / 28px 28px,
+					var(--paper);
+				color: var(--ink);
+				line-height: 1.55;
+			}
+
+			a {
+				color: var(--accent);
+				text-decoration-color: rgb(15 111 116 / 35%);
+				text-decoration-thickness: 2px;
+				text-underline-offset: 0.16em;
+			}
+
+			a:hover {
+				color: var(--accent-ink);
+				text-decoration-color: currentColor;
+			}
+
+			code,
+			pre {
+				font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', ui-monospace, monospace;
+			}
+
+			code {
+				border: 1px solid rgb(51 47 40 / 12%);
+				border-radius: 4px;
+				background: rgb(255 253 248 / 72%);
+				padding: 0.08rem 0.28rem;
+				font-size: 0.92em;
+				overflow-wrap: anywhere;
+				white-space: normal;
+				word-break: break-word;
+			}
+
+			pre {
+				overflow-x: auto;
+				border: 1px solid var(--line);
+				border-left: 5px solid var(--accent);
+				border-radius: 6px;
+				background: #fffbf0;
+				padding: 1rem;
+				box-shadow: inset 0 1px 0 rgb(255 255 255 / 80%);
+				font-size: 0.9rem;
+				line-height: 1.5;
+			}
+
+			pre code {
+				border: 0;
+				background: transparent;
+				padding: 0;
+				overflow-wrap: normal;
+				white-space: pre;
+				word-break: normal;
+			}
+
+			.shell {
+				display: grid;
+				grid-template-columns: minmax(220px, 290px) minmax(0, 1fr);
+				min-height: 100vh;
+			}
+
+			.side {
+				position: sticky;
+				top: 0;
+				height: 100vh;
+				overflow-y: auto;
+				background: var(--nav);
+				color: var(--nav-ink);
+				border-right: 4px solid #c6953e;
+				padding: 1.35rem 1.2rem 1.6rem;
+			}
+
+			.side-title {
+				border-bottom: 1px solid rgb(255 248 232 / 22%);
+				padding-bottom: 1rem;
+				margin-bottom: 1rem;
+			}
+
+			.side-title strong {
+				display: block;
+				font-family: Georgia, 'Times New Roman', serif;
+				font-size: 1.22rem;
+				line-height: 1.12;
+				letter-spacing: 0;
+			}
+
+			.side-title span {
+				display: block;
+				margin-top: 0.55rem;
+				color: rgb(255 248 232 / 68%);
+				font-size: 0.8rem;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+			}
+
+			.side a {
+				display: block;
+				border-radius: 4px;
+				color: var(--nav-ink);
+				padding: 0.42rem 0.5rem;
+				text-decoration: none;
+				font-size: 0.92rem;
+			}
+
+			.side a:hover,
+			.side a:focus-visible {
+				background: rgb(255 248 232 / 12%);
+				outline: none;
+			}
+
+			.meta-block {
+				margin-top: 1.2rem;
+				border: 1px solid rgb(255 248 232 / 20%);
+				border-radius: 6px;
+				padding: 0.85rem;
+				color: rgb(255 248 232 / 72%);
+				font-size: 0.82rem;
+			}
+
+			.content {
+				max-width: 1180px;
+				width: 100%;
+				padding: clamp(1.1rem, 2.4vw, 2rem);
+			}
+
+			.hero {
+				min-height: 78vh;
+				display: grid;
+				align-content: end;
+				gap: 1.2rem;
+				border-bottom: 3px solid var(--line-strong);
+				padding: min(8vh, 5rem) 0 2rem;
+			}
+
+			.kicker {
+				display: inline-flex;
+				width: fit-content;
+				align-items: center;
+				gap: 0.55rem;
+				border: 1px solid var(--line-strong);
+				background: var(--paper-strong);
+				padding: 0.38rem 0.55rem;
+				font-size: 0.78rem;
+				font-weight: 700;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+			}
+
+			.kicker::before {
+				content: '';
+				width: 0.72rem;
+				height: 0.72rem;
+				background: var(--accent);
+				box-shadow:
+					0.95rem 0 0 var(--amber),
+					1.9rem 0 0 var(--rose);
+			}
+
+			h1,
+			h2,
+			h3 {
+				font-family: Georgia, 'Times New Roman', serif;
+				line-height: 1.05;
+				letter-spacing: 0;
+			}
+
+			h1 {
+				max-width: 980px;
+				margin: 0;
+				font-size: clamp(3rem, 6.5vw, 6.9rem);
+				font-weight: 900;
+			}
+
+			h2 {
+				margin: 0 0 1rem;
+				font-size: clamp(2rem, 3.2vw, 3.25rem);
+			}
+
+			h3 {
+				margin: 1.6rem 0 0.55rem;
+				font-size: clamp(1.28rem, 1.7vw, 1.7rem);
+			}
+
+			.lede {
+				max-width: 760px;
+				margin: 0;
+				color: #39352d;
+				font-size: clamp(1.08rem, 1.7vw, 1.42rem);
+			}
+
+			.hero-grid,
+			.panel-grid,
+			.matrix,
+			.rules,
+			.release-flow {
+				display: grid;
+				gap: 1rem;
+			}
+
+			.hero-grid {
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+				align-items: stretch;
+				margin-top: 1rem;
+			}
+
+			.hero-stat,
+			.panel,
+			.choice,
+			.phase,
+			.rule,
+			.check,
+			.source-card {
+				border: 1px solid var(--line);
+				border-radius: 6px;
+				background: rgb(255 253 248 / 86%);
+				box-shadow: var(--shadow);
+			}
+
+			.hero-stat {
+				min-height: 145px;
+				padding: 1rem;
+			}
+
+			.hero-stat strong {
+				display: block;
+				font-family: Georgia, 'Times New Roman', serif;
+				font-size: 2rem;
+				line-height: 1;
+			}
+
+			.hero-stat span {
+				display: block;
+				margin-top: 0.65rem;
+				color: var(--muted);
+				font-size: 0.95rem;
+			}
+
+			section {
+				scroll-margin-top: 1rem;
+				border-bottom: 1px solid var(--line);
+				padding: clamp(2.2rem, 5vw, 5rem) 0;
+			}
+
+			section:last-of-type {
+				border-bottom: 0;
+			}
+
+			.section-head {
+				display: grid;
+				grid-template-columns: minmax(0, 0.85fr) minmax(260px, 0.65fr);
+				gap: 1.6rem;
+				align-items: start;
+				margin-bottom: 1.7rem;
+			}
+
+			.section-head p {
+				margin: 0;
+				color: var(--muted);
+				font-size: 1.04rem;
+			}
+
+			.system-overview {
+				display: grid;
+				grid-template-columns: minmax(0, 0.95fr) minmax(280px, 0.55fr);
+				gap: 1rem;
+				align-items: stretch;
+			}
+
+			.system-overview-main {
+				border: 2px solid var(--line-strong);
+				border-radius: 6px;
+				background: var(--paper-strong);
+				padding: clamp(1rem, 2.5vw, 1.6rem);
+			}
+
+			.system-overview-main h2 {
+				font-size: clamp(2.2rem, 4vw, 4.2rem);
+			}
+
+			.system-overview-main p {
+				max-width: 760px;
+				font-size: 1.1rem;
+			}
+
+			.verdict {
+				display: grid;
+				gap: 0.75rem;
+				align-content: stretch;
+			}
+
+			.verdict-item {
+				border-radius: 6px;
+				padding: 0.85rem;
+				color: #fffaf0;
+			}
+
+			.verdict-item:nth-child(1) {
+				background: var(--accent-ink);
+			}
+
+			.verdict-item:nth-child(2) {
+				background: #784232;
+			}
+
+			.verdict-item:nth-child(3) {
+				background: #313f62;
+			}
+
+			.verdict-item strong {
+				display: block;
+				margin-bottom: 0.25rem;
+				font-size: 0.82rem;
+				text-transform: uppercase;
+				letter-spacing: 0.09em;
+			}
+
+			.verdict-item p {
+				margin: 0;
+				color: rgb(255 250 240 / 82%);
+			}
+
+			.ledger {
+				display: grid;
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+				gap: 1rem;
+			}
+
+			.ledger-card {
+				position: relative;
+				border: 1px solid var(--line-strong);
+				border-radius: 6px;
+				background: var(--paper-strong);
+				padding: 1rem;
+				min-height: 235px;
+				box-shadow: var(--shadow);
+			}
+
+			.ledger-card::before {
+				content: attr(data-step);
+				display: grid;
+				place-items: center;
+				width: 2rem;
+				height: 2rem;
+				border-radius: 50%;
+				background: var(--line-strong);
+				color: var(--paper-strong);
+				font-weight: 800;
+			}
+
+			.ledger-card h3 {
+				margin-top: 1.1rem;
+			}
+
+			.ledger-card p {
+				color: var(--muted);
+			}
+
+			.panel-grid {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+
+			.panel {
+				padding: 1rem;
+			}
+
+			.panel h3 {
+				margin-top: 0;
+			}
+
+			.panel p,
+			.panel li,
+			.choice li,
+			.rule li,
+			.check li,
+			.phase li {
+				color: var(--muted);
+			}
+
+			ul,
+			ol {
+				padding-left: 1.25rem;
+			}
+
+			li + li {
+				margin-top: 0.32rem;
+			}
+
+			.matrix {
+				grid-template-columns: repeat(4, minmax(0, 1fr));
+			}
+
+			.choice {
+				display: grid;
+				grid-template-rows: auto auto 1fr;
+				min-width: 0;
+				min-height: 340px;
+				overflow: hidden;
+				padding: 1rem;
+			}
+
+			.choice li,
+			.choice p,
+			.choice h3,
+			.panel li,
+			.artifacts td {
+				min-width: 0;
+				overflow-wrap: anywhere;
+				word-break: break-word;
+			}
+
+			.choice .badge {
+				width: fit-content;
+				border-radius: 99px;
+				padding: 0.22rem 0.55rem;
+				background: rgb(15 111 116 / 12%);
+				color: var(--accent-ink);
+				font-size: 0.75rem;
+				font-weight: 800;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+			}
+
+			.choice h3 {
+				margin-top: 0.8rem;
+			}
+
+			.release-flow {
+				grid-template-columns: repeat(6, minmax(0, 1fr));
+				counter-reset: flow;
+			}
+
+			.flow-step {
+				position: relative;
+				border-top: 4px solid var(--line-strong);
+				padding-top: 0.85rem;
+				min-height: 145px;
+			}
+
+			.flow-step::before {
+				counter-increment: flow;
+				content: counter(flow);
+				display: grid;
+				place-items: center;
+				width: 1.9rem;
+				height: 1.9rem;
+				margin-bottom: 0.7rem;
+				background: var(--line-strong);
+				color: var(--paper-strong);
+				font-weight: 800;
+			}
+
+			.flow-step strong {
+				display: block;
+				margin-bottom: 0.35rem;
+			}
+
+			.flow-step span {
+				color: var(--muted);
+				font-size: 0.92rem;
+			}
+
+			.artifacts {
+				width: 100%;
+				border-collapse: collapse;
+				border: 1px solid var(--line);
+				background: rgb(255 253 248 / 86%);
+				box-shadow: var(--shadow);
+			}
+
+			.artifacts th,
+			.artifacts td {
+				border-bottom: 1px solid var(--line);
+				padding: 0.78rem 0.82rem;
+				text-align: left;
+				vertical-align: top;
+			}
+
+			.artifacts th {
+				background: var(--line-strong);
+				color: var(--paper-strong);
+				font-size: 0.78rem;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+			}
+
+			.artifacts tr:last-child td {
+				border-bottom: 0;
+			}
+
+			.artifacts td:nth-child(2),
+			.artifacts td:nth-child(3) {
+				color: var(--muted);
+			}
+
+			.rules {
+				grid-template-columns: repeat(3, minmax(0, 1fr));
+			}
+
+			.rule {
+				border-top: 7px solid var(--accent);
+				padding: 1rem;
+			}
+
+			.rule.minor {
+				border-top-color: var(--blue);
+			}
+
+			.rule.patch {
+				border-top-color: var(--green);
+			}
+
+			.rule.none {
+				border-top-color: var(--amber);
+			}
+
+			.rule h3 {
+				margin-top: 0;
+			}
+
+			.phase-list {
+				display: grid;
+				gap: 1rem;
+			}
+
+			.phase {
+				display: grid;
+				grid-template-columns: minmax(120px, 0.24fr) minmax(0, 1fr);
+				gap: 1rem;
+				padding: 1rem;
+			}
+
+			.phase strong {
+				color: var(--accent-ink);
+				font-size: 0.82rem;
+				text-transform: uppercase;
+				letter-spacing: 0.09em;
+			}
+
+			.phase h3 {
+				margin-top: 0;
+			}
+
+			.checklist {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 1rem;
+			}
+
+			.check {
+				padding: 1rem;
+			}
+
+			.check h3 {
+				margin-top: 0;
+			}
+
+			.callout {
+				border-left: 6px solid var(--rose);
+				background: #fff1ef;
+				padding: 1rem 1.1rem;
+				margin: 1.2rem 0;
+			}
+
+			.callout strong {
+				display: block;
+				margin-bottom: 0.35rem;
+			}
+
+			.callout p {
+				margin: 0;
+				color: #5e2a32;
+			}
+
+			.sources {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 1rem;
+			}
+
+			.source-card {
+				padding: 1rem;
+			}
+
+			.source-card strong {
+				display: block;
+				margin-bottom: 0.35rem;
+			}
+
+			.source-card p {
+				margin: 0;
+				color: var(--muted);
+			}
+
+			.footer-note {
+				color: var(--muted);
+				font-size: 0.95rem;
+			}
+
+			@media (max-width: 980px) {
+				.shell {
+					display: block;
+				}
+
+				.side {
+					position: static;
+					height: auto;
+					border-right: 0;
+					border-bottom: 4px solid #c6953e;
+				}
+
+				.side nav {
+					display: grid;
+					grid-template-columns: repeat(2, minmax(0, 1fr));
+					gap: 0.2rem;
+				}
+
+				.hero {
+					min-height: auto;
+					padding-top: 2rem;
+				}
+
+				.hero-grid,
+				.ledger,
+				.panel-grid,
+				.matrix,
+				.rules,
+				.release-flow,
+				.checklist,
+				.sources,
+				.system-overview,
+				.section-head {
+					grid-template-columns: 1fr;
+				}
+
+				.choice,
+				.ledger-card,
+				.hero-stat,
+				.flow-step {
+					min-height: auto;
+				}
+			}
+
+			@media (max-width: 640px) {
+				.content {
+					padding: 1rem;
+				}
+
+				.side nav {
+					grid-template-columns: 1fr;
+				}
+
+				h1 {
+					font-size: clamp(2.45rem, 14vw, 4rem);
+				}
+
+				.phase {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			@media print {
+				body {
+					background: #fff;
+				}
+
+				.shell {
+					display: block;
+				}
+
+				.side {
+					display: none;
+				}
+
+				.content {
+					max-width: none;
+				}
+
+				section,
+				.hero {
+					break-inside: avoid;
+				}
+
+				.hero-stat,
+				.panel,
+				.choice,
+				.phase,
+				.rule,
+				.check,
+				.source-card,
+				.ledger-card,
+				.system-overview-main {
+					box-shadow: none;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="shell">
+			<aside class="side" aria-label="Document navigation">
+				<div class="side-title">
+					<strong>ChangeSet Architecture</strong>
+					<span>Implemented workflow</span>
+				</div>
+				<nav>
+					<a href="#system-overview">System Overview</a>
+					<a href="#agent-skills">Agent Skills</a>
+					<a href="#quickstart">Underlying Commands</a>
+					<a href="#system-map">System Map</a>
+					<a href="#artifacts">Files and Ownership</a>
+					<a href="#pr-workflow">PR Workflow</a>
+					<a href="#release-workflow">Release Workflow</a>
+					<a href="#versioning">Versioning</a>
+					<a href="#changelog">Changelog</a>
+					<a href="#github">Tags and Releases</a>
+					<a href="#tracking">Feature Tracking</a>
+					<a href="#implementation">Maintenance</a>
+					<a href="#checklists">Checklists</a>
+					<a href="#sources">Sources</a>
+				</nav>
+				<div class="meta-block">
+					<strong>Context checked</strong><br />
+					Repo: <code>terminal-bli-net</code><br />
+					Package: private SvelteKit app<br />
+					Current package version: <code>1.0.0</code><br />
+					Current tags: none found<br />
+					Date: June 3, 2026
+				</div>
+			</aside>
+
+			<main class="content">
+				<header class="hero">
+					<div class="kicker">Release System</div>
+					<h1>ChangeSet Architecture</h1>
+					<p class="lede">
+						This document describes the implemented workflow for writing PR change sets, staging
+						them in <code>.changeset/</code>, turning them into <code>CHANGELOG.md</code> entries,
+						archiving consumed files, and publishing versioned GitHub Releases from tags.
+					</p>
+					<div class="hero-grid" aria-label="System summary">
+						<div class="hero-stat">
+							<strong>1</strong>
+							<span
+								>Repo-level product version until add-ons become separately shipped packages.</span
+							>
+						</div>
+						<div class="hero-stat">
+							<strong>3</strong>
+							<span
+								>Separate ledgers: planned work, unreleased change intent, released history.</span
+							>
+						</div>
+						<div class="hero-stat">
+							<strong>Skills</strong>
+							<span
+								>Agents run the change-set and release workflows; scripts do the repo
+								mutations.</span
+							>
+						</div>
+					</div>
+				</header>
+
+				<section id="system-overview">
+					<div class="system-overview">
+						<div class="system-overview-main">
+							<h2>System Overview</h2>
+							<p>
+								This repo uses a <strong>custom archived changeset workflow</strong>. Pending files
+								in <code>.changeset/*.md</code> are the source of truth for unreleased user-facing
+								change notes. <code>CHANGELOG.md</code> is the durable public ledger.
+								<code>vX.Y.Z</code> tags and GitHub Releases are the public release snapshots.
+							</p>
+							<p>
+								The package remains <code>private: true</code> and is not published to npm. The
+								release artifact is the source snapshot, the public site deployment, and the
+								human-readable release record.
+							</p>
+							<p>
+								SemVer is the versioning policy. The current <code>package.json</code> value,
+								<code>1.0.0</code>, is the baseline changelog entry. During release preparation,
+								<code>pnpm changeset:version</code> bumps from that value and archives consumed
+								changesets under <code>.changeset/released/&lt;version&gt;/</code>.
+							</p>
+							<p>
+								There is no separate agent command named <code>release</code>. The mutating release
+								step is <code>pnpm changeset:version -- --yes</code>. The surrounding commit, tag,
+								push, deployment verification, and GitHub Release work are normal maintainer steps.
+							</p>
+						</div>
+						<div class="verdict" aria-label="System summary">
+							<div class="verdict-item">
+								<strong>Track work</strong>
+								<p>GitHub issues, PRDs, and project labels describe planned or active work.</p>
+							</div>
+							<div class="verdict-item">
+								<strong>Track change intent</strong>
+								<p>
+									<code>.changeset/*.md</code> files travel with PRs and explain the release note.
+								</p>
+							</div>
+							<div class="verdict-item">
+								<strong>Track releases</strong>
+								<p>
+									<code>CHANGELOG.md</code>, tags, and GitHub Releases describe shipped snapshots.
+								</p>
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<section id="agent-skills">
+					<div class="section-head">
+						<h2>Agent Skills</h2>
+						<p>
+							The intended day-to-day interface is an agent skill. The package scripts are the
+							repo-local machinery that the skill validates or runs after it has inspected the PR or
+							release state.
+						</p>
+					</div>
+					<div class="panel-grid">
+						<article class="panel">
+							<h3>Write a PR change set</h3>
+							<pre><code>$write-change-set</code></pre>
+							<p>
+								Run this when the PR is ready for review or ready to merge and carries its change
+								set with the code. The agent inspects the branch, writes or updates one
+								<code>.changeset/*.md</code> file, and runs <code>pnpm changeset:check-pr</code>.
+							</p>
+							<p>Plain-language prompt: <code>Write the change set for this PR.</code></p>
+						</article>
+						<article class="panel">
+							<h3>Prepare a release</h3>
+							<pre><code>$prepare-release</code></pre>
+							<p>
+								Run this after one or more PRs have merged and pending files exist in
+								<code>.changeset/</code>. The agent previews the next version, runs validation,
+								consumes pending change sets into <code>CHANGELOG.md</code>, and archives consumed
+								files under <code>.changeset/released/&lt;version&gt;/</code>.
+							</p>
+							<p>
+								Plain-language prompt:
+								<code>Prepare the next release from pending change sets.</code>
+							</p>
+						</article>
+					</div>
+					<div class="callout">
+						<strong>Codex invocation</strong>
+						<p>
+							In Codex, skills are invoked with <code>$skill-name</code>, not slash commands. Use
+							<code>$write-change-set</code> and <code>$prepare-release</code>. Claude can use the
+							same skill names through its installed skill surface or a plain-language prompt.
+						</p>
+					</div>
+				</section>
+
+				<section id="quickstart">
+					<div class="section-head">
+						<h2>Underlying Commands</h2>
+						<p>
+							These are the real commands in <code>package.json</code>. Agents use these commands
+							inside the skills, and maintainers can run them manually when they want direct
+							control.
+						</p>
+					</div>
+					<div class="panel-grid">
+						<article class="panel">
+							<h3>In a feature or fix PR</h3>
+							<pre><code>pnpm changeset:add
+pnpm changeset:check-pr</code></pre>
+							<p>
+								Run these when the PR changes visible behavior, app-author contracts, storage,
+								deployment behavior, or public docs. Update the same changeset if the PR changes
+								during review.
+							</p>
+						</article>
+						<article class="panel">
+							<h3>For a general validation pass</h3>
+							<pre><code>pnpm changeset:status
+pnpm changeset:check</code></pre>
+							<p>
+								<code>status</code> previews pending release notes and the next version.
+								<code>check</code> validates every pending changeset file without requiring the
+								current branch to contain one.
+							</p>
+						</article>
+						<article class="panel">
+							<h3>To prepare a release</h3>
+							<pre><code>pnpm changeset:version -- --dry-run
+pnpm test:unit
+pnpm build
+pnpm changeset:version -- --yes</code></pre>
+							<p>
+								The dry run shows the next version and changelog output. The <code>--yes</code> run
+								mutates <code>package.json</code>, <code>CHANGELOG.md</code>, and
+								<code>.changeset/released/&lt;version&gt;/</code>.
+							</p>
+						</article>
+						<article class="panel">
+							<h3>After release files are reviewed</h3>
+							<pre><code>git add package.json CHANGELOG.md .changeset/
+git commit -m "chore: release vX.Y.Z"
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin main --follow-tags</code></pre>
+							<p>
+								Replace <code>X.Y.Z</code> with the version produced by
+								<code>pnpm changeset:version</code>. Verify production before publishing the GitHub
+								Release from that tag.
+							</p>
+						</article>
+					</div>
+				</section>
+
+				<section id="system-map">
+					<div class="section-head">
+						<h2>System Map</h2>
+						<p>
+							The workflow uses three records with different jobs. Issues and PRDs plan work,
+							changesets describe unreleased user-facing changes, and the changelog plus tags
+							describe what shipped.
+						</p>
+					</div>
+					<div class="ledger">
+						<article class="ledger-card" data-step="1">
+							<h3>Planned Work</h3>
+							<p>
+								GitHub issues, PRDs, and discussion docs describe ideas before they land. They can
+								be split, renamed, merged, or abandoned without rewriting release history.
+							</p>
+							<p><strong>Lives in:</strong> issues, PR descriptions, planning docs.</p>
+						</article>
+						<article class="ledger-card" data-step="2">
+							<h3>Unreleased Intent</h3>
+							<p>
+								Pending changeset files describe what a merged PR will mean to users, app authors,
+								or operators. They are short, explicit, and version-aware.
+							</p>
+							<p><strong>Lives in:</strong> <code>.changeset/*.md</code>.</p>
+						</article>
+						<article class="ledger-card" data-step="3">
+							<h3>Released History</h3>
+							<p>
+								The changelog and GitHub Releases describe what actually shipped. Archived
+								changesets preserve the source notes that produced each release.
+							</p>
+							<p>
+								<strong>Lives in:</strong> <code>CHANGELOG.md</code>,
+								<code>.changeset/released/&lt;version&gt;/</code>, and <code>vX.Y.Z</code> tags.
+							</p>
+						</article>
+					</div>
+				</section>
+
+				<section id="artifacts">
+					<div class="section-head">
+						<h2>Files and Ownership</h2>
+						<p>
+							Each artifact has one owner. Avoid making PR labels, commit titles, release notes, and
+							changelog entries compete as sources of truth.
+						</p>
+					</div>
+					<table class="artifacts">
+						<thead>
+							<tr>
+								<th>Artifact</th>
+								<th>Purpose</th>
+								<th>Owner / creation time</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td><code>.changeset/*.md</code></td>
+								<td>Unreleased release intent: package, bump type, and human-facing summary.</td>
+								<td>Written in the feature/fix PR before merge.</td>
+							</tr>
+							<tr>
+								<td><code>CHANGELOG.md</code></td>
+								<td>Permanent release ledger with version sections and dates.</td>
+								<td>
+									Generated by <code>pnpm changeset:version -- --yes</code>, then edited and
+									committed by the maintainer.
+								</td>
+							</tr>
+							<tr>
+								<td><code>package.json</code> version</td>
+								<td>Repo-level product version for tooling and optional in-app display.</td>
+								<td>Updated only by <code>pnpm changeset:version -- --yes</code>.</td>
+							</tr>
+							<tr>
+								<td><code>vX.Y.Z</code> Git tag</td>
+								<td>Immutable code pointer for a public release snapshot.</td>
+								<td>Created after the release commit lands and production deploy is verified.</td>
+							</tr>
+							<tr>
+								<td>GitHub Release</td>
+								<td>
+									Public release page with curated notes, source archives, compare link, and assets.
+								</td>
+								<td>Created from the tag; uses the changelog section as the starting point.</td>
+							</tr>
+							<tr>
+								<td>GitHub issue / PR labels</td>
+								<td>Planning, triage, release-note categories, and optional omission reasons.</td>
+								<td>Maintained during issue and PR review. Labels are not the changelog source.</td>
+							</tr>
+						</tbody>
+					</table>
+				</section>
+
+				<section id="pr-workflow">
+					<div class="section-head">
+						<h2>PR Workflow</h2>
+						<p>
+							Each release-worthy PR carries the release note that will eventually become part of
+							<code>CHANGELOG.md</code>. The changeset describes the final user-visible result, not
+							every implementation step.
+						</p>
+					</div>
+					<div class="release-flow" aria-label="Release workflow">
+						<div class="flow-step">
+							<strong>Change</strong>
+							<span>Build the feature or fix with the normal tests and docs.</span>
+						</div>
+						<div class="flow-step">
+							<strong>Add note</strong>
+							<span
+								>Run <code>pnpm changeset:add</code> or create one file in
+								<code>.changeset/</code>.</span
+							>
+						</div>
+						<div class="flow-step">
+							<strong>Review</strong>
+							<span>Check the bump type, category, and human-facing wording.</span>
+						</div>
+						<div class="flow-step">
+							<strong>Validate</strong>
+							<span>Run <code>pnpm changeset:check-pr</code> for release-worthy PRs.</span>
+						</div>
+						<div class="flow-step">
+							<strong>Merge</strong>
+							<span>Merged changesets accumulate on <code>main</code> until release time.</span>
+						</div>
+					</div>
+
+					<h3>Feature PR rules</h3>
+					<div class="panel-grid">
+						<article class="panel">
+							<h3>Add a changeset when the PR affects users</h3>
+							<ul>
+								<li>
+									New apps, windows, menus, document handlers, desktop behavior, or store flow.
+								</li>
+								<li>Bug fixes users can observe.</li>
+								<li>Storage, backup/restore, document routing, or app registration behavior.</li>
+								<li>Public app-author docs or manifest contract changes.</li>
+								<li>
+									Security fixes, dependency updates with runtime impact, or deploy behavior
+									changes.
+								</li>
+							</ul>
+						</article>
+						<article class="panel">
+							<h3>Skip a changeset when the PR is invisible</h3>
+							<ul>
+								<li>Test-only changes.</li>
+								<li>Internal refactors with no behavior or public contract change.</li>
+								<li>
+									Development tooling changes that do not alter install, build, deploy, or runtime.
+								</li>
+								<li>Typo fixes in internal docs.</li>
+								<li>Dependency lockfile churn with no shipped effect.</li>
+							</ul>
+						</article>
+					</div>
+
+					<h3>Example changeset</h3>
+					<pre><code>---
+type: minor
+category: Added
+issue: #123
+---
+
+Add folder-addressable Finder windows so Desktop folder aliases open the folder
+the user clicked instead of focusing an unrelated Finder window.</code></pre>
+				</section>
+
+				<section id="release-workflow">
+					<div class="section-head">
+						<h2>Release Workflow</h2>
+						<p>
+							A release maintainer consumes the pending changesets when they want a new public
+							snapshot. This is a local command sequence today, followed by normal Git and GitHub
+							release steps.
+						</p>
+					</div>
+					<div class="release-flow" aria-label="Maintainer release workflow">
+						<div class="flow-step">
+							<strong>Preview</strong>
+							<span>Run <code>pnpm changeset:version -- --dry-run</code>.</span>
+						</div>
+						<div class="flow-step">
+							<strong>Verify</strong>
+							<span
+								>Run <code>pnpm test:unit</code>, <code>pnpm build</code>, and any relevant browser
+								checks.</span
+							>
+						</div>
+						<div class="flow-step">
+							<strong>Consume</strong>
+							<span
+								>Run <code>pnpm changeset:version -- --yes</code> from a clean working tree.</span
+							>
+						</div>
+						<div class="flow-step">
+							<strong>Review</strong>
+							<span
+								>Edit <code>CHANGELOG.md</code> wording if needed, keeping archived source
+								notes.</span
+							>
+						</div>
+						<div class="flow-step">
+							<strong>Publish</strong>
+							<span
+								>Commit release files, tag <code>vX.Y.Z</code>, verify production, then create the
+								GitHub Release.</span
+							>
+						</div>
+					</div>
+
+					<h3>Release maintainer command sequence</h3>
+					<pre><code>pnpm changeset:check
+pnpm changeset:version -- --dry-run
+pnpm test:unit
+pnpm build
+pnpm changeset:version -- --yes
+git add package.json CHANGELOG.md .changeset/
+git commit -m "chore: release vX.Y.Z"
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin main --follow-tags</code></pre>
+
+					<p>
+						The only command above that updates release files is
+						<code>pnpm changeset:version -- --yes</code>. It updates <code>package.json</code>,
+						prepends a version section to <code>CHANGELOG.md</code>, and moves consumed changesets
+						into <code>.changeset/released/&lt;version&gt;/</code>.
+					</p>
+				</section>
+
+				<section id="versioning">
+					<div class="section-head">
+						<h2>Versioning Policy</h2>
+						<p>
+							SemVer is useful only after you define what compatibility means. For Terminal, the
+							public surface is broader than package APIs.
+						</p>
+					</div>
+					<div class="rules">
+						<article class="rule">
+							<h3>Major</h3>
+							<ul>
+								<li>After <code>1.0.0</code>, breaking public app/add-on manifest contracts.</li>
+								<li>
+									Data or backup format changes that require user action or cannot be rolled back.
+								</li>
+								<li>Dropping documented browser/runtime support.</li>
+								<li>Removing a released user workflow or app surface.</li>
+							</ul>
+							<p>
+								Before <code>1.0.0</code>, use major only for deliberate public compatibility
+								resets.
+							</p>
+						</article>
+						<article class="rule minor">
+							<h3>Minor</h3>
+							<ul>
+								<li>New apps, document handlers, OS features, settings, or user workflows.</li>
+								<li>Backward-compatible additions to the app manifest or AppContext contract.</li>
+								<li>Major visible improvements that are not bug fixes.</li>
+								<li>Deprecations that warn before removal.</li>
+							</ul>
+							<p>During <code>0.x</code>, most meaningful public contract shifts are minor.</p>
+						</article>
+						<article class="rule patch">
+							<h3>Patch</h3>
+							<ul>
+								<li>
+									Bug fixes, visual corrections, small copy fixes, and browser compatibility fixes.
+								</li>
+								<li>Security fixes that do not change public contracts.</li>
+								<li>Runtime dependency updates that preserve behavior.</li>
+								<li>Documentation clarifications for existing behavior.</li>
+							</ul>
+							<p>Patch releases can happen immediately when production is broken.</p>
+						</article>
+					</div>
+
+					<div class="callout">
+						<strong>Starting version</strong>
+						<p>
+							Keep <code>1.0.0</code> as the baseline version because it is already the repo's
+							declared package version. The first consumed changeset release will bump from that
+							baseline and preserve the initial release entry in <code>CHANGELOG.md</code>.
+						</p>
+					</div>
+				</section>
+
+				<section id="changelog">
+					<div class="section-head">
+						<h2>Changelog Shape</h2>
+						<p>
+							Use Keep a Changelog categories, but allow Terminal-specific notes where users need
+							migration or browser-storage context.
+						</p>
+					</div>
+					<div class="panel-grid">
+						<article class="panel">
+							<h3>Canonical sections</h3>
+							<ul>
+								<li><code>Added</code> for new features.</li>
+								<li><code>Changed</code> for behavior changes.</li>
+								<li><code>Deprecated</code> for planned removals.</li>
+								<li><code>Removed</code> for removals.</li>
+								<li><code>Fixed</code> for bug fixes.</li>
+								<li><code>Security</code> for vulnerability fixes.</li>
+							</ul>
+						</article>
+						<article class="panel">
+							<h3>Terminal-specific additions</h3>
+							<ul>
+								<li>
+									<code>Migration Notes</code> when localStorage, IndexedDB, backup, or restore
+									behavior changes.
+								</li>
+								<li>
+									<code>App Author Notes</code> when manifest, AppContext, or document-routing
+									contracts change.
+								</li>
+								<li>
+									<code>Known Issues</code> when a release intentionally ships with a visible
+									limitation.
+								</li>
+								<li>
+									<code>Upgrade Notes</code> when self-hosters need an action beyond pulling the
+									tag.
+								</li>
+							</ul>
+						</article>
+					</div>
+
+					<h3>Release section example</h3>
+					<pre><code>## 0.2.0 - 2026-06-17
+
+### Added
+
+- Add folder-addressable Finder windows so Desktop folder aliases open the
+  folder the user clicked.
+- Add Computer Store conformance coverage for released app catalog entries.
+
+### Fixed
+
+- Show a clear alert when no installed app can open a document instead of
+  opening a dead fallback window.
+
+### App Author Notes
+
+- Custom launch behavior now belongs to app manifests instead of Desktop shell
+  special cases.</code></pre>
+				</section>
+
+				<section id="github">
+					<div class="section-head">
+						<h2>Tags, GitHub Releases, and Deploy Timing</h2>
+						<p>
+							GitHub Releases are based on Git tags. Treat tags as immutable public anchors and
+							release pages as the announcement layer.
+						</p>
+					</div>
+					<div class="panel-grid">
+						<article class="panel">
+							<h3>Tag policy</h3>
+							<ul>
+								<li>Use <code>vX.Y.Z</code> tags for public releases.</li>
+								<li>Do not move or rewrite release tags.</li>
+								<li>Prefer annotated tags for manual releases.</li>
+								<li>
+									Use <code>vX.Y.Z-alpha.N</code> only when you need public prerelease testing.
+								</li>
+								<li>
+									Do not use package-name tags like <code>terminal-bli-net@0.2.0</code> for the
+									public release surface.
+								</li>
+							</ul>
+						</article>
+						<article class="panel">
+							<h3>Release page policy</h3>
+							<ul>
+								<li>Start from the matching changelog section, then edit for readability.</li>
+								<li>Include the compare link and any notable screenshots or migration notes.</li>
+								<li>
+									Mark prereleases in GitHub when using alpha, beta, or release-candidate tags.
+								</li>
+								<li>
+									Use GitHub security advisories for vulnerabilities that need coordinated
+									disclosure.
+								</li>
+								<li>Let GitHub attach source zip and tarball archives automatically.</li>
+							</ul>
+						</article>
+					</div>
+
+					<h3>Deployment alignment</h3>
+					<p>
+						If Cloudflare Pages deploys automatically from <code>main</code>, the release tag points
+						at the release commit only after the production deployment is verified. If production
+						deploys move into GitHub Actions, release creation waits for the build, tests, and
+						deploy job.
+					</p>
+					<p>
+						For now, the pragmatic path is a two-stage flow: run the local changeset version
+						command, commit the generated release files, then create the tag and GitHub Release
+						after the production deployment is verified.
+					</p>
+				</section>
+
+				<section id="tracking">
+					<div class="section-head">
+						<h2>Feature Tracking</h2>
+						<p>
+							Changesets are not a roadmap. They are the final release-intent note attached to work
+							that is about to merge or has already merged and is waiting for release.
+						</p>
+					</div>
+					<div class="panel-grid">
+						<article class="panel">
+							<h3>Issue and PR labels</h3>
+							<ul>
+								<li>
+									<code>type:feature</code>, <code>type:bug</code>, <code>type:docs</code>,
+									<code>type:chore</code>.
+								</li>
+								<li>
+									<code>area:terminalos</code>, <code>area:apps</code>, <code>area:storage</code>,
+									<code>area:workers</code>, <code>area:docs</code>.
+								</li>
+								<li>
+									<code>release:major</code>, <code>release:minor</code>,
+									<code>release:patch</code>, <code>release:none</code>.
+								</li>
+								<li>
+									<code>needs:changeset</code> when a PR appears release-worthy but lacks one.
+								</li>
+								<li>
+									<code>changelog:skip</code> only for explicit maintainer-reviewed omissions.
+								</li>
+							</ul>
+						</article>
+						<article class="panel">
+							<h3>PR template additions</h3>
+							<ul>
+								<li>Release impact: major, minor, patch, none.</li>
+								<li>Changeset included: yes, no, not needed.</li>
+								<li>User-facing summary in one sentence.</li>
+								<li>Storage model changed: yes or no.</li>
+								<li>
+									Docs and in-app copy updated when storage, backup, routing, or app registration
+									behavior changes.
+								</li>
+							</ul>
+						</article>
+					</div>
+				</section>
+
+				<section id="implementation">
+					<div class="section-head">
+						<h2>Maintenance</h2>
+						<p>
+							The system is repo-native and already wired into package scripts, docs, tests, and the
+							PR template. Maintenance is mostly about keeping change-set decisions explicit.
+						</p>
+					</div>
+					<div class="panel-grid">
+						<article class="panel">
+							<h3>Implemented files</h3>
+							<ul>
+								<li><code>scripts/changesets.js</code> is the CLI entry point.</li>
+								<li>
+									<code>scripts/lib/changesets.js</code> parses, validates, versions, and writes.
+								</li>
+								<li><code>scripts/lib/changesets.test.js</code> covers the release logic.</li>
+								<li>
+									<code>.changeset/README.md</code> documents the file format for contributors.
+								</li>
+								<li><code>docs/changesets.md</code> is the compact operating guide.</li>
+								<li>
+									<code>.github/PULL_REQUEST_TEMPLATE.md</code> prompts for change-set status.
+								</li>
+							</ul>
+						</article>
+						<article class="panel">
+							<h3>Maintainer responsibilities</h3>
+							<ul>
+								<li>
+									Keep one changeset per release-worthy PR unless there is a clear omission reason.
+								</li>
+								<li>Review the generated changelog before committing release files.</li>
+								<li>Do not delete consumed changesets; keep the archived folder committed.</li>
+								<li>Do not move published release tags. Ship a follow-up patch if needed.</li>
+								<li>Update architecture docs and in-app copy when storage behavior changes.</li>
+							</ul>
+						</article>
+					</div>
+
+					<h3>Package scripts now installed</h3>
+					<pre><code>{
+	"scripts": {
+		"changeset": "node scripts/changesets.js",
+		"changeset:add": "node scripts/changesets.js add",
+		"changeset:status": "node scripts/changesets.js status",
+		"changeset:check": "node scripts/changesets.js validate",
+		"changeset:check-pr": "node scripts/changesets.js validate --branch-only --require-pending",
+		"changeset:version": "node scripts/changesets.js version"
+	}
+}</code></pre>
+
+					<h3>Automation and agent notes</h3>
+					<div class="panel-grid">
+						<article class="panel">
+							<h3>Required now</h3>
+							<ul>
+								<li>No GitHub Action is installed for the first version of this system.</li>
+								<li>
+									PR authors and agents follow <code>AGENTS.md</code>,
+									<code>docs/changesets.md</code>, and <code>.changeset/README.md</code>.
+								</li>
+								<li>
+									Release-worthy PRs run <code>pnpm changeset:check-pr</code>; release maintainers
+									run <code>pnpm changeset:version -- --dry-run</code> before consuming changesets.
+								</li>
+							</ul>
+						</article>
+						<article class="panel">
+							<h3>Not installed</h3>
+							<ul>
+								<li>
+									There is no automatic PR check that runs <code>pnpm changeset:check-pr</code>;
+									authors, agents, and reviewers run it directly.
+								</li>
+								<li>
+									There is no GitHub Actions release workflow that extracts
+									<code>CHANGELOG.md</code> and creates the GitHub Release.
+								</li>
+								<li>
+									Tagging and GitHub Release creation remain manual maintainer steps after
+									deployment verification.
+								</li>
+							</ul>
+						</article>
+					</div>
+				</section>
+
+				<section id="checklists">
+					<div class="section-head">
+						<h2>Checklists</h2>
+						<p>These are the habits that keep the system useful after the initial setup.</p>
+					</div>
+					<div class="checklist">
+						<article class="check">
+							<h3>PR author</h3>
+							<ul>
+								<li>Decide whether the PR is release-worthy.</li>
+								<li>
+									Add a changeset for user-facing, app-author-facing, storage, or deploy-impacting
+									work.
+								</li>
+								<li>Use user language, not implementation-only wording.</li>
+								<li>Choose the smallest defensible bump type.</li>
+								<li>If storage changes, update architecture docs and in-app copy.</li>
+							</ul>
+						</article>
+						<article class="check">
+							<h3>PR reviewer</h3>
+							<ul>
+								<li>Check that missing changesets are intentional.</li>
+								<li>Check the SemVer bump type.</li>
+								<li>Check whether migration or app-author notes are needed.</li>
+								<li>Check that release notes are clear to someone who did not read the diff.</li>
+								<li>
+									Apply <code>release:none</code> or <code>needs:changeset</code> labels when
+									useful.
+								</li>
+							</ul>
+						</article>
+						<article class="check">
+							<h3>Release maintainer</h3>
+							<ul>
+								<li>Review the generated release files, especially <code>CHANGELOG.md</code>.</li>
+								<li>Group or rewrite entries when raw changesets are too granular.</li>
+								<li>Run the normal build, unit tests, and relevant browser checks.</li>
+								<li>Commit or merge release files only when the release snapshot is coherent.</li>
+								<li>Verify production deploy before creating the public tag and release.</li>
+							</ul>
+						</article>
+						<article class="check">
+							<h3>Hotfix release</h3>
+							<ul>
+								<li>Branch from <code>main</code>.</li>
+								<li>Fix the issue and add a patch changeset.</li>
+								<li>
+									Merge the fix, consume its patch changeset, and ship a patch release immediately.
+								</li>
+								<li>Use a GitHub security advisory if the fix is vulnerability-related.</li>
+								<li>Backfill any public explanation after disclosure is safe.</li>
+							</ul>
+						</article>
+					</div>
+				</section>
+
+				<section id="sources">
+					<div class="section-head">
+						<h2>Sources Consulted</h2>
+						<p>
+							These informed the implemented workflow. The final architecture is adapted to this
+							repo's release and deployment model rather than copied directly from any one tool.
+						</p>
+					</div>
+					<div class="sources">
+						<article class="source-card">
+							<strong
+								><a
+									href="https://github.com/changesets/changesets/blob/main/docs/intro-to-using-changesets.md"
+									>Changesets Concepts</a
+								></strong
+							>
+							<p>
+								Release notes can carry SemVer bump type and changelog text before they are consumed
+								by a version command.
+							</p>
+						</article>
+						<article class="source-card">
+							<strong
+								><a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog 1.1.0</a></strong
+							>
+							<p>Human-readable changelog principles and standard change categories.</p>
+						</article>
+						<article class="source-card">
+							<strong><a href="https://semver.org/">Semantic Versioning 2.0.0</a></strong>
+							<p>Major, minor, patch, prerelease, and public API compatibility rules.</p>
+						</article>
+						<article class="source-card">
+							<strong
+								><a
+									href="https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases"
+									>GitHub: About Releases</a
+								></strong
+							>
+							<p>
+								GitHub Releases are based on Git tags and expose source archives for each release.
+							</p>
+						</article>
+						<article class="source-card">
+							<strong
+								><a
+									href="https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes"
+									>GitHub: Automatically Generated Release Notes</a
+								></strong
+							>
+							<p>
+								Generated notes can include merged PRs, contributors, labels, and compare links.
+							</p>
+						</article>
+					</div>
+				</section>
+
+				<p class="footer-note">
+					This document describes the custom archived changeset workflow implemented for Terminal.
+				</p>
+			</main>
+		</div>
+	</body>
+</html>
