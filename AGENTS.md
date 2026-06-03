@@ -8,6 +8,7 @@
 - Start architecture work with `docs/terminalos-architecture.md`.
 - Check `docs/adr/` before changing filesystem persistence, document routing, or app/add-on registration.
 - Terminal HD stores its manifest/preferences in localStorage and blob file bodies in IndexedDB; update both docs and in-app copy if that storage model changes.
+- Use `docs/start-here.md` or `pnpm start-here` when the user asks how to get oriented, resume work, create a PR, write a change set, or prepare a release.
 - Add or update one `.changeset/*.md` file for every release-worthy user-facing, app-author-facing, storage, deploy, or public documentation change. Use `docs/changesets.md` and `.changeset/README.md` for the workflow.
 
 ## Svelte MCP
