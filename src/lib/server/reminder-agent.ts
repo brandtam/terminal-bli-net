@@ -194,7 +194,6 @@ export class ReminderAgent extends Agent<ReminderAgentEnv> {
 					showName: candidate.showName,
 					characterName: candidate.characterName,
 					characterPrompt: `greeting": ${JSON.stringify(candidate.characterGreeting)}`,
-					recipientEmail: candidate.email,
 					signedReplyAddr,
 					nextAirTime: candidate.nextAirTime
 				});
@@ -212,7 +211,6 @@ export class ReminderAgent extends Agent<ReminderAgentEnv> {
 				sent++;
 			} catch (err) {
 				console.error('[ReminderAgent] reminder delivery failed', {
-					email: candidate.email,
 					showSlug: candidate.showSlug,
 					slotKey: candidate.slotKey,
 					error: err instanceof Error ? err.message : String(err)

@@ -13,5 +13,6 @@ pnpm-lock.yaml
 package-lock.json
 yarn.lock
 
-# Per-machine Claude Code agent state — managed by the agent, not by repo tooling
-.claude/
+# Per-machine agent state, not repo tooling
+.claude/projects/
+.claude/settings.local.json

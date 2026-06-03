@@ -77,7 +77,6 @@ export interface ComposeReminderParams {
 	showName: string;
 	characterName: string;
 	characterPrompt: string;
-	recipientEmail: string;
 	signedReplyAddr: string;
 	nextAirTime: string;
 }

@@ -18,7 +18,6 @@ const DEFAULT_PARAMS: ComposeReminderParams = {
 	showName: 'M*A*S*H',
 	characterName: 'Hawkeye',
 	characterPrompt: 'greeting": "Well, hello there. Pull up a martini, soldier." voice: sardonic',
-	recipientEmail: 'fan@example.com',
 	signedReplyAddr: 'unsub+0123456789abcdefghijklmnopqrstuv@bli.net',
 	nextAirTime: '7:00 PM EST'
 };
