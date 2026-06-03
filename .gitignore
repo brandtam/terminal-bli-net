@@ -1,5 +1,9 @@
 /local-docs
 .DS_Store
+.claude/projects/
+.claude/settings.local.json
+.codex/
+.agents/
 node_modules
 .pnpm-store
 /build
@@ -15,5 +19,5 @@ vite.config.ts.timestamp-*
 /test-results
 bundle-stats.html
 
-# Claude Code scheduled-tasks runtime lock (not project state)
+# Agent scheduled-tasks runtime lock (not project state)
 scheduled_tasks.lock
