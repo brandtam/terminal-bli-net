@@ -40,7 +40,8 @@ function hasFlag(flag) {
 function getOption(name, fallback) {
 	const index = args.indexOf(name);
 	if (index === -1) return fallback;
-	return args[index + 1] ?? fallback;
+	const value = args[index + 1];
+	return value && !value.startsWith('--') ? value : fallback;
 }
 
 function printValidationErrors(errors) {
@@ -73,7 +74,7 @@ async function addChangeset() {
 			await rl.question(`Category (${CHANGELOG_CATEGORIES.join(', ')}): `)
 		).trim();
 		const summary = (await rl.question('Summary: ')).trim();
-		const issue = (await rl.question('Issue or PR link (optional): ')).trim();
+		const link = (await rl.question('Link (PR, issue, optional): ')).trim();
 		const bodyLines = [];
 
 		output.write('Details, one line at a time. Submit an empty line when done.\n');
@@ -83,7 +84,7 @@ async function addChangeset() {
 			bodyLines.push(line);
 		}
 
-		const defaultFilename = `${slugify(summary)}.md`;
+		const defaultFilename = `${slugify(summary) || 'changeset'}.md`;
 		const filenameAnswer = (await rl.question(`Filename (${defaultFilename}): `)).trim();
 		const filename = filenameAnswer || defaultFilename;
 		const category = categoryAnswer || undefined;
@@ -92,7 +93,7 @@ async function addChangeset() {
 			filename,
 			type,
 			category,
-			issue,
+			link,
 			summary,
 			body: bodyLines.join('\n')
 		});
@@ -144,6 +145,13 @@ function status() {
 }
 
 function version() {
+	if (hasFlag('--branch-only') || args.includes('--since')) {
+		console.error(
+			'--branch-only and --since are not valid for version; releases consume every pending changeset.'
+		);
+		process.exit(1);
+	}
+
 	if (!hasFlag('--dry-run') && !hasFlag('--yes')) {
 		console.error('Refusing to mutate files without --yes. Use --dry-run to preview.');
 		process.exit(1);
@@ -171,6 +179,9 @@ function version() {
 try {
 	if (command === 'help' || command === '--help' || command === '-h') {
 		printHelp();
+	} else if (!existsSync('package.json')) {
+		console.error('Run this command from the repository root.');
+		process.exit(1);
 	} else if (command === 'add') {
 		await addChangeset();
 	} else if (command === 'validate') {
@@ -179,9 +190,6 @@ try {
 		status();
 	} else if (command === 'version') {
 		version();
-	} else if (!existsSync('package.json')) {
-		console.error('Run this command from the repository root.');
-		process.exit(1);
 	} else {
 		console.error(`Unknown command: ${command}`);
 		printHelp();

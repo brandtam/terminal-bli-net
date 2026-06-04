@@ -79,6 +79,12 @@ pnpm changeset:check-pr
 
 That command validates branch-local changesets and fails if none are present.
 
+It compares the branch against `origin/main`, so that ref must exist locally —
+run `git fetch origin` first. On a shallow clone, a fork, or a remote not named
+`origin`, the diff cannot resolve and the command fails even when a valid
+changeset is present. When this workflow runs in CI, fetch enough history (or
+point it at the right base ref) before calling `check-pr`.
+
 ## Release Maintainer Workflow
 
 Agent workflow:
@@ -111,6 +117,20 @@ This command:
 Review the generated changelog before committing. It is acceptable to edit
 wording and grouping after generation, but keep the archived changesets as the
 source notes that produced the release.
+
+Steps 4–6 are not a single atomic operation. The clean-working-tree requirement
+is the recovery mechanism: if any step fails partway, the only changes on disk
+are the ones this command just made, so
+
+```bash
+git checkout -- CHANGELOG.md package.json .changeset
+git clean -fd .changeset/released
+```
+
+restores the pre-release state. Run the command again once the cause is fixed.
+This is also why you must not re-run `--yes` after a partial failure without
+resetting first — a second run would consume the same changesets again and
+duplicate the changelog entry.
 
 ## Tags and GitHub Releases
 
@@ -162,7 +182,7 @@ is deliberately complete without them.
 ---
 type: minor
 category: Added
-issue: #123
+link: #123
 ---
 
 Add folder-addressable Finder windows

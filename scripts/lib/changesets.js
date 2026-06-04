@@ -66,7 +66,8 @@ function parseFrontmatter(frontmatter) {
 }
 
 export function parseChangeset(filename, content) {
-	const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
+	const normalized = content.replace(/\r\n/g, '\n');
+	const match = normalized.match(/^---\s*\n([\s\S]*?)\n---\s*(?:\n([\s\S]*))?$/);
 	if (!match) {
 		return {
 			changeset: null,
@@ -75,7 +76,7 @@ export function parseChangeset(filename, content) {
 	}
 
 	const fields = parseFrontmatter(match[1]);
-	const description = match[2].trim();
+	const description = (match[2] ?? '').trim();
 	const type = fields.type?.toLowerCase();
 	const category = fields.category || (type ? DEFAULT_CATEGORY_BY_TYPE[type] : undefined);
 	const summary = description.split('\n')[0]?.trim() ?? '';
@@ -84,8 +85,7 @@ export function parseChangeset(filename, content) {
 		filename,
 		type,
 		category,
-		issue: fields.issue || '',
-		pr: fields.pr || '',
+		link: fields.link || '',
 		summary,
 		body: description.split('\n').slice(1).join('\n').trim(),
 		description
@@ -118,7 +118,7 @@ export function validateChangeset(changeset) {
 		errors.push(`${changeset.filename}: body must start with a one-line summary`);
 	}
 
-	if (changeset.summary.length > 120) {
+	if (changeset.summary && changeset.summary.length > 120) {
 		errors.push(`${changeset.filename}: summary should be 120 characters or less`);
 	}
 
@@ -162,8 +162,7 @@ export function getValidPendingChangesets(options = {}) {
 export function getBranchOnlyChangesetFiles({ root = process.cwd(), since = 'origin/main' } = {}) {
 	const files = [
 		...gitChangedFiles(root, ['diff', `${since}...HEAD`, '--name-only', '--', CHANGESET_DIR]),
-		...gitChangedFiles(root, ['diff', '--name-only', '--', CHANGESET_DIR]),
-		...gitChangedFiles(root, ['diff', '--cached', '--name-only', '--', CHANGESET_DIR]),
+		...gitChangedFiles(root, ['diff', 'HEAD', '--name-only', '--', CHANGESET_DIR]),
 		...gitChangedFiles(root, ['ls-files', '--others', '--exclude-standard', '--', CHANGESET_DIR])
 	];
 
@@ -205,8 +204,7 @@ export function bumpVersion(version, type) {
 
 function formatEntry(changeset) {
 	const lines = [`**${changeset.summary}**`];
-	if (changeset.issue) lines.push('', changeset.issue);
-	if (changeset.pr) lines.push('', changeset.pr);
+	if (changeset.link) lines.push('', changeset.link);
 	if (changeset.body) lines.push('', changeset.body);
 	return lines.join('\n');
 }
@@ -219,7 +217,9 @@ export function generateChangelogEntry(version, changesets, { date = currentDate
 	}
 
 	for (const changeset of changesets) {
-		grouped.get(changeset.category)?.push(changeset);
+		const bucket = grouped.get(changeset.category);
+		if (!bucket) throw new Error(`Unknown changelog category: ${changeset.category}`);
+		bucket.push(changeset);
 	}
 
 	const sections = [];
@@ -359,23 +359,14 @@ export function validatePendingChangesets(options = {}) {
 }
 
 export function createChangesetFile(
-	{
-		filename,
-		type,
-		category = DEFAULT_CATEGORY_BY_TYPE[type],
-		issue = '',
-		pr = '',
-		summary,
-		body = ''
-	},
+	{ filename, type, category = DEFAULT_CATEGORY_BY_TYPE[type], link = '', summary, body = '' },
 	{ root = process.cwd() } = {}
 ) {
 	const changeset = {
 		filename,
 		type,
 		category,
-		issue,
-		pr,
+		link,
 		summary,
 		body,
 		description: [summary, body].filter(Boolean).join('\n')
@@ -396,8 +387,7 @@ export function createChangesetFile(
 	const optionalFields = [
 		`type: ${type}`,
 		`category: ${category}`,
-		issue ? `issue: ${issue}` : '',
-		pr ? `pr: ${pr}` : ''
+		link ? `link: ${link}` : ''
 	].filter(Boolean);
 
 	const content = `---\n${optionalFields.join('\n')}\n---\n\n${changeset.description.trim()}\n`;
@@ -414,7 +404,11 @@ export function slugify(input) {
 }
 
 function currentDate() {
-	return new Date().toISOString().slice(0, 10);
+	const now = new Date();
+	const year = now.getFullYear();
+	const month = String(now.getMonth() + 1).padStart(2, '0');
+	const day = String(now.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
 }
 
 function gitChangedFiles(root, args) {
