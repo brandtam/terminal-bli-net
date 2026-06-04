@@ -50,7 +50,11 @@ export default defineConfig(({ mode }) => {
 		test: {
 			// The "node" project: app + server code, jsdom/node with the Svelte plugin.
 			name: 'unit',
-			include: ['src/**/*.{test,spec}.{js,ts}', 'workers/**/*.{test,spec}.{js,ts}'],
+			include: [
+				'src/**/*.{test,spec}.{js,ts}',
+				'scripts/**/*.{test,spec}.{js,ts}',
+				'workers/**/*.{test,spec}.{js,ts}'
+			],
 			// The Durable Object suite needs the real Workers runtime — it runs in the
 			// Cloudflare pool project instead (workers/reminder-agent/vitest.config.ts).
 			exclude: [...configDefaults.exclude, 'workers/reminder-agent/test/**']
