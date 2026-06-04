@@ -23,7 +23,7 @@ a release instead of being deleted.
 ---
 type: minor
 category: Added
-issue: #123
+link: #123
 ---
 
 Add folder-addressable Finder windows
@@ -38,8 +38,7 @@ Add folder-addressable Finder windows
 | ---------- | -------- | -------------------------------------------------------------------------------------------------- |
 | `type`     | Yes      | SemVer impact: `major`, `minor`, or `patch`. Highest pending type wins the release bump.           |
 | `category` | No       | Changelog section. Defaults by type: `minor` -> `Added`, `patch` -> `Fixed`, `major` -> `Changed`. |
-| `issue`    | No       | GitHub issue, PR, or discussion link to include in the changelog entry.                            |
-| `pr`       | No       | Optional separate PR link when useful.                                                             |
+| `link`     | No       | A PR, issue, or discussion link to include in the changelog entry.                                 |
 
 ## Categories
 
