@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
 	assertCanArchiveChangesets,
 	bumpVersion,
@@ -18,8 +18,11 @@ import {
 	validatePendingChangesets
 } from './changesets.js';
 
+const createdRoots = [];
+
 function tempRoot() {
 	const root = mkdtempSync(join(tmpdir(), 'terminal-changesets-'));
+	createdRoots.push(root);
 	writeFileSync(
 		join(root, 'package.json'),
 		JSON.stringify({ name: 'terminal-bli-net', version: '1.0.0', private: true }, null, '\t') +
@@ -28,6 +31,12 @@ function tempRoot() {
 	);
 	return root;
 }
+
+afterEach(() => {
+	while (createdRoots.length) {
+		rmSync(createdRoots.pop(), { recursive: true, force: true });
+	}
+});
 
 function git(root, args) {
 	const result = spawnSync('git', args, {
@@ -62,7 +71,7 @@ describe('parseChangeset', () => {
 			`---
 type: minor
 category: Added
-issue: #12
+link: #12
 ---
 
 Add folder-addressable Finder windows
@@ -75,7 +84,7 @@ Add folder-addressable Finder windows
 			filename: 'add-finder-routing.md',
 			type: 'minor',
 			category: 'Added',
-			issue: '#12',
+			link: '#12',
 			summary: 'Add folder-addressable Finder windows',
 			body: '- Desktop folder aliases preserve their target folder'
 		});
@@ -243,8 +252,7 @@ describe('changelog generation', () => {
 					category: 'Fixed',
 					summary: 'Fix unknown document alerts',
 					body: '',
-					issue: '',
-					pr: ''
+					link: ''
 				},
 				{
 					filename: 'add.md',
@@ -252,8 +260,7 @@ describe('changelog generation', () => {
 					category: 'Added',
 					summary: 'Add release tooling',
 					body: '- Archives consumed changesets',
-					issue: '',
-					pr: ''
+					link: ''
 				}
 			],
 			{ date: '2026-06-03' }
