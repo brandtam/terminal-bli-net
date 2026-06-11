@@ -1,6 +1,7 @@
 packages: []
 allowBuilds:
   '@sveltejs/kit': set this to true or false
+  core-js-pure: false
   esbuild: true
   sharp: true
   svelte-preprocess: set this to true or false
@@ -9,3 +10,14 @@ minimumReleaseAgeExclude:
   - '@cloudflare/vitest-pool-workers@0.16.11'
   - miniflare@4.20260529.0
   - wrangler@4.96.0
+# Transitive security patches. The Cloudflare `agents` SDK auto-pulls an
+# optional peer subtree (@cloudflare/ai-chat, @cloudflare/codemode and the
+# Vercel AI / MCP SDKs) that the reminder agent never imports. These overrides
+# force the patched versions so the advisories clear without us touching code
+# that depends on them. Revisit when `agents` ships these patched upstream.
+overrides:
+  ai: '5.0.52'
+  '@ai-sdk/provider-utils': '>=3.0.98'
+  jsondiffpatch: '>=0.7.2'
+  '@modelcontextprotocol/sdk': '>=1.25.4'
+  cookie: '>=0.7.0'

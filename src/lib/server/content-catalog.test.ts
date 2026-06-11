@@ -60,10 +60,10 @@ function makeBot(overrides: Partial<Bot> = {}): Bot {
 
 function makeChannel(slot: NonNullable<Channel['schedule'][number]> = episodeSlot()): Channel {
 	return {
-		slug: 'ch1-nbc',
-		name: 'NBC Primetime',
+		slug: 'ch1-beacon',
+		name: 'Beacon Primetime',
 		number: 4,
-		network: 'NBC',
+		network: 'Beacon',
 		schedule: Array.from({ length: 48 }, () => slot)
 	};
 }
@@ -81,7 +81,7 @@ function makeModules(overrides: Partial<ContentCatalogModules> = {}): ContentCat
 			'/bots/seinfeld/jerry.json': makeBot()
 		},
 		channelModules: {
-			'/channels/ch1-nbc.json': makeChannel()
+			'/channels/ch1-beacon.json': makeChannel()
 		},
 		...overrides
 	};
@@ -144,7 +144,7 @@ describe('loadContentCatalog', () => {
 			createContentCatalog(
 				makeModules({
 					channelModules: {
-						'/channels/ch1-nbc.json': makeChannel({
+						'/channels/ch1-beacon.json': makeChannel({
 							showSlug: 'missing-show',
 							season: 1,
 							episode: 1
@@ -155,7 +155,7 @@ describe('loadContentCatalog', () => {
 		);
 
 		expect(error.message).toContain(
-			'channels/ch1-nbc.json schedule[0] references missing show "missing-show"'
+			'channels/ch1-beacon.json schedule[0] references missing show "missing-show"'
 		);
 	});
 
@@ -164,7 +164,7 @@ describe('loadContentCatalog', () => {
 			createContentCatalog(
 				makeModules({
 					channelModules: {
-						'/channels/ch1-nbc.json': makeChannel({
+						'/channels/ch1-beacon.json': makeChannel({
 							showSlug: 'seinfeld',
 							season: 9,
 							episode: 99
@@ -175,7 +175,7 @@ describe('loadContentCatalog', () => {
 		);
 
 		expect(error.message).toContain(
-			'channels/ch1-nbc.json schedule[0] references missing episode seinfeld S9E99'
+			'channels/ch1-beacon.json schedule[0] references missing episode seinfeld S9E99'
 		);
 	});
 
@@ -192,7 +192,7 @@ describe('loadContentCatalog', () => {
 						'/bots/seinfeld/duplicate.json': makeBot({ name: 'Duplicate Jerry' })
 					},
 					channelModules: {
-						'/channels/ch1-nbc.json': makeChannel(),
+						'/channels/ch1-beacon.json': makeChannel(),
 						'/channels/ch1-duplicate.json': makeChannel()
 					}
 				})
@@ -201,7 +201,7 @@ describe('loadContentCatalog', () => {
 
 		expect(error.message).toContain('duplicates show slug "seinfeld"');
 		expect(error.message).toContain('duplicates bot id "jerry"');
-		expect(error.message).toContain('duplicates channel slug "ch1-nbc"');
+		expect(error.message).toContain('duplicates channel slug "ch1-beacon"');
 	});
 
 	it('rejects bots whose group does not reference a loaded show', () => {

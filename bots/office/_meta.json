@@ -4,7 +4,7 @@
 	"description": "A documentary crew captures the everyday absurdity of life at a mid-size paper company.",
 	"setting": "Dunder Mifflin, Scranton, Pennsylvania",
 	"era": "Mid-2000s",
-	"image": "/bots/office/group-icon.png",
+	"image": "/bots/office/group-icon.svg",
 	"active": true,
 	"color": "#4a7c59",
 	"episodes": [

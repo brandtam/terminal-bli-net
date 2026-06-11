@@ -4,7 +4,7 @@
 	"description": "A show about nothing, set in a New York apartment where four friends overthink everything.",
 	"setting": "Upper West Side, New York City",
 	"era": "1990s",
-	"image": "/bots/seinfeld/group-icon.png",
+	"image": "/bots/seinfeld/group-icon.svg",
 	"active": true,
 	"color": "#f5c518",
 	"episodes": [

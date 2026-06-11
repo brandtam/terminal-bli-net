@@ -142,6 +142,12 @@ For manual release preparation, run `pnpm changeset:version -- --dry-run`, then
 `pnpm changeset:version -- --yes` from a clean working tree. Consumed changesets
 are archived under `.changeset/released/<version>/`.
 
+## Disclaimer
+
+Terminal is an unofficial, non-commercial fan/parody project. The chat characters are AI parodies inspired by fictional TV characters; they are not the real people, actors, or studios, and this project is not affiliated with or endorsed by any rights holder. All trademarks and character rights belong to their respective owners.
+
+The MIT license below covers the project's **own source code only** — not the names, likenesses, or marks of any third-party characters, shows, or networks referenced in the bundled sample content.
+
 ## License
 
 [MIT](LICENSE.md)

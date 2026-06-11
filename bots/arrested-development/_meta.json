@@ -4,7 +4,7 @@
 	"description": "A wealthy family loses everything and one son has no choice but to keep them all together.",
 	"setting": "Newport Beach and Sudden Valley, Orange County, California",
 	"era": "Mid-2000s",
-	"image": "/bots/arrested-development/group-icon.png",
+	"image": "/bots/arrested-development/group-icon.svg",
 	"active": true,
 	"color": "#c0392b",
 	"episodes": [
@@ -125,7 +125,7 @@
 			"episode": 7,
 			"title": "Prison Break-In",
 			"year": "2005",
-			"premise": "The family launches an elaborate scheme to break into prison to steal evidence, echoing the show within a show that FOX keeps threatening to replace them with."
+			"premise": "The family launches an elaborate scheme to break into prison to steal evidence, echoing the show within a show that network executives keep threatening to replace them with."
 		},
 		{
 			"season": 3,

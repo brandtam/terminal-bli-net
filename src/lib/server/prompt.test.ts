@@ -5,7 +5,7 @@ import type { Channel, Show } from '$lib/types';
 const basePrompt = 'You are George Costanza. Be neurotic.';
 
 function makeChannel(slug: string, schedule: Channel['schedule'][number][]): Channel {
-	return { slug, name: `Channel ${slug}`, number: 1, network: 'NBC', schedule };
+	return { slug, name: `Channel ${slug}`, number: 1, network: 'Beacon', schedule };
 }
 
 function makeShow(slug: string, episodes: Show['episodes']): Show {
