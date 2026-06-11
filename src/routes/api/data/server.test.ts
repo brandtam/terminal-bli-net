@@ -41,10 +41,10 @@ const publicCatalog: PublicContentCatalog = {
 	],
 	channels: [
 		{
-			slug: 'ch1-nbc',
-			name: 'NBC Primetime',
+			slug: 'ch1-beacon',
+			name: 'Beacon Primetime',
 			number: 4,
-			network: 'NBC',
+			network: 'Beacon',
 			schedule: Array.from({ length: 48 }, () => ({
 				showSlug: 'seinfeld',
 				season: 1,

@@ -47,17 +47,17 @@ describe('Channel type', () => {
 		);
 
 		const channel = {
-			slug: 'comedy-central',
-			name: 'Comedy Central',
+			slug: 'vault-comedy',
+			name: 'Vault Comedy',
 			number: 4,
-			network: 'Viacom',
+			network: 'The Vault',
 			schedule: slots
 		} satisfies Channel;
 
 		expect(channel.schedule).toHaveLength(48);
-		expect(channel.slug).toBe('comedy-central');
+		expect(channel.slug).toBe('vault-comedy');
 		expect(channel.number).toBe(4);
-		expect(channel.network).toBe('Viacom');
+		expect(channel.network).toBe('The Vault');
 		expect(channel.schedule[0]).toBeNull();
 		expect(channel.schedule[1]).toEqual({ showSlug: 'test-show', season: 1, episode: 1 });
 	});
