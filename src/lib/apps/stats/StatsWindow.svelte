@@ -16,7 +16,7 @@
 	<div class="row"><span>Marriages (Ross)</span><span class="n">3</span></div>
 	<div class="row"><span>Server uptime</span><span class="n">98.4%</span></div>
 	<div class="row"><span>Cease-and-desist letters</span><span class="n">0*</span></div>
-	<p class="footnote">* for now. love &amp; respect to NBCUniversal, etc.</p>
+	<p class="footnote">* for now. love &amp; respect to every fictional legal department, etc.</p>
 </div>
 
 <style>
