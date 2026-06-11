@@ -1,8 +1,8 @@
 {
 	"slug": "ch2-fox",
-	"name": "FOX Comedy",
+	"name": "Vixen Comedy",
 	"number": 5,
-	"network": "FOX",
+	"network": "Vixen",
 	"schedule": [
 		{
 			"showSlug": "star-trek-tng",

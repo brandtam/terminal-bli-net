@@ -1,8 +1,8 @@
 {
 	"slug": "ch3-cbs",
-	"name": "CBS Classic",
+	"name": "Optic Classics",
 	"number": 7,
-	"network": "CBS",
+	"network": "Optic",
 	"schedule": [
 		{
 			"showSlug": "mash",

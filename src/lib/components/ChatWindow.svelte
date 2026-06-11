@@ -116,6 +116,21 @@
 		return { name: null, text: content };
 	}
 
+	// Map a responder name (often just a first name) back to a cast member's
+	// avatar. Returns the group icon when the speaker can't be resolved.
+	function avatarFor(name: string | null): string | undefined {
+		if (name) {
+			const n = name.trim().toLowerCase();
+			const bot = castBots.find((b) => {
+				const full = b.name.toLowerCase();
+				const first = full.split(' ')[0];
+				return full === n || first === n || full.startsWith(n) || n.startsWith(first);
+			});
+			if (bot?.image) return bot.image;
+		}
+		return group?.image;
+	}
+
 	async function send() {
 		const text = input.trim();
 		if (!text || busy) return;
@@ -306,7 +321,11 @@
 	<div class="chat-container">
 		<div class="chat-header">
 			<div class="chat-avatar">
-				{showInitials}
+				{#if group?.image}
+					<img src={group.image} alt="" class="pixel-avatar" />
+				{:else}
+					{showInitials}
+				{/if}
 			</div>
 			<div class="who">
 				<span class="name">{showName.toUpperCase()}</span>
@@ -333,8 +352,12 @@
 					</div>
 				{:else}
 					{@const parsed = parseResponder(m.content)}
+					{@const avatar = avatarFor(parsed.name)}
 					<div class="bubble bot">
-						<span class="who-label">{parsed.name?.toUpperCase() ?? showName.toUpperCase()}</span>
+						<span class="who-label">
+							{#if avatar}<img src={avatar} alt="" class="label-avatar" />{/if}
+							{parsed.name?.toUpperCase() ?? showName.toUpperCase()}
+						</span>
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 						{@html renderMarkdown(parsed.text)}
 					</div>
@@ -342,14 +365,28 @@
 			{/each}
 			{#if streamingText}
 				<div class="bubble bot streaming">
-					<span class="who-label">{streamingBotName.toUpperCase()}</span>
+					<span class="who-label">
+						{#if avatarFor(streamingBotName)}<img
+								src={avatarFor(streamingBotName)}
+								alt=""
+								class="label-avatar"
+							/>{/if}
+						{streamingBotName.toUpperCase()}
+					</span>
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 					{@html renderMarkdown(streamingText)}
 				</div>
 			{/if}
 			{#if busy && !streamingText}
 				<div class="bubble bot typing">
-					<span class="who-label">{streamingBotName.toUpperCase()} is typing</span>
+					<span class="who-label">
+						{#if avatarFor(streamingBotName)}<img
+								src={avatarFor(streamingBotName)}
+								alt=""
+								class="label-avatar"
+							/>{/if}
+						{streamingBotName.toUpperCase()} is typing
+					</span>
 					<span class="dot">●</span><span class="dot">●</span><span class="dot">●</span>
 				</div>
 			{/if}
@@ -459,11 +496,26 @@
 		margin: 0;
 	}
 	.who-label {
-		display: block;
+		display: flex;
+		align-items: center;
+		gap: 5px;
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 8px;
 		margin-bottom: 4px;
 		opacity: 0.7;
+	}
+	.label-avatar {
+		width: 16px;
+		height: 16px;
+		border: 1px solid var(--ink);
+		image-rendering: pixelated;
+		flex-shrink: 0;
+	}
+	.pixel-avatar {
+		width: 100%;
+		height: 100%;
+		image-rendering: pixelated;
+		display: block;
 	}
 	.bubble.user {
 		align-self: flex-end;

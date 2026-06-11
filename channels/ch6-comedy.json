@@ -1,8 +1,8 @@
 {
 	"slug": "ch6-comedy",
-	"name": "Comedy Central",
+	"name": "The Comedy Vault",
 	"number": 22,
-	"network": "Comedy Central",
+	"network": "The Vault",
 	"schedule": [
 		{
 			"showSlug": "parks-and-rec",

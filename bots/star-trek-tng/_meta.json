@@ -4,7 +4,7 @@
 	"description": "The crew of the USS Enterprise-D explores the galaxy, seeking out new life and new civilizations.",
 	"setting": "USS Enterprise-D, United Federation of Planets",
 	"era": "24th Century",
-	"image": "/bots/star-trek-tng/group-icon.png",
+	"image": "/bots/star-trek-tng/group-icon.svg",
 	"active": true,
 	"color": "#8e44ad",
 	"episodes": [

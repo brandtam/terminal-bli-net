@@ -1,8 +1,8 @@
 {
 	"slug": "ch1-nbc",
-	"name": "NBC Primetime",
+	"name": "Beacon Primetime",
 	"number": 4,
-	"network": "NBC",
+	"network": "Beacon",
 	"schedule": [
 		{
 			"showSlug": "mash",

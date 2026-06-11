@@ -1,8 +1,8 @@
 {
 	"slug": "ch4-abc",
-	"name": "ABC Laughs",
+	"name": "Apex Laughs",
 	"number": 9,
-	"network": "ABC",
+	"network": "Apex",
 	"schedule": [
 		{
 			"showSlug": "arrested-development",

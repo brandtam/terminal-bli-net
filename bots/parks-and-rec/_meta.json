@@ -4,7 +4,7 @@
 	"description": "A mid-level bureaucrat in a small Indiana town tries to make her community better, one park at a time.",
 	"setting": "Pawnee Parks Department, Pawnee, Indiana",
 	"era": "2010s",
-	"image": "/bots/parks-and-rec/group-icon.png",
+	"image": "/bots/parks-and-rec/group-icon.svg",
 	"active": true,
 	"color": "#2e86de",
 	"episodes": [

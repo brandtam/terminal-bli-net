@@ -1,8 +1,8 @@
 {
 	"slug": "ch5-tbs",
-	"name": "TBS Superstation",
+	"name": "Titan Superstation",
 	"number": 13,
-	"network": "TBS",
+	"network": "Titan",
 	"schedule": [
 		{
 			"showSlug": "seinfeld",

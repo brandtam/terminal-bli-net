@@ -692,7 +692,11 @@ export const MANIFESTS = [
 				},
 				{
 					h: 'CREDITS',
-					body: "The Prevue Channel. NBC's 'Must See TV' graphics circa 1996. The font designers who made VT323 free."
+					body: 'The Prevue Channel. Those primetime must-see-TV promo bumpers circa 1996. The font designers who made VT323 free.'
+				},
+				{
+					h: 'FAN PROJECT',
+					body: 'Unofficial, non-commercial parody. The networks, channels, and shows listed here are fictional or parody references — not affiliated with or endorsed by any broadcaster, studio, or rights holder. All trademarks belong to their respective owners.'
 				}
 			]
 		},
@@ -817,6 +821,10 @@ export const MANIFESTS = [
 				{
 					h: 'CREDITS',
 					body: 'The cast and crew of every show we lovingly satirize. Anthropic, for the engine. You, for hanging out.'
+				},
+				{
+					h: 'NOT THE REAL THING',
+					body: 'Unofficial, non-commercial parody. Every character here is an AI parody inspired by a fictional TV character — not the real person, actor, or studio — and chatrbot is not affiliated with or endorsed by any rights holder. All trademarks and character rights belong to their respective owners.'
 				}
 			]
 		},
