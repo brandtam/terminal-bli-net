@@ -35,7 +35,8 @@ const KEYS = {
 	conversations: 'terminal.app.chatrbot.conversations',
 	timezone: 'terminal.os.timezone',
 	sessionId: 'terminal.os.session',
-	firstVisit: 'terminal.os.firstVisit'
+	firstVisit: 'terminal.os.firstVisit',
+	chatSessionToken: 'terminal.app.chatrbot.sessionToken'
 } as const;
 
 const LEGACY_KEYS: Record<string, string> = {
@@ -133,6 +134,23 @@ export function getSessionId(): string {
 	const id = crypto.randomUUID();
 	set(KEYS.sessionId, id);
 	return id;
+}
+
+/**
+ * The signed Turnstile session token (issued by /api/chat for ~30 min). Stored
+ * so subsequent messages — even across reloads — skip the human challenge. An
+ * expired token is harmless: the server rejects it and the client re-challenges.
+ */
+export function getChatSessionToken(): string | null {
+	return get<string | null>(KEYS.chatSessionToken, null) || null;
+}
+
+export function setChatSessionToken(token: string): void {
+	set(KEYS.chatSessionToken, token);
+}
+
+export function clearChatSessionToken(): void {
+	set(KEYS.chatSessionToken, '');
 }
 
 export function isFirstVisit(): boolean {

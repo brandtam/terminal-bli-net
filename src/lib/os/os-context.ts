@@ -58,6 +58,12 @@ export type AppContext = {
 	storage: AppStorageHandle;
 	capabilities?: AppCapabilities;
 	lifecycle?: AppLifecycle;
+	/**
+	 * Public Turnstile site key, read once from `$env/dynamic/public` at the app
+	 * edge and threaded here so leaf windows (the chat) need no env import.
+	 * Empty/undefined → Turnstile not configured (dev); the chat gate is bypassed.
+	 */
+	turnstileSiteKey?: string;
 };
 
 /**

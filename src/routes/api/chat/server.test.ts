@@ -3,6 +3,7 @@ import { POST } from './+server';
 import { streamCompletion } from '$lib/server/llm';
 import { canRespond, recordMessage } from '$lib/server/spend';
 import { getSpendLedger, actualCostUsd } from '$lib/server/spend-ledger';
+import { evaluateChatGate } from '$lib/server/turnstile';
 import { loadContentCatalog } from '$lib/server/content-catalog';
 import type { Bot, Channel, Show, TextChunk } from '$lib/types';
 import type { ContentCatalog } from '$lib/server/content-catalog';
@@ -24,6 +25,10 @@ vi.mock('$lib/server/spend-ledger', () => ({
 	actualCostUsd: vi.fn()
 }));
 
+vi.mock('$lib/server/turnstile', () => ({
+	evaluateChatGate: vi.fn()
+}));
+
 vi.mock('$lib/server/content-catalog', () => ({
 	loadContentCatalog: vi.fn()
 }));
@@ -33,6 +38,7 @@ const canRespondMock = vi.mocked(canRespond);
 const recordMessageMock = vi.mocked(recordMessage);
 const getSpendLedgerMock = vi.mocked(getSpendLedger);
 const actualCostUsdMock = vi.mocked(actualCostUsd);
+const evaluateChatGateMock = vi.mocked(evaluateChatGate);
 const loadContentCatalogMock = vi.mocked(loadContentCatalog);
 
 const reserveMock = vi.fn<SpendLedger['reserve']>();
@@ -169,6 +175,7 @@ describe('POST /api/chat', () => {
 		);
 		canRespondMock.mockResolvedValue({ allowed: true });
 		recordMessageMock.mockResolvedValue();
+		evaluateChatGateMock.mockResolvedValue({ ok: true });
 		getSpendLedgerMock.mockReturnValue(ledger);
 		reserveMock.mockResolvedValue({
 			ok: true,
@@ -361,6 +368,46 @@ describe('POST /api/chat', () => {
 		expect(text).toContain('transmitter');
 		expect(text).not.toContain('"type":"error"');
 		expect(streamCompletionMock).not.toHaveBeenCalled();
+	});
+
+	it('rejects with 401 and spends nothing when the Turnstile gate fails', async () => {
+		evaluateChatGateMock.mockResolvedValueOnce({ ok: false });
+
+		await expect(POST(makeEvent(makeBody('Asia/Kathmandu')))).rejects.toMatchObject({
+			status: 401
+		});
+
+		expect(reserveMock).not.toHaveBeenCalled();
+		expect(streamCompletionMock).not.toHaveBeenCalled();
+		expect(recordMessageMock).not.toHaveBeenCalled();
+	});
+
+	it('returns a freshly minted session token in the X-Chat-Session header', async () => {
+		evaluateChatGateMock.mockResolvedValueOnce({ ok: true, issuedSessionToken: 'sess-123' });
+
+		const response = await POST(makeEvent(makeBody('Asia/Kathmandu')));
+		await response.text();
+
+		expect(response.headers.get('X-Chat-Session')).toBe('sess-123');
+	});
+
+	it('forwards the body tokens to the gate and omits the header on a returning session', async () => {
+		const event = makeEvent(makeBody('Asia/Kathmandu'));
+		event.request = new Request('http://localhost/api/chat', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ ...makeBody('Asia/Kathmandu'), sessionToken: 'existing-session' })
+		});
+
+		const response = await POST(event);
+		await response.text();
+
+		expect(evaluateChatGateMock.mock.calls[0][1]).toMatchObject({
+			sessionToken: 'existing-session',
+			remoteIp: '127.0.0.1'
+		});
+		// A valid returning session mints no new token, so no header is set.
+		expect(response.headers.get('X-Chat-Session')).toBeNull();
 	});
 
 	it('rejects an invalid timezone before spend or LLM calls', async () => {

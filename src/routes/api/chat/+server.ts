@@ -4,6 +4,7 @@ import { streamCompletion, defaultModelFor } from '$lib/server/llm';
 import { canRespond, recordMessage } from '$lib/server/spend';
 import { getSpendLedger, actualCostUsd } from '$lib/server/spend-ledger';
 import type { CandidateProvider, DenialReason, SpendLedgerEnv } from '$lib/server/spend-ledger';
+import { evaluateChatGate } from '$lib/server/turnstile';
 import { loadContentCatalog } from '$lib/server/content-catalog';
 import { createChatSession, validateChatTimezone } from '$lib/server/chat-session';
 import type { ChatMessage, LlmProvider, TextChunk } from '$lib/types';
@@ -34,6 +35,8 @@ interface ChatEnv extends SpendLedgerEnv {
 	RATE_LIMIT_PER_HOUR?: string;
 	PROVIDER?: string;
 	MODEL?: string;
+	/** Turnstile secret (a deploy secret). Unset in dev → the gate fails open. */
+	TURNSTILE_SECRET?: string;
 }
 
 function parseProviderOrder(raw: string | undefined): LlmProvider[] {
@@ -137,7 +140,8 @@ function sseResponse(
 	hooks?: {
 		onUsage?: (chunk: TextChunk) => void;
 		onClose?: () => void | Promise<void>;
-	}
+	},
+	extraHeaders?: Record<string, string>
 ): Response {
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream({
@@ -173,7 +177,8 @@ function sseResponse(
 		headers: {
 			'Content-Type': 'text/event-stream',
 			'Cache-Control': 'no-cache',
-			Connection: 'keep-alive'
+			Connection: 'keep-alive',
+			...extraHeaders
 		}
 	});
 }
@@ -208,11 +213,20 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		throw error(400, 'Request body must be a JSON object');
 	}
 
-	const { botId, messages: rawMessages, timezone: rawTimezone } = body as Record<string, unknown>;
+	const {
+		botId,
+		messages: rawMessages,
+		timezone: rawTimezone,
+		turnstileToken: rawTurnstileToken,
+		sessionToken: rawSessionToken
+	} = body as Record<string, unknown>;
 
 	if (typeof botId !== 'string' || !botId) {
 		throw error(400, 'botId is required');
 	}
+
+	const turnstileToken = typeof rawTurnstileToken === 'string' ? rawTurnstileToken : undefined;
+	const sessionToken = typeof rawSessionToken === 'string' ? rawSessionToken : undefined;
 
 	const messages = validateMessages(rawMessages);
 	let timezone: string;
@@ -249,6 +263,22 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		throw error(429, gate.reason || 'Rate limited');
 	}
 
+	// Turnstile Gate — proof-of-human before any spend path (PRD decision 10).
+	// A valid session token skips the challenge; a fresh Turnstile token mints one.
+	const humanGate = await evaluateChatGate(
+		env.TURNSTILE_SECRET,
+		{ turnstileToken, sessionToken, remoteIp: ip },
+		new Date()
+	);
+	if (!humanGate.ok) {
+		// Not verified (or session expired) — the client runs the challenge and
+		// retries. A 401 stays invisible to the user, keeping the fiction intact.
+		throw error(401, 'Human verification required');
+	}
+	const sessionHeaders = humanGate.issuedSessionToken
+		? { 'X-Chat-Session': humanGate.issuedSessionToken }
+		: undefined;
+
 	const providers = resolveLlmProviders(env);
 	if (providers.length === 0) {
 		throw error(503, 'No LLM providers are configured');
@@ -268,7 +298,12 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 
 	if (!reservation.ok) {
 		// Ceiling hit — render a graceful in-voice "off the air" turn, not an error.
-		return sseResponse(messageStream(overBudgetMessage(reservation.reason)));
+		// Still return any freshly minted session token so a retry isn't re-challenged.
+		return sseResponse(
+			messageStream(overBudgetMessage(reservation.reason)),
+			undefined,
+			sessionHeaders
+		);
 	}
 
 	const admitted = providers.find((config) => config.provider === reservation.provider);
@@ -291,26 +326,30 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 	// even when the client disconnects mid-stream.
 	let actualUsd = 0;
 	let sawUsage = false;
-	return sseResponse(stream, {
-		onUsage: (chunk) => {
-			if (!chunk.usage) return;
-			sawUsage = true;
-			try {
-				actualUsd += actualCostUsd(chunk.usage);
-			} catch (e) {
-				console.error('[chat SSE] cost calculation failed:', e);
+	return sseResponse(
+		stream,
+		{
+			onUsage: (chunk) => {
+				if (!chunk.usage) return;
+				sawUsage = true;
+				try {
+					actualUsd += actualCostUsd(chunk.usage);
+				} catch (e) {
+					console.error('[chat SSE] cost calculation failed:', e);
+				}
+			},
+			onClose: async () => {
+				if (sawUsage) {
+					await ledger.reconcile(
+						reservation.reservationId,
+						{ provider: reservation.provider, usd: actualUsd },
+						new Date()
+					);
+				} else {
+					await ledger.release(reservation.reservationId, new Date());
+				}
 			}
 		},
-		onClose: async () => {
-			if (sawUsage) {
-				await ledger.reconcile(
-					reservation.reservationId,
-					{ provider: reservation.provider, usd: actualUsd },
-					new Date()
-				);
-			} else {
-				await ledger.release(reservation.reservationId, new Date());
-			}
-		}
-	});
+		sessionHeaders
+	);
 };

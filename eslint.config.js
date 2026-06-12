@@ -42,6 +42,7 @@ export default [
 				DragEvent: 'readonly',
 				PointerEvent: 'readonly',
 				DataTransfer: 'readonly',
+				FormData: 'readonly',
 				DurableObjectNamespace: 'readonly',
 				DurableObjectState: 'readonly',
 				RequestInit: 'readonly',
