@@ -9,7 +9,16 @@
 	// "kv_namespaces": [{ "binding": "KV", "id": "YOUR_KV_NAMESPACE_ID" }],
 	// ReminderAgent runs as a separate Worker because Cloudflare Pages cannot
 	// export Durable Object classes from the Pages adapter output.
-	"services": [{ "binding": "REMINDER_SERVICE", "service": "terminal-reminder-agent" }],
+	// REMINDER_SERVICE → the reminder Worker's subscribe/confirm endpoints.
+	// SPEND_LEDGER → the same Worker's /ledger/* endpoints, which front the single
+	// global SpendLedgerDO that enforces every dollar ceiling exactly (docs/adr/0005).
+	"services": [
+		{ "binding": "REMINDER_SERVICE", "service": "terminal-reminder-agent" },
+		{ "binding": "SPEND_LEDGER", "service": "terminal-reminder-agent" }
+	],
+	// Spend Ledger ceilings — keep ANTHROPIC/OPENAI monthly caps in step with the
+	// reminder Worker's vars (the DO reads its limits from the Worker's env, not these).
+	// DAILY_SPEND_CAP_USD / DAILY_REQUEST_CAP default to $3 / 5000 when unset.
 	// Secrets (set via `wrangler secret put`):
 	// ANTHROPIC_API_KEY and/or OPENAI_API_KEY.
 	//
@@ -17,7 +26,15 @@
 	// once its monthly spend reaches its provider-specific cap.
 	// Claude options:  claude-haiku-4-5-20251001 (default), claude-sonnet-4-6
 	// OpenAI options:  gpt-4o-mini (default), gpt-4o, gpt-4.1-mini, gpt-4.1
+	// Turnstile Gate (proof-of-human in front of chat spend). To ACTIVATE:
+	//   1. uncomment PUBLIC_TURNSTILE_SITE_KEY below (the public widget key), and
+	//   2. set the secret (this is a Pages project, not a Worker):
+	//        wrangler pages secret put TURNSTILE_SECRET
+	// Activate both together — a live site key without the server secret would
+	// re-challenge every message. Until then the gate fails open (no challenge).
 	"vars": {
+		"PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAADjFy1qjbUZS5DgP",
+		"SPEND_LEDGER_REQUIRED": "true",
 		"LLM_PROVIDER_ORDER": "openai,claude",
 		"OPENAI_MODEL": "gpt-4o-mini",
 		"ANTHROPIC_MODEL": "claude-haiku-4-5-20251001",

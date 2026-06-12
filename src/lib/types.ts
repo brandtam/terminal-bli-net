@@ -52,7 +52,8 @@ export interface ChatMessage {
 	content: string;
 }
 
-export type LlmProvider = 'claude' | 'openai';
+export const LLM_PROVIDERS = ['claude', 'openai'] as const;
+export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
 export interface LlmTokenUsage {
 	provider: LlmProvider;

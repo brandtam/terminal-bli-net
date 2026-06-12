@@ -5,7 +5,12 @@
 	import { setAppContext, type WindowHandle } from '$lib/os/os-context';
 	import { resolveWindow } from '$lib/os/window-host';
 
-	let { win, os, fs }: { win: WindowState; os: OsApiClass; fs: TerminalFS } = $props();
+	let {
+		win,
+		os,
+		fs,
+		turnstileSiteKey = ''
+	}: { win: WindowState; os: OsApiClass; fs: TerminalFS; turnstileSiteKey?: string } = $props();
 
 	// win.id is the stable key for this window (the {#each} is keyed by it), but
 	// the window object is reassigned on focus/move/resize — so read through it
@@ -44,7 +49,10 @@
 			status: 'reserved'
 		},
 		capabilities: {},
-		lifecycle: {}
+		lifecycle: {},
+		get turnstileSiteKey() {
+			return turnstileSiteKey;
+		}
 	});
 </script>
 

@@ -6,6 +6,11 @@ declare global {
 			env: {
 				KV: KVNamespace;
 				REMINDER_SERVICE?: Fetcher;
+				SPEND_LEDGER?: Fetcher;
+				SPEND_LEDGER_REQUIRED?: string;
+				DAILY_SPEND_CAP_USD?: string;
+				DAILY_REQUEST_CAP?: string;
+				TURNSTILE_SECRET?: string;
 				REMINDER_SUBSCRIBE_RATE_LIMIT_PER_HOUR?: string;
 				ANTHROPIC_API_KEY?: string;
 				OPENAI_API_KEY?: string;
@@ -18,6 +23,9 @@ declare global {
 				PROVIDER?: string;
 				MONTHLY_SPEND_CAP?: string;
 				MODEL?: string;
+			};
+			context?: {
+				waitUntil(promise: Promise<unknown>): void;
 			};
 		}
 	}

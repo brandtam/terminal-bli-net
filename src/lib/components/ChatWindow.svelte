@@ -1,7 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { ChatMessage, TextChunk } from '$lib/types';
-	import { loadConversations, saveConversation, getSessionId } from '$lib/persistence';
+	import {
+		loadConversations,
+		saveConversation,
+		getSessionId,
+		getChatSessionToken,
+		setChatSessionToken,
+		clearChatSessionToken
+	} from '$lib/persistence';
+	import { getTurnstileToken } from '$lib/turnstile-client';
 	import { formatTimeUntil, isShowOnAir, minutesUntilSlotEnd } from '$lib/schedule';
 	import { getAppContext } from '$lib/os/os-context';
 	import Dropdown from './Dropdown.svelte';
@@ -12,7 +20,7 @@
 	// window-id (`chat:<slug>` → ctx.window.args.slug). Everything else — the cast and
 	// the ticking on-air state — is derived off the live OS, so a window left
 	// open keeps counting down as os.now advances. No props bag ever freezes it.
-	const { os, window: appWindow } = getAppContext();
+	const { os, window: appWindow, turnstileSiteKey } = getAppContext();
 	const showSlug = appWindow.args.slug ?? '';
 
 	const group = $derived(os.groups.find((g) => g.slug === showSlug));
@@ -151,22 +159,42 @@
 		messages = [...messages, userMsg];
 
 		try {
-			const response = await fetch('/api/chat', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					botId: respondingBot.id,
-					messages: messages.slice(-20).map((m) => {
-						if (m.role === 'assistant') {
-							const { text: stripped } = parseResponder(m.content);
-							return { role: m.role, content: stripped };
-						}
-						return m;
-					}),
-					sessionId: getSessionId(),
-					timezone: os.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
-				})
-			});
+			const postChat = (turnstileToken: string | null, sessionToken: string | null) =>
+				fetch('/api/chat', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						botId: respondingBot.id,
+						messages: messages.slice(-20).map((m) => {
+							if (m.role === 'assistant') {
+								const { text: stripped } = parseResponder(m.content);
+								return { role: m.role, content: stripped };
+							}
+							return m;
+						}),
+						sessionId: getSessionId(),
+						timezone: os.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+						...(turnstileToken ? { turnstileToken } : {}),
+						...(sessionToken ? { sessionToken } : {})
+					})
+				});
+
+			// Turnstile Gate: reuse a stored session token, else solve a challenge.
+			const storedSession = getChatSessionToken();
+			let response = await postChat(
+				storedSession ? null : await getTurnstileToken(turnstileSiteKey),
+				storedSession
+			);
+
+			// 401 = no valid session (or it expired) → run the challenge once and retry.
+			if (response.status === 401) {
+				clearChatSessionToken();
+				response = await postChat(await getTurnstileToken(turnstileSiteKey), null);
+			}
+
+			// Persist any freshly minted session token so later messages skip the check.
+			const issuedSession = response.headers.get('X-Chat-Session');
+			if (issuedSession) setChatSessionToken(issuedSession);
 
 			if (!response.ok) {
 				const err = await response.text();

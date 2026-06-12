@@ -1,8 +1,5 @@
-/// <reference types="@cloudflare/workers-types" />
-/* eslint-disable no-undef */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { TextChunk } from '$lib/types';
-import { monthlySpendKey } from './spend';
 
 // --- Anthropic mock ---
 const mockAnthropicMessagesStream = vi.fn();
@@ -46,35 +43,6 @@ async function collectChunks(stream: ReadableStream<TextChunk>): Promise<TextChu
 		if (value) chunks.push(value);
 	}
 	return chunks;
-}
-
-function createMockKV(initial?: Record<string, string>): KVNamespace {
-	const store = new Map(Object.entries(initial ?? {}));
-	return {
-		async get(key: string): Promise<string | null> {
-			return store.get(key) ?? null;
-		},
-		async put(key: string, value: string): Promise<void> {
-			store.set(key, value);
-		},
-		async delete(key: string): Promise<void> {
-			store.delete(key);
-		},
-		async list() {
-			return {
-				keys: [],
-				list_complete: true,
-				cacheStatus: null
-			} as unknown as KVNamespaceListResult<unknown, string>;
-		},
-		async getWithMetadata() {
-			return {
-				value: null,
-				metadata: null,
-				cacheStatus: null
-			} as unknown as KVNamespaceGetWithMetadataResult<string, unknown>;
-		}
-	} as unknown as KVNamespace;
 }
 
 describe('streamCompletion', () => {
@@ -275,7 +243,7 @@ describe('streamCompletion', () => {
 			expect(chunks).toHaveLength(1);
 			expect(chunks[0]).toEqual({
 				type: 'error',
-				error: 'All LLM providers are unavailable or over budget'
+				error: 'All LLM providers are unavailable'
 			});
 		});
 
@@ -535,40 +503,6 @@ describe('streamCompletion', () => {
 			]);
 		});
 
-		it('skips a provider that is over its monthly budget', async () => {
-			const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-			mockAnthropicMessagesStream.mockReturnValue({
-				on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-					if (!handlers[event]) handlers[event] = [];
-					handlers[event].push(handler);
-				})
-			});
-
-			const { streamCompletion } = await import('./llm');
-
-			const stream = await streamCompletion({
-				systemPrompt: 'Test',
-				messages: [{ role: 'user', content: 'Hi' }],
-				kv: createMockKV({ [monthlySpendKey('openai')]: '25' }),
-				providers: [
-					{ provider: 'openai', apiKey: 'openai-key', model: 'gpt-4o-mini', monthlyBudget: 25 },
-					{ provider: 'claude', apiKey: 'anthropic-key', model: 'claude-haiku-4-5-20251001' }
-				]
-			});
-			const chunksPromise = collectChunks(stream);
-
-			await new Promise((r) => setTimeout(r, 0));
-			for (const h of handlers['text'] ?? []) h('Budget fallback');
-			for (const h of handlers['finalMessage'] ?? [])
-				h({ usage: { input_tokens: 8, output_tokens: 3 } });
-			for (const h of handlers['end'] ?? []) h();
-
-			const chunks = await chunksPromise;
-			expect(mockOpenAIChatCompletionsCreate).not.toHaveBeenCalled();
-			expect(mockAnthropicMessagesStream).toHaveBeenCalled();
-			expect(chunks[0]).toEqual({ type: 'text', text: 'Budget fallback' });
-		});
-
 		it('keeps partial text, appends a notice, and retries once after mid-stream failure', async () => {
 			mockOpenAIChatCompletionsCreate.mockResolvedValue({
 				[Symbol.asyncIterator]: async function* () {
@@ -660,22 +594,21 @@ describe('streamCompletion', () => {
 			expect(chunks).toHaveLength(3);
 		});
 
-		it('returns a clean error when all providers are unavailable or over budget', async () => {
+		it('returns a clean error when every provider attempt fails with a transient error', async () => {
+			mockOpenAIChatCompletionsCreate.mockRejectedValue(
+				Object.assign(new Error('rate limit'), { status: 429 })
+			);
+
 			const { streamCompletion } = await import('./llm');
 
 			const stream = await streamCompletion({
 				systemPrompt: 'Test',
 				messages: [{ role: 'user', content: 'Hi' }],
-				kv: createMockKV({ [monthlySpendKey('openai')]: '25' }),
-				providers: [
-					{ provider: 'openai', apiKey: 'openai-key', model: 'gpt-4o-mini', monthlyBudget: 25 }
-				]
+				providers: [{ provider: 'openai', apiKey: 'openai-key', model: 'gpt-4o-mini' }]
 			});
 
 			const chunks = await collectChunks(stream);
-			expect(chunks).toEqual([
-				{ type: 'error', error: 'All LLM providers are unavailable or over budget' }
-			]);
+			expect(chunks).toEqual([{ type: 'error', error: 'All LLM providers are unavailable' }]);
 		});
 	});
 });

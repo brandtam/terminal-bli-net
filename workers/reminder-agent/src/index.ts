@@ -1,14 +1,24 @@
 /// <reference types="@cloudflare/workers-types" />
 import { getAgentByName } from 'agents';
 import { ReminderAgent, type ReminderAgentEnv } from '../../../src/lib/server/reminder-agent';
+import {
+	SpendLedgerDO,
+	type SpendLedgerDOEnv
+} from '../../../src/lib/server/spend-ledger/do-ledger';
+import { SPEND_LEDGER_ROUTES } from '../../../src/lib/server/spend-ledger/do-adapter';
+import type { ReconcileInput, ReserveRequest } from '../../../src/lib/server/spend-ledger/types';
 
-export { ReminderAgent };
+export { ReminderAgent, SpendLedgerDO };
 
 const REMINDER_AGENT_INSTANCE = 'global';
+// One global Spend Ledger instance is the whole point — it's the serialization
+// point that makes the dollar ceilings exact (see docs/adr/0005).
+const SPEND_LEDGER_INSTANCE = 'global';
 const MAX_SUBSCRIPTIONS = 50;
 
-export interface ReminderWorkerEnv extends ReminderAgentEnv {
+export interface ReminderWorkerEnv extends ReminderAgentEnv, SpendLedgerDOEnv {
 	REMINDER_AGENT: DurableObjectNamespace<ReminderAgent>;
+	SPEND_LEDGER_DO: DurableObjectNamespace<SpendLedgerDO>;
 }
 
 export interface SubscribePayload {
@@ -169,6 +179,64 @@ export async function handleEmail(
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Spend Ledger RPC — the Pages app reaches the global ledger through these
+// endpoints over its SPEND_LEDGER service binding. Each request is forwarded to
+// the single global SpendLedgerDO instance, where the exact accounting lives.
+// ---------------------------------------------------------------------------
+
+interface LedgerCallBody {
+	req?: unknown;
+	reservationId?: unknown;
+	actual?: unknown;
+	nowMs?: unknown;
+}
+
+function ledgerStub(env: ReminderWorkerEnv) {
+	return env.SPEND_LEDGER_DO.get(env.SPEND_LEDGER_DO.idFromName(SPEND_LEDGER_INSTANCE));
+}
+
+export async function handleLedger(request: Request, env: ReminderWorkerEnv): Promise<Response> {
+	if (request.method !== 'POST') {
+		return json({ error: 'Method not allowed' }, { status: 405 });
+	}
+
+	let body: LedgerCallBody;
+	try {
+		body = (await request.json()) as LedgerCallBody;
+	} catch {
+		return json({ error: 'Invalid JSON body' }, { status: 400 });
+	}
+
+	if (typeof body.nowMs !== 'number' || !Number.isFinite(body.nowMs)) {
+		return json({ error: 'nowMs is required' }, { status: 400 });
+	}
+
+	const nowMs = body.nowMs;
+	const path = new URL(request.url).pathname;
+	const stub = ledgerStub(env);
+
+	try {
+		switch (path) {
+			case SPEND_LEDGER_ROUTES.reserve:
+				return json(await stub.reserve(body.req as ReserveRequest, nowMs));
+			case SPEND_LEDGER_ROUTES.reconcile:
+				await stub.reconcile(String(body.reservationId), body.actual as ReconcileInput, nowMs);
+				return json({ ok: true });
+			case SPEND_LEDGER_ROUTES.release:
+				await stub.release(String(body.reservationId), nowMs);
+				return json({ ok: true });
+			case SPEND_LEDGER_ROUTES.status:
+				return json(await stub.status(nowMs));
+			default:
+				return json({ error: 'Not found' }, { status: 404 });
+		}
+	} catch (err) {
+		console.error('[reminder-worker] spend ledger call failed', err);
+		return json({ error: 'Spend ledger failed' }, { status: 500 });
+	}
+}
+
 export default {
 	async fetch(request, env) {
 		const url = new URL(request.url);
@@ -183,6 +251,10 @@ export default {
 
 		if (url.pathname === '/confirm') {
 			return handleConfirm(request, env);
+		}
+
+		if (url.pathname.startsWith('/ledger/')) {
+			return handleLedger(request, env);
 		}
 
 		return json({ error: 'Not found' }, { status: 404 });

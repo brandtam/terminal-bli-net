@@ -4,12 +4,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
 	canRespond,
 	calculateTokenCostUsd,
-	getMonthlySpend,
-	isProviderOverBudget,
-	monthlySpendKey,
 	rateLimitKey,
 	recordMessage,
-	recordTokens,
 	type SpendConfig
 } from './spend';
 import type { LlmTokenUsage } from '$lib/types';
@@ -73,18 +69,6 @@ function usage(overrides?: Partial<LlmTokenUsage>): LlmTokenUsage {
 
 const TEST_IP = '203.0.113.42';
 
-describe('monthlySpendKey', () => {
-	it('formats as spend:provider:YYYY-MM', () => {
-		const key = monthlySpendKey('openai', new Date('2026-05-23T14:00:00Z'));
-		expect(key).toBe('spend:openai:2026-05');
-	});
-
-	it('zero-pads single-digit months', () => {
-		const key = monthlySpendKey('claude', new Date('2026-01-05T00:00:00Z'));
-		expect(key).toBe('spend:claude:2026-01');
-	});
-});
-
 describe('rateLimitKey', () => {
 	it('formats as rate:IP:YYYY-MM-DD-HH', () => {
 		const key = rateLimitKey(TEST_IP, new Date('2026-05-23T14:30:00Z'));
@@ -116,13 +100,6 @@ describe('canRespond', () => {
 		const result = await canRespond(config, TEST_IP);
 		expect(result.allowed).toBe(false);
 		expect(result.reason).toContain('Rate limit exceeded');
-	});
-
-	it('does not treat monthly spend as a global kill switch', async () => {
-		const config = defaultConfig(kv);
-		kv._store.set(monthlySpendKey('openai'), '1000');
-		const result = await canRespond(config, TEST_IP);
-		expect(result.allowed).toBe(true);
 	});
 });
 
@@ -178,58 +155,6 @@ describe('calculateTokenCostUsd', () => {
 	});
 });
 
-describe('recordTokens', () => {
-	let kv: MockKV;
-
-	beforeEach(() => {
-		kv = createMockKV();
-	});
-
-	it('creates the provider monthly key when none exists', async () => {
-		await recordTokens(kv, usage());
-		const spend = await getMonthlySpend(kv, 'openai');
-		expect(spend).toBeCloseTo(1.35, 5);
-	});
-
-	it('increments an existing provider monthly spend', async () => {
-		kv._store.set(monthlySpendKey('openai'), '10');
-		await recordTokens(kv, usage());
-		const spend = await getMonthlySpend(kv, 'openai');
-		expect(spend).toBeCloseTo(11.35, 5);
-	});
-
-	it('records spend against the provider actually used', async () => {
-		await recordTokens(kv, usage({ provider: 'claude', model: 'claude-haiku-4-5-20251001' }));
-
-		expect(await getMonthlySpend(kv, 'openai')).toBe(0);
-		expect(await getMonthlySpend(kv, 'claude')).toBeCloseTo(11, 5);
-	});
-
-	it('handles zero tokens gracefully', async () => {
-		await recordTokens(kv, usage({ inputTokens: 0, outputTokens: 0 }));
-		const spend = await getMonthlySpend(kv, 'openai');
-		expect(spend).toBe(0);
-	});
-});
-
-describe('isProviderOverBudget', () => {
-	let kv: MockKV;
-
-	beforeEach(() => {
-		kv = createMockKV();
-	});
-
-	it('returns false below the provider budget', async () => {
-		kv._store.set(monthlySpendKey('openai'), '24.99');
-		await expect(isProviderOverBudget(kv, 'openai', 25)).resolves.toBe(false);
-	});
-
-	it('returns true at the provider budget', async () => {
-		kv._store.set(monthlySpendKey('openai'), '25');
-		await expect(isProviderOverBudget(kv, 'openai', 25)).resolves.toBe(true);
-	});
-});
-
 describe('recordMessage', () => {
 	let kv: MockKV;
 
@@ -258,24 +183,5 @@ describe('recordMessage', () => {
 
 		expect(kv._store.get(rateLimitKey(TEST_IP))).toBe('2');
 		expect(kv._store.get(rateLimitKey(ip2))).toBe('1');
-	});
-});
-
-describe('getMonthlySpend', () => {
-	let kv: MockKV;
-
-	beforeEach(() => {
-		kv = createMockKV();
-	});
-
-	it('returns 0 when no spend has been recorded', async () => {
-		const spend = await getMonthlySpend(kv, 'openai');
-		expect(spend).toBe(0);
-	});
-
-	it('returns the stored provider spend value', async () => {
-		kv._store.set(monthlySpendKey('openai'), '42.75');
-		const spend = await getMonthlySpend(kv, 'openai');
-		expect(spend).toBe(42.75);
 	});
 });

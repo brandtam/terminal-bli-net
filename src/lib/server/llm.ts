@@ -1,11 +1,21 @@
 /* eslint-disable no-undef */
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import type { ChatMessage, LlmProvider, LlmTokenUsage, TextChunk } from '$lib/types';
-import { getModelPricing, isProviderOverBudget } from './spend';
+import {
+	LLM_PROVIDERS,
+	type ChatMessage,
+	type LlmProvider,
+	type LlmTokenUsage,
+	type TextChunk
+} from '$lib/types';
+import { getModelPricing } from './spend';
 
 const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
 const OPENAI_FALLBACK_MODEL = 'gpt-4o-mini';
+const DEFAULT_MODELS: Record<LlmProvider, string> = {
+	claude: CLAUDE_FALLBACK_MODEL,
+	openai: OPENAI_FALLBACK_MODEL
+};
 const MID_STREAM_RETRY_NOTICE =
 	'\n\n[signal drops for a beat]\n\nOops, brain fart... let me try that again.\n\n';
 
@@ -13,7 +23,6 @@ export interface LlmProviderConfig {
 	provider: LlmProvider;
 	apiKey: string;
 	model?: string;
-	monthlyBudget?: number;
 }
 
 export interface StreamCompletionParams {
@@ -27,14 +36,12 @@ export interface StreamCompletionParams {
 		model?: string;
 	};
 	apiKey?: string;
-	kv?: KVNamespace;
 }
 
 interface ProviderAttempt {
 	provider: LlmProvider;
 	model: string;
 	apiKey: string;
-	monthlyBudget?: number;
 }
 
 interface ProviderStreamParams {
@@ -49,8 +56,12 @@ interface ProviderStreamParams {
 	};
 }
 
-function defaultModelFor(provider: LlmProvider): string {
-	return provider === 'openai' ? OPENAI_FALLBACK_MODEL : CLAUDE_FALLBACK_MODEL;
+export function defaultModelFor(provider: LlmProvider): string {
+	return DEFAULT_MODELS[provider];
+}
+
+export function isLlmProvider(value: string): value is LlmProvider {
+	return (LLM_PROVIDERS as readonly string[]).includes(value);
 }
 
 function isRetryableProviderError(err: unknown): boolean {
@@ -102,10 +113,12 @@ function usageOnlyChunk(usage: LlmTokenUsage): TextChunk {
 	};
 }
 
-function estimateTokens(text: string): number {
+function estimateTokens(text: string, maxTokens?: number): number {
 	const normalized = text.trim();
 	if (!normalized) return 0;
-	return Math.max(1, Math.ceil(normalized.length / 4));
+	const byteUpperBound = new TextEncoder().encode(normalized).length;
+	const capped = maxTokens === undefined ? byteUpperBound : Math.min(byteUpperBound, maxTokens);
+	return Math.max(1, capped);
 }
 
 function estimateFailedStreamUsage(
@@ -113,18 +126,30 @@ function estimateFailedStreamUsage(
 	attempt: ProviderAttempt,
 	outputText: string
 ): LlmTokenUsage | null {
-	const outputTokens = estimateTokens(outputText);
+	const outputTokens = estimateTokens(outputText, params.options?.maxTokens);
 	if (outputTokens === 0) return null;
 
 	const inputText = [
 		params.systemPrompt,
 		...params.messages.map((message) => `${message.role}: ${message.content}`)
 	].join('\n');
+	const inputTokens = estimateTokens(inputText);
+
+	if (attempt.provider === 'claude') {
+		return {
+			provider: attempt.provider,
+			model: attempt.model,
+			inputTokens: 0,
+			cacheCreationInputTokens: inputTokens,
+			outputTokens,
+			estimated: true
+		};
+	}
 
 	return {
 		provider: attempt.provider,
 		model: attempt.model,
-		inputTokens: estimateTokens(inputText),
+		inputTokens,
 		outputTokens,
 		estimated: true
 	};
@@ -297,28 +322,6 @@ function streamProviderCompletion(
 	return streamAnthropicCompletion(params);
 }
 
-async function isAttemptAvailable(
-	attempt: ProviderAttempt,
-	kv: KVNamespace | undefined
-): Promise<boolean> {
-	if (!kv || attempt.monthlyBudget === undefined) return true;
-	return !(await isProviderOverBudget(kv, attempt.provider, attempt.monthlyBudget));
-}
-
-async function nextAvailableAttempt(
-	attempts: ProviderAttempt[],
-	startIndex: number,
-	kv: KVNamespace | undefined
-): Promise<{ attempt: ProviderAttempt; index: number } | null> {
-	for (let i = startIndex; i < attempts.length; i += 1) {
-		const attempt = attempts[i];
-		if (await isAttemptAvailable(attempt, kv)) {
-			return { attempt, index: i };
-		}
-	}
-	return null;
-}
-
 type PipeResult = 'success' | 'retry-pre-token' | 'fatal-pre-token' | 'retry-mid-stream' | 'stop';
 
 async function pipeProviderAttempt(
@@ -385,20 +388,10 @@ export async function streamCompletion(
 
 	return new ReadableStream<TextChunk>({
 		async start(controller) {
-			let nextIndex = 0;
-
-			while (true) {
-				const next = await nextAvailableAttempt(attempts, nextIndex, params.kv);
-				if (!next) {
-					controller.enqueue({
-						type: 'error',
-						error: 'All LLM providers are unavailable or over budget'
-					});
-					controller.close();
-					return;
-				}
-
-				const result = await pipeProviderAttempt(controller, params, next.attempt, false);
+			// The chat route only passes attempts that already have Spend Ledger holds,
+			// so this loop may fail over without opening an unreserved spend path.
+			for (let index = 0; index < attempts.length; index += 1) {
+				const result = await pipeProviderAttempt(controller, params, attempts[index], false);
 				if (result === 'success' || result === 'fatal-pre-token' || result === 'stop') {
 					controller.close();
 					return;
@@ -406,16 +399,18 @@ export async function streamCompletion(
 
 				if (result === 'retry-mid-stream') {
 					controller.enqueue({ type: 'text', text: MID_STREAM_RETRY_NOTICE });
-					const retry = await nextAvailableAttempt(attempts, next.index + 1, params.kv);
+					const retry = attempts[index + 1];
 					if (retry) {
-						await pipeProviderAttempt(controller, params, retry.attempt, true);
+						await pipeProviderAttempt(controller, params, retry, true);
 					}
 					controller.close();
 					return;
 				}
-
-				nextIndex = next.index + 1;
+				// result === 'retry-pre-token' → fall through to the next attempt.
 			}
+
+			controller.enqueue({ type: 'error', error: 'All LLM providers are unavailable' });
+			controller.close();
 		}
 	});
 }

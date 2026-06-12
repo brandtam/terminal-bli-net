@@ -47,6 +47,10 @@
 	// has no app-specific render branch — adding an app is a manifest entry only.
 	const isFlatWindow = (id: string) => matchWindow(id) !== null;
 
+	// Public Turnstile site key, read at the app edge (routes/+page.svelte) and
+	// handed to each WindowHost so the chat window can reach it via context.
+	let { turnstileSiteKey = '' }: { turnstileSiteKey?: string } = $props();
+
 	let booted = $state(false);
 	let os = $state<OsApiClass>(undefined!);
 	let terminalFs = $state<TerminalFS>(undefined!);
@@ -514,7 +518,7 @@
 						     render branches. The {:else} arm is unreachable for any live id
 						     (matchWindow gates isFlatWindow); it only catches a stale/unknown
 						     saved id that slipped past the restore filter. -->
-						<WindowHost win={w} {os} fs={terminalFs} />
+						<WindowHost win={w} {os} fs={terminalFs} {turnstileSiteKey} />
 					{:else}
 						<div class="window-content">
 							<p>Coming soon...</p>
