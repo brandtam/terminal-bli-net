@@ -337,6 +337,33 @@ describe('POST /api/chat', () => {
 		expect(releaseMock).not.toHaveBeenCalled();
 	});
 
+	it('renders the monthly "channel dark" message when every provider is over its monthly cap', async () => {
+		reserveMock.mockResolvedValueOnce({
+			ok: false,
+			reason: 'monthly-provider',
+			detail: 'All candidate providers are over their monthly cap.'
+		});
+
+		const text = await (await POST(makeEvent(makeBody('Asia/Kathmandu')))).text();
+		expect(text).toContain('gone dark for the month');
+		expect(streamCompletionMock).not.toHaveBeenCalled();
+	});
+
+	it('renders the "transmitter dropped out" message when the ledger fails closed', async () => {
+		reserveMock.mockResolvedValueOnce({
+			ok: false,
+			reason: 'ledger-unavailable',
+			detail: 'Spend ledger is unreachable; refusing spend.'
+		});
+
+		const response = await POST(makeEvent(makeBody('Asia/Kathmandu')));
+		const text = await response.text();
+		expect(response.status).toBe(200);
+		expect(text).toContain('transmitter');
+		expect(text).not.toContain('"type":"error"');
+		expect(streamCompletionMock).not.toHaveBeenCalled();
+	});
+
 	it('rejects an invalid timezone before spend or LLM calls', async () => {
 		await expect(POST(makeEvent(makeBody('Not/A_Zone')))).rejects.toMatchObject({
 			status: 400
