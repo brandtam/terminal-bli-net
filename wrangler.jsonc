@@ -33,7 +33,7 @@
 	// Activate both together — a live site key without the server secret would
 	// re-challenge every message. Until then the gate fails open (no challenge).
 	"vars": {
-		// "PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAADjFy1qjbUZS5DgP",
+		"PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAADjFy1qjbUZS5DgP",
 		"LLM_PROVIDER_ORDER": "openai,claude",
 		"OPENAI_MODEL": "gpt-4o-mini",
 		"ANTHROPIC_MODEL": "claude-haiku-4-5-20251001",
