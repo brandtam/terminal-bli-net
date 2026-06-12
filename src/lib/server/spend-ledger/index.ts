@@ -14,6 +14,7 @@ export { LedgerCore, type LedgerState } from './ledger-core';
 export { InMemorySpendLedger } from './in-memory-ledger';
 export { DurableObjectSpendLedger, SPEND_LEDGER_ROUTES } from './do-adapter';
 export { FailClosedSpendLedger } from './fail-closed-ledger';
+export { logLedgerEvent, type LedgerEvent, type LedgerEventSink } from './observability';
 export { worstCaseCostUsd, actualCostUsd } from './cost';
 export {
 	DEFAULT_CEILINGS,

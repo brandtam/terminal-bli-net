@@ -1,5 +1,6 @@
 import type { LlmProvider } from '$lib/types';
 import { worstCaseCostUsd } from './cost';
+import type { LedgerEventSink } from './observability';
 import type {
 	CeilingId,
 	LedgerCeilings,
@@ -49,6 +50,8 @@ export interface LedgerCoreOptions {
 	idFactory?: () => string;
 	/** Restore prior state (DO adapter). */
 	state?: LedgerState;
+	/** Observability sink, one event per decision; defaults to a no-op. */
+	emit?: LedgerEventSink;
 }
 
 function utcDayKey(now: Date): string {
@@ -72,6 +75,7 @@ export class LedgerCore {
 	private readonly ceilings: LedgerCeilings;
 	private readonly ttlMs: number;
 	private readonly newId: () => string;
+	private readonly emit: LedgerEventSink;
 
 	private committedDaily: Map<string, DailyCommit>;
 	private committedMonthly: Map<string, number>;
@@ -81,6 +85,7 @@ export class LedgerCore {
 		this.ceilings = opts.ceilings;
 		this.ttlMs = opts.reservationTtlMs;
 		this.newId = opts.idFactory ?? (() => crypto.randomUUID());
+		this.emit = opts.emit ?? (() => {});
 		this.committedDaily = new Map(Object.entries(opts.state?.committedDaily ?? {}));
 		this.committedMonthly = new Map(Object.entries(opts.state?.committedMonthly ?? {}));
 		this.reservations = new Map(Object.entries(opts.state?.reservations ?? {}));
@@ -90,7 +95,10 @@ export class LedgerCore {
 	private purgeExpired(now: Date): void {
 		const cutoff = now.getTime();
 		for (const [id, res] of this.reservations) {
-			if (res.expiresAt <= cutoff) this.reservations.delete(id);
+			if (res.expiresAt <= cutoff) {
+				this.reservations.delete(id);
+				this.emit({ type: 'expire', reservationId: id, provider: res.provider, usd: res.usd });
+			}
 		}
 	}
 
@@ -111,6 +119,7 @@ export class LedgerCore {
 	}
 
 	private deny(reason: CeilingId, detail: string): ReserveResult {
+		this.emit({ type: 'deny', reason, detail });
 		return { ok: false, reason, detail };
 	}
 
@@ -165,6 +174,16 @@ export class LedgerCore {
 				expiresAt
 			});
 
+			this.emit({
+				type: 'reserve',
+				reservationId,
+				provider: candidate.provider,
+				model: candidate.model,
+				reservedUsd: worst,
+				day: dayKey,
+				month: monthKey
+			});
+
 			return {
 				ok: true,
 				reservationId,
@@ -197,10 +216,13 @@ export class LedgerCore {
 
 		const mKey = monthlyKey(monthKey, actual.provider);
 		this.committedMonthly.set(mKey, (this.committedMonthly.get(mKey) ?? 0) + actual.usd);
+
+		this.emit({ type: 'commit', reservationId, provider: actual.provider, usd: actual.usd });
 	}
 
 	release(reservationId: string): void {
 		this.reservations.delete(reservationId);
+		this.emit({ type: 'refund', reservationId });
 	}
 
 	status(now: Date): LedgerStatus {

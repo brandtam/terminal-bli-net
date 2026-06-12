@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { LedgerCore, type LedgerState } from './ledger-core';
 import { resolveCeilings, DEFAULT_RESERVATION_TTL_MS, type CeilingEnv } from './config';
+import { logLedgerEvent } from './observability';
 import type { LedgerStatus, ReconcileInput, ReserveRequest, ReserveResult } from './types';
 
 /**
@@ -35,7 +36,9 @@ export class SpendLedgerDO extends DurableObject<SpendLedgerDOEnv> {
 			this.core = new LedgerCore({
 				ceilings: resolveCeilings(env),
 				reservationTtlMs: DEFAULT_RESERVATION_TTL_MS,
-				state
+				state,
+				// Production observability — captured by the Worker's `observability`.
+				emit: logLedgerEvent
 			});
 		});
 	}
