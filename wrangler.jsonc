@@ -28,7 +28,8 @@
 	// OpenAI options:  gpt-4o-mini (default), gpt-4o, gpt-4.1-mini, gpt-4.1
 	// Turnstile Gate (proof-of-human in front of chat spend). To ACTIVATE:
 	//   1. uncomment PUBLIC_TURNSTILE_SITE_KEY below (the public widget key), and
-	//   2. set the secret:  wrangler secret put TURNSTILE_SECRET
+	//   2. set the secret (this is a Pages project, not a Worker):
+	//        wrangler pages secret put TURNSTILE_SECRET
 	// Activate both together — a live site key without the server secret would
 	// re-challenge every message. Until then the gate fails open (no challenge).
 	"vars": {
