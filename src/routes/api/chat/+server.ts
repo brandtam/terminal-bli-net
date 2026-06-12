@@ -1,17 +1,28 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { streamCompletion } from '$lib/server/llm';
-import { canRespond, recordTokens, recordMessage } from '$lib/server/spend';
+import { streamCompletion, defaultModelFor } from '$lib/server/llm';
+import { canRespond, recordMessage } from '$lib/server/spend';
+import { getSpendLedger, actualCostUsd } from '$lib/server/spend-ledger';
+import type { CandidateProvider, CeilingId, SpendLedgerEnv } from '$lib/server/spend-ledger';
 import { loadContentCatalog } from '$lib/server/content-catalog';
 import { createChatSession, validateChatTimezone } from '$lib/server/chat-session';
-import type { ChatMessage, LlmProvider } from '$lib/types';
+import type { ChatMessage, LlmProvider, TextChunk } from '$lib/types';
 import type { LlmProviderConfig } from '$lib/server/llm';
 
 const VALID_ROLES = new Set(['user', 'assistant']);
 const MAX_MESSAGES = 20;
 const MAX_CONTENT_LENGTH = 2000;
+/** Hard per-request output cap; also the worst-case output hold for a Reservation. */
+const MAX_OUTPUT_TOKENS = 300;
+/**
+ * Conservative chars-per-token for the worst-case input hold. Deliberately low
+ * (English averages ~4) so the Reservation can never under-estimate input and
+ * let actual spend slip past a ceiling. Output dominates cost, so over-holding
+ * input only ever errs toward refusing early — the safe direction.
+ */
+const INPUT_CHARS_PER_TOKEN = 3;
 
-interface ChatEnv {
+interface ChatEnv extends SpendLedgerEnv {
 	KV: KVNamespace;
 	ANTHROPIC_API_KEY?: string;
 	OPENAI_API_KEY?: string;
@@ -101,12 +112,97 @@ function validateMessages(raw: unknown): ChatMessage[] {
 	});
 }
 
+/** Worst-case input tokens for the Reservation — a true upper bound, not a guess. */
+function worstCaseInputTokens(systemPrompt: string, messages: ChatMessage[]): number {
+	const chars =
+		systemPrompt.length + messages.reduce((sum, m) => sum + m.role.length + m.content.length, 0);
+	return Math.ceil(chars / INPUT_CHARS_PER_TOKEN);
+}
+
+/** Map the ledger's provider preference order onto concrete candidate models. */
+function toCandidates(providers: LlmProviderConfig[]): CandidateProvider[] {
+	return providers.map((config) => ({
+		provider: config.provider,
+		model: config.model ?? defaultModelFor(config.provider)
+	}));
+}
+
+/**
+ * In-voice "off the air" copy for a ceiling refusal. The chat window renders it
+ * as a normal assistant turn so the retro-OS fiction stays intact — never a raw
+ * HTTP error (see PRD decision 11).
+ */
+function overBudgetMessage(ceiling: CeilingId): string {
+	if (ceiling === 'monthly-provider') {
+		return "[ STATIC ] ...this channel's gone dark for the month — the dial's tapped out. Try another network, or check back when the new month rolls around.";
+	}
+	return "[ STATIC ] ...that's all she wrote for today — we're off the air until the tower fires back up tomorrow. Same station, same dial.";
+}
+
+/** Build an SSE Response from a TextChunk source, hiding internal `usage` chunks. */
+function sseResponse(
+	source: ReadableStream<TextChunk>,
+	hooks?: {
+		onUsage?: (chunk: TextChunk) => void;
+		onClose?: () => void | Promise<void>;
+	}
+): Response {
+	const encoder = new TextEncoder();
+	const stream = new ReadableStream({
+		async start(controller) {
+			const reader = source.getReader();
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+
+					if (value.type !== 'usage') {
+						controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
+					}
+					if (value.usage) hooks?.onUsage?.(value);
+				}
+			} catch (e) {
+				console.error('[chat SSE] stream error:', e);
+				controller.enqueue(
+					encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'internal error' })}\n\n`)
+				);
+			} finally {
+				try {
+					await hooks?.onClose?.();
+				} catch (e) {
+					console.error('[chat SSE] close hook failed:', e);
+				}
+				controller.close();
+			}
+		}
+	});
+
+	return new Response(stream, {
+		headers: {
+			'Content-Type': 'text/event-stream',
+			'Cache-Control': 'no-cache',
+			Connection: 'keep-alive'
+		}
+	});
+}
+
+/** A one-shot SSE stream of a single in-voice assistant message (the deny path). */
+function messageStream(text: string): ReadableStream<TextChunk> {
+	return new ReadableStream({
+		start(controller) {
+			controller.enqueue({ type: 'text', text });
+			controller.enqueue({ type: 'done', tokenCount: 0 });
+			controller.close();
+		}
+	});
+}
+
 export const POST: RequestHandler = async ({ request, platform, getClientAddress }) => {
 	if (!platform?.env) {
 		throw error(500, 'Platform bindings not available');
 	}
 
-	const env = platform.env;
+	const env = platform.env as ChatEnv;
 	const ip = getClientAddress();
 
 	let body: unknown;
@@ -152,12 +248,11 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		throw error(chatSession.status, chatSession.reason ?? 'Chat is not available');
 	}
 
-	const spendConfig = {
-		kv: env.KV,
-		rateLimitPerHour: parseInt(env.RATE_LIMIT_PER_HOUR || '30')
-	};
-
-	const gate = await canRespond(spendConfig, ip);
+	// Per-IP fairness throttle (approximate, KV) — unchanged.
+	const gate = await canRespond(
+		{ kv: env.KV, rateLimitPerHour: parseInt(env.RATE_LIMIT_PER_HOUR || '30') },
+		ip
+	);
 	if (!gate.allowed) {
 		throw error(429, gate.reason || 'Rate limited');
 	}
@@ -167,53 +262,63 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		throw error(503, 'No LLM providers are configured');
 	}
 
-	const stream = await streamCompletion({
-		systemPrompt: chatSession.systemPrompt,
-		messages,
-		providers,
-		kv: env.KV,
-		options: { maxTokens: 300, temperature: 0.8 }
-	});
+	// The Spend Ledger owns every dollar ceiling: reserve worst-case cost and let
+	// it pick the first candidate provider that fits, before any money is spent.
+	const ledger = getSpendLedger(env);
+	const reservation = await ledger.reserve(
+		{
+			candidates: toCandidates(providers),
+			maxInputTokens: worstCaseInputTokens(chatSession.systemPrompt, messages),
+			maxOutputTokens: MAX_OUTPUT_TOKENS
+		},
+		new Date()
+	);
+
+	if (!reservation.ok) {
+		// Ceiling hit — render a graceful in-voice "off the air" turn, not an error.
+		return sseResponse(messageStream(overBudgetMessage(reservation.ceiling)));
+	}
+
+	const admitted = providers.find((config) => config.provider === reservation.provider);
+	if (!admitted) {
+		await ledger.release(reservation.reservationId, new Date());
+		throw error(500, 'Admitted provider is not configured');
+	}
 
 	await recordMessage(env.KV, ip);
 
-	const encoder = new TextEncoder();
-	const sseStream = new ReadableStream({
-		async start(controller) {
-			const reader = stream.getReader();
-			try {
-				while (true) {
-					const { done, value } = await reader.read();
-					if (done) break;
-
-					if (value.type !== 'usage') {
-						const data = `data: ${JSON.stringify(value)}\n\n`;
-						controller.enqueue(encoder.encode(data));
-					}
-
-					if (value.usage) {
-						try {
-							await recordTokens(env.KV, value.usage);
-						} catch (recordError) {
-							console.error('[chat SSE] token accounting failed:', recordError);
-						}
-					}
-				}
-			} catch (e) {
-				console.error('[chat SSE] stream error:', e);
-				const errData = `data: ${JSON.stringify({ type: 'error', error: 'internal error' })}\n\n`;
-				controller.enqueue(encoder.encode(errData));
-			} finally {
-				controller.close();
-			}
-		}
+	const stream = await streamCompletion({
+		systemPrompt: chatSession.systemPrompt,
+		messages,
+		providers: [{ ...admitted, model: reservation.model }],
+		options: { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.8 }
 	});
 
-	return new Response(sseStream, {
-		headers: {
-			'Content-Type': 'text/event-stream',
-			'Cache-Control': 'no-cache',
-			Connection: 'keep-alive'
+	// Settle the Reservation to actual cost once the stream ends; release it if the
+	// request produced no billable usage. Runs in the SSE close hook so it fires
+	// even when the client disconnects mid-stream.
+	let actualUsd = 0;
+	let sawUsage = false;
+	return sseResponse(stream, {
+		onUsage: (chunk) => {
+			if (!chunk.usage) return;
+			sawUsage = true;
+			try {
+				actualUsd += actualCostUsd(chunk.usage);
+			} catch (e) {
+				console.error('[chat SSE] cost calculation failed:', e);
+			}
+		},
+		onClose: async () => {
+			if (sawUsage) {
+				await ledger.reconcile(
+					reservation.reservationId,
+					{ provider: reservation.provider, usd: actualUsd },
+					new Date()
+				);
+			} else {
+				await ledger.release(reservation.reservationId, new Date());
+			}
 		}
 	});
 };

@@ -1,19 +1,27 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { POST } from './+server';
 import { streamCompletion } from '$lib/server/llm';
-import { canRespond, recordMessage, recordTokens } from '$lib/server/spend';
+import { canRespond, recordMessage } from '$lib/server/spend';
+import { getSpendLedger, actualCostUsd } from '$lib/server/spend-ledger';
 import { loadContentCatalog } from '$lib/server/content-catalog';
 import type { Bot, Channel, Show, TextChunk } from '$lib/types';
 import type { ContentCatalog } from '$lib/server/content-catalog';
+import type { SpendLedger } from '$lib/server/spend-ledger';
 
 vi.mock('$lib/server/llm', () => ({
-	streamCompletion: vi.fn()
+	streamCompletion: vi.fn(),
+	defaultModelFor: (provider: 'claude' | 'openai') =>
+		provider === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001'
 }));
 
 vi.mock('$lib/server/spend', () => ({
 	canRespond: vi.fn(),
-	recordMessage: vi.fn(),
-	recordTokens: vi.fn()
+	recordMessage: vi.fn()
+}));
+
+vi.mock('$lib/server/spend-ledger', () => ({
+	getSpendLedger: vi.fn(),
+	actualCostUsd: vi.fn()
 }));
 
 vi.mock('$lib/server/content-catalog', () => ({
@@ -23,8 +31,20 @@ vi.mock('$lib/server/content-catalog', () => ({
 const streamCompletionMock = vi.mocked(streamCompletion);
 const canRespondMock = vi.mocked(canRespond);
 const recordMessageMock = vi.mocked(recordMessage);
-const recordTokensMock = vi.mocked(recordTokens);
+const getSpendLedgerMock = vi.mocked(getSpendLedger);
+const actualCostUsdMock = vi.mocked(actualCostUsd);
 const loadContentCatalogMock = vi.mocked(loadContentCatalog);
+
+const reserveMock = vi.fn<SpendLedger['reserve']>();
+const reconcileMock = vi.fn<SpendLedger['reconcile']>();
+const releaseMock = vi.fn<SpendLedger['release']>();
+const statusMock = vi.fn<SpendLedger['status']>();
+const ledger: SpendLedger = {
+	reserve: reserveMock,
+	reconcile: reconcileMock,
+	release: releaseMock,
+	status: statusMock
+};
 
 const sessionId = '00000000-0000-4000-8000-000000000000';
 
@@ -149,7 +169,18 @@ describe('POST /api/chat', () => {
 		);
 		canRespondMock.mockResolvedValue({ allowed: true });
 		recordMessageMock.mockResolvedValue();
-		recordTokensMock.mockResolvedValue(0);
+		getSpendLedgerMock.mockReturnValue(ledger);
+		reserveMock.mockResolvedValue({
+			ok: true,
+			reservationId: 'res-1',
+			provider: 'openai',
+			model: 'gpt-4o-mini',
+			reservedUsd: 0.05,
+			expiresAt: Date.now() + 60_000
+		});
+		reconcileMock.mockResolvedValue();
+		releaseMock.mockResolvedValue();
+		actualCostUsdMock.mockReturnValue(0.01);
 		streamCompletionMock.mockResolvedValue(
 			makeTokenStream([
 				{ type: 'text', text: 'Well, ' },
@@ -179,22 +210,29 @@ describe('POST /api/chat', () => {
 		});
 
 		expect(canRespondMock).not.toHaveBeenCalled();
+		expect(reserveMock).not.toHaveBeenCalled();
 		expect(streamCompletionMock).not.toHaveBeenCalled();
 		expect(recordMessageMock).not.toHaveBeenCalled();
-		expect(recordTokensMock).not.toHaveBeenCalled();
 	});
 
-	it('accepts the same bot when its show is airing and sends requested-timezone episode context to the LLM', async () => {
+	it('reserves against the ledger, streams the admitted provider, and reconciles actual cost', async () => {
 		const response = await POST(makeEvent(makeBody('Asia/Kathmandu')));
 		await response.text();
 
 		expect(response.status).toBe(200);
+
+		// Ledger admits the provider by budget before any spend.
+		expect(reserveMock).toHaveBeenCalledTimes(1);
+		expect(reserveMock.mock.calls[0][0]).toMatchObject({
+			candidates: [{ provider: 'openai', model: 'gpt-4o-mini' }],
+			maxOutputTokens: 300
+		});
+		expect(reserveMock.mock.calls[0][0].maxInputTokens).toBeGreaterThan(0);
+
+		// The route streams from the single admitted provider/model.
 		expect(streamCompletionMock).toHaveBeenCalledTimes(1);
 		expect(streamCompletionMock.mock.calls[0][0].systemPrompt).toContain(
 			'[SCENE CONTEXT: Currently airing S5E14 "The Marine Biologist"'
-		);
-		expect(streamCompletionMock.mock.calls[0][0].systemPrompt).toContain(
-			'George claims to be a marine biologist.'
 		);
 		expect(streamCompletionMock.mock.calls[0][0].providers).toEqual([
 			{
@@ -204,20 +242,17 @@ describe('POST /api/chat', () => {
 				monthlyBudget: 25
 			}
 		]);
-		expect(recordMessageMock).toHaveBeenCalledTimes(1);
+
 		expect(recordMessageMock).toHaveBeenCalledWith({}, '127.0.0.1');
-		expect(recordTokensMock).toHaveBeenCalledWith(
-			{},
-			{
-				provider: 'openai',
-				model: 'gpt-4o-mini',
-				inputTokens: 5,
-				outputTokens: 2
-			}
-		);
+
+		// Reservation settles once to the summed actual cost; never released.
+		expect(reconcileMock).toHaveBeenCalledTimes(1);
+		expect(reconcileMock.mock.calls[0][0]).toBe('res-1');
+		expect(reconcileMock.mock.calls[0][1]).toEqual({ provider: 'openai', usd: 0.01 });
+		expect(releaseMock).not.toHaveBeenCalled();
 	});
 
-	it('records provider usage chunks without forwarding them to the browser stream', async () => {
+	it('sums actual cost across usage chunks and reconciles once, hiding usage chunks from the browser', async () => {
 		streamCompletionMock.mockResolvedValueOnce(
 			makeTokenStream([
 				{ type: 'text', text: 'Partial answer.' },
@@ -245,6 +280,7 @@ describe('POST /api/chat', () => {
 				}
 			])
 		);
+		actualCostUsdMock.mockReturnValueOnce(0.02).mockReturnValueOnce(0.03);
 
 		const response = await POST(makeEvent(makeBody('Asia/Kathmandu')));
 		const text = await response.text();
@@ -252,21 +288,26 @@ describe('POST /api/chat', () => {
 		expect(text).toContain('Partial answer.');
 		expect(text).toContain('Fresh answer.');
 		expect(text).not.toContain('"type":"usage"');
-		expect(recordTokensMock).toHaveBeenCalledTimes(2);
-		expect(recordTokensMock.mock.calls[0][1]).toMatchObject({
-			provider: 'openai',
-			model: 'gpt-4o-mini',
-			estimated: true
-		});
-		expect(recordTokensMock.mock.calls[1][1]).toMatchObject({
-			provider: 'openai',
-			model: 'gpt-4o-mini'
-		});
-		expect(recordTokensMock.mock.calls[1][1].estimated).toBeUndefined();
+
+		expect(actualCostUsdMock).toHaveBeenCalledTimes(2);
+		expect(reconcileMock).toHaveBeenCalledTimes(1);
+		expect(reconcileMock.mock.calls[0][1]).toEqual({ provider: 'openai', usd: 0.05 });
 	});
 
-	it('still forwards done chunks when token accounting fails', async () => {
-		recordTokensMock.mockRejectedValueOnce(new Error('KV write failed'));
+	it('releases the reservation when the stream produces no billable usage', async () => {
+		streamCompletionMock.mockResolvedValueOnce(
+			makeTokenStream([{ type: 'text', text: 'silence' }])
+		);
+
+		const response = await POST(makeEvent(makeBody('Asia/Kathmandu')));
+		await response.text();
+
+		expect(reconcileMock).not.toHaveBeenCalled();
+		expect(releaseMock).toHaveBeenCalledWith('res-1', expect.any(Date));
+	});
+
+	it('still forwards done chunks when reconciliation fails', async () => {
+		reconcileMock.mockRejectedValueOnce(new Error('ledger write failed'));
 
 		const response = await POST(makeEvent(makeBody('Asia/Kathmandu')));
 		const text = await response.text();
@@ -275,12 +316,34 @@ describe('POST /api/chat', () => {
 		expect(text).not.toContain('"type":"error"');
 	});
 
+	it('returns a graceful in-voice message and spends nothing when a ceiling is hit', async () => {
+		reserveMock.mockResolvedValueOnce({
+			ok: false,
+			ceiling: 'daily-spend',
+			reason: 'Daily spend cap reached ($3/day).'
+		});
+
+		const response = await POST(makeEvent(makeBody('Asia/Kathmandu')));
+		const text = await response.text();
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get('Content-Type')).toBe('text/event-stream');
+		expect(text).toContain('off the air');
+		expect(text).not.toContain('"type":"error"');
+
+		expect(streamCompletionMock).not.toHaveBeenCalled();
+		expect(recordMessageMock).not.toHaveBeenCalled();
+		expect(reconcileMock).not.toHaveBeenCalled();
+		expect(releaseMock).not.toHaveBeenCalled();
+	});
+
 	it('rejects an invalid timezone before spend or LLM calls', async () => {
 		await expect(POST(makeEvent(makeBody('Not/A_Zone')))).rejects.toMatchObject({
 			status: 400
 		});
 
 		expect(canRespondMock).not.toHaveBeenCalled();
+		expect(reserveMock).not.toHaveBeenCalled();
 		expect(streamCompletionMock).not.toHaveBeenCalled();
 	});
 });

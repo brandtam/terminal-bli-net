@@ -49,7 +49,7 @@ interface ProviderStreamParams {
 	};
 }
 
-function defaultModelFor(provider: LlmProvider): string {
+export function defaultModelFor(provider: LlmProvider): string {
 	return provider === 'openai' ? OPENAI_FALLBACK_MODEL : CLAUDE_FALLBACK_MODEL;
 }
 

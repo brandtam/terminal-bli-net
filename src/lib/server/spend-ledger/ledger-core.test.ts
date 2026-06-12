@@ -95,7 +95,7 @@ describe('LedgerCore — request-count backstop', () => {
 	it('counts the request at reserve time and never refunds the count', () => {
 		const core = makeCore();
 		const r = core.reserve(ONE_M_INPUT, NOW);
-		if (r.ok) core.release(r.reservationId, NOW); // dollars refunded...
+		if (r.ok) core.release(r.reservationId); // dollars refunded...
 		expect(core.status(NOW).daily.requests).toBe(1); // ...but the request still counted
 	});
 });
