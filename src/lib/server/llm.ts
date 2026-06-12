@@ -2,7 +2,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import type { ChatMessage, LlmProvider, LlmTokenUsage, TextChunk } from '$lib/types';
-import { getModelPricing, isProviderOverBudget } from './spend';
+import { getModelPricing } from './spend';
 
 const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
 const OPENAI_FALLBACK_MODEL = 'gpt-4o-mini';
@@ -13,7 +13,6 @@ export interface LlmProviderConfig {
 	provider: LlmProvider;
 	apiKey: string;
 	model?: string;
-	monthlyBudget?: number;
 }
 
 export interface StreamCompletionParams {
@@ -27,14 +26,12 @@ export interface StreamCompletionParams {
 		model?: string;
 	};
 	apiKey?: string;
-	kv?: KVNamespace;
 }
 
 interface ProviderAttempt {
 	provider: LlmProvider;
 	model: string;
 	apiKey: string;
-	monthlyBudget?: number;
 }
 
 interface ProviderStreamParams {
@@ -297,28 +294,6 @@ function streamProviderCompletion(
 	return streamAnthropicCompletion(params);
 }
 
-async function isAttemptAvailable(
-	attempt: ProviderAttempt,
-	kv: KVNamespace | undefined
-): Promise<boolean> {
-	if (!kv || attempt.monthlyBudget === undefined) return true;
-	return !(await isProviderOverBudget(kv, attempt.provider, attempt.monthlyBudget));
-}
-
-async function nextAvailableAttempt(
-	attempts: ProviderAttempt[],
-	startIndex: number,
-	kv: KVNamespace | undefined
-): Promise<{ attempt: ProviderAttempt; index: number } | null> {
-	for (let i = startIndex; i < attempts.length; i += 1) {
-		const attempt = attempts[i];
-		if (await isAttemptAvailable(attempt, kv)) {
-			return { attempt, index: i };
-		}
-	}
-	return null;
-}
-
 type PipeResult = 'success' | 'retry-pre-token' | 'fatal-pre-token' | 'retry-mid-stream' | 'stop';
 
 async function pipeProviderAttempt(
@@ -385,20 +360,12 @@ export async function streamCompletion(
 
 	return new ReadableStream<TextChunk>({
 		async start(controller) {
-			let nextIndex = 0;
-
-			while (true) {
-				const next = await nextAvailableAttempt(attempts, nextIndex, params.kv);
-				if (!next) {
-					controller.enqueue({
-						type: 'error',
-						error: 'All LLM providers are unavailable or over budget'
-					});
-					controller.close();
-					return;
-				}
-
-				const result = await pipeProviderAttempt(controller, params, next.attempt, false);
+			// The Spend Ledger already chose the provider by budget, so this loop only
+			// handles transient provider errors: try the given attempts in order, and
+			// after partial output retry once on the next attempt (a no-op when the
+			// route passes a single admitted provider).
+			for (let index = 0; index < attempts.length; index += 1) {
+				const result = await pipeProviderAttempt(controller, params, attempts[index], false);
 				if (result === 'success' || result === 'fatal-pre-token' || result === 'stop') {
 					controller.close();
 					return;
@@ -406,16 +373,18 @@ export async function streamCompletion(
 
 				if (result === 'retry-mid-stream') {
 					controller.enqueue({ type: 'text', text: MID_STREAM_RETRY_NOTICE });
-					const retry = await nextAvailableAttempt(attempts, next.index + 1, params.kv);
+					const retry = attempts[index + 1];
 					if (retry) {
-						await pipeProviderAttempt(controller, params, retry.attempt, true);
+						await pipeProviderAttempt(controller, params, retry, true);
 					}
 					controller.close();
 					return;
 				}
-
-				nextIndex = next.index + 1;
+				// result === 'retry-pre-token' → fall through to the next attempt.
 			}
+
+			controller.enqueue({ type: 'error', error: 'All LLM providers are unavailable' });
+			controller.close();
 		}
 	});
 }

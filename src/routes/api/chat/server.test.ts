@@ -238,8 +238,7 @@ describe('POST /api/chat', () => {
 			{
 				provider: 'openai',
 				apiKey: 'test-openai-key',
-				model: 'gpt-4o-mini',
-				monthlyBudget: 25
+				model: 'gpt-4o-mini'
 			}
 		]);
 

@@ -22,6 +22,8 @@ const MAX_OUTPUT_TOKENS = 300;
  */
 const INPUT_CHARS_PER_TOKEN = 3;
 
+// Monthly spend caps come in via SpendLedgerEnv (the ledger reads them); this
+// interface adds the route's own provider/model + KV throttle vars.
 interface ChatEnv extends SpendLedgerEnv {
 	KV: KVNamespace;
 	ANTHROPIC_API_KEY?: string;
@@ -29,11 +31,8 @@ interface ChatEnv extends SpendLedgerEnv {
 	LLM_PROVIDER_ORDER?: string;
 	ANTHROPIC_MODEL?: string;
 	OPENAI_MODEL?: string;
-	ANTHROPIC_MONTHLY_SPEND_CAP?: string;
-	OPENAI_MONTHLY_SPEND_CAP?: string;
 	RATE_LIMIT_PER_HOUR?: string;
 	PROVIDER?: string;
-	MONTHLY_SPEND_CAP?: string;
 	MODEL?: string;
 }
 
@@ -60,20 +59,14 @@ function parseProviderOrder(raw: string | undefined): LlmProvider[] {
 	return providers;
 }
 
-function parseBudget(raw: string | undefined): number | undefined {
-	if (raw === undefined || raw.trim() === '') return undefined;
-	const budget = Number(raw);
-	if (!Number.isFinite(budget) || budget < 0) {
-		throw error(500, `Invalid LLM monthly spend cap "${raw}"`);
-	}
-	return budget;
-}
-
 function resolveLlmProviders(env: ChatEnv): LlmProviderConfig[] {
 	const legacyProvider =
 		env.PROVIDER === 'claude' || env.PROVIDER === 'openai' ? env.PROVIDER : undefined;
 	const providerOrder = parseProviderOrder(env.LLM_PROVIDER_ORDER ?? legacyProvider);
 
+	// Monthly dollar caps are no longer carried per provider — the Spend Ledger
+	// owns them (resolveCeilings reads ANTHROPIC/OPENAI_MONTHLY_SPEND_CAP). Here we
+	// only resolve which providers are configured and which model each uses.
 	return providerOrder.flatMap((provider) => {
 		const apiKey = provider === 'claude' ? env.ANTHROPIC_API_KEY : env.OPENAI_API_KEY;
 		if (!apiKey) return [];
@@ -82,12 +75,8 @@ function resolveLlmProviders(env: ChatEnv): LlmProviderConfig[] {
 			provider === 'claude'
 				? (env.ANTHROPIC_MODEL ?? (legacyProvider === 'claude' ? env.MODEL : undefined))
 				: (env.OPENAI_MODEL ?? (legacyProvider === 'openai' ? env.MODEL : undefined));
-		const monthlyBudget =
-			provider === 'claude'
-				? parseBudget(env.ANTHROPIC_MONTHLY_SPEND_CAP ?? env.MONTHLY_SPEND_CAP)
-				: parseBudget(env.OPENAI_MONTHLY_SPEND_CAP ?? env.MONTHLY_SPEND_CAP);
 
-		return [{ provider, apiKey, model, monthlyBudget }];
+		return [{ provider, apiKey, model }];
 	});
 }
 

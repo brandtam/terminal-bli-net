@@ -1,14 +1,16 @@
 /// <reference types="@cloudflare/workers-types" />
 
 /**
- * Spend control / kill-switch module.
+ * Per-IP rate throttle + model pricing.
  *
- * Tracks per-provider monthly token spend and per-IP hourly rate limits via
- * Cloudflare KV. Provider budgets are soft fallback controls: once a provider
- * reaches its monthly cap, callers should skip it and try the next provider.
+ * Dollar ceilings are owned by the Spend Ledger now (see
+ * `src/lib/server/spend-ledger/`, docs/adr/0005); the superseded KV monthly
+ * spend counters were removed. What remains here is the approximate per-IP
+ * hourly rate throttle (a fairness control, not a money guarantee) and the
+ * canonical model pricing table the ledger reuses for cost.
  */
 
-import type { LlmProvider, LlmTokenUsage } from '$lib/types';
+import type { LlmTokenUsage } from '$lib/types';
 
 // ---------------------------------------------------------------------------
 // Cost constants
@@ -68,13 +70,6 @@ export interface CanRespondResult {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** "spend:openai:2026-05" */
-export function monthlySpendKey(provider: LlmProvider, now: Date = new Date()): string {
-	const yyyy = now.getUTCFullYear();
-	const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-	return `spend:${provider}:${yyyy}-${mm}`;
-}
 
 /** "rate:203.0.113.42:2026-05-23-14" */
 export function rateLimitKey(ip: string, now: Date = new Date()): string {
@@ -150,35 +145,4 @@ export function calculateTokenCostUsd(usage: LlmTokenUsage): number {
 		((usage.cacheReadInputTokens ?? 0) * (pricing.cacheReadInput ?? pricing.input * 0.1)) /
 			1_000_000
 	);
-}
-
-/**
- * Record tokens consumed after a response has been generated.
- * Converts the token count to USD and adds it to the monthly spend counter.
- */
-export async function recordTokens(kv: KVNamespace, usage: LlmTokenUsage): Promise<number> {
-	const key = monthlySpendKey(usage.provider);
-	const raw = await kv.get(key);
-	const current = raw ? parseFloat(raw) : 0;
-	const cost = calculateTokenCostUsd(usage);
-	await kv.put(key, String(current + cost));
-	return cost;
-}
-
-/**
- * Return the current monthly spend in USD for a provider.
- */
-export async function getMonthlySpend(kv: KVNamespace, provider: LlmProvider): Promise<number> {
-	const raw = await kv.get(monthlySpendKey(provider));
-	return raw ? parseFloat(raw) : 0;
-}
-
-export async function isProviderOverBudget(
-	kv: KVNamespace,
-	provider: LlmProvider,
-	monthlyBudget: number
-): Promise<boolean> {
-	if (!Number.isFinite(monthlyBudget)) return false;
-	const spend = await getMonthlySpend(kv, provider);
-	return spend >= monthlyBudget;
 }
