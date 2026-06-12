@@ -59,8 +59,7 @@ export class SpendLedgerDO extends DurableObject<SpendLedgerDOEnv> {
 	}
 
 	async release(reservationId: string, nowMs: number): Promise<void> {
-		void nowMs;
-		this.core.release(reservationId);
+		this.core.release(reservationId, new Date(nowMs));
 		await this.persist();
 	}
 

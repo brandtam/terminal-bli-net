@@ -208,7 +208,11 @@ export async function handleLedger(request: Request, env: ReminderWorkerEnv): Pr
 		return json({ error: 'Invalid JSON body' }, { status: 400 });
 	}
 
-	const nowMs = typeof body.nowMs === 'number' ? body.nowMs : Date.now();
+	if (typeof body.nowMs !== 'number' || !Number.isFinite(body.nowMs)) {
+		return json({ error: 'nowMs is required' }, { status: 400 });
+	}
+
+	const nowMs = body.nowMs;
 	const path = new URL(request.url).pathname;
 	const stub = ledgerStub(env);
 

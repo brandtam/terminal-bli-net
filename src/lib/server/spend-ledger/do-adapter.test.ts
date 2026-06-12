@@ -19,7 +19,16 @@ describe('DurableObjectSpendLedger', () => {
 				provider: 'openai',
 				model: 'gpt-4o-mini',
 				reservedUsd: 0.05,
-				expiresAt: 123
+				expiresAt: 123,
+				reservations: [
+					{
+						reservationId: 'r1',
+						provider: 'openai',
+						model: 'gpt-4o-mini',
+						reservedUsd: 0.05,
+						expiresAt: 123
+					}
+				]
 			})
 		);
 		const ledger = new DurableObjectSpendLedger(fetch);

@@ -31,7 +31,7 @@ describe('LedgerCore observability', () => {
 				reservationId: 'r1',
 				provider: 'openai',
 				model: 'gpt-4o-mini',
-				reservedUsd: 0.15,
+				reservedUsd: 0.1875,
 				day: '2026-06-11',
 				month: '2026-06'
 			}

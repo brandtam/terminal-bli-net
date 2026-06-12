@@ -1,13 +1,18 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { streamCompletion, defaultModelFor } from '$lib/server/llm';
+import { streamCompletion, defaultModelFor, isLlmProvider } from '$lib/server/llm';
 import { canRespond, recordMessage } from '$lib/server/spend';
 import { getSpendLedger, actualCostUsd } from '$lib/server/spend-ledger';
-import type { CandidateProvider, DenialReason, SpendLedgerEnv } from '$lib/server/spend-ledger';
+import type {
+	CandidateProvider,
+	DenialReason,
+	ProviderReservation,
+	SpendLedgerEnv
+} from '$lib/server/spend-ledger';
 import { evaluateChatGate } from '$lib/server/turnstile';
 import { loadContentCatalog } from '$lib/server/content-catalog';
 import { createChatSession, validateChatTimezone } from '$lib/server/chat-session';
-import type { ChatMessage, LlmProvider, TextChunk } from '$lib/types';
+import type { ChatMessage, LlmProvider, LlmTokenUsage, TextChunk } from '$lib/types';
 import type { LlmProviderConfig } from '$lib/server/llm';
 
 const VALID_ROLES = new Set(['user', 'assistant']);
@@ -15,13 +20,9 @@ const MAX_MESSAGES = 20;
 const MAX_CONTENT_LENGTH = 2000;
 /** Hard per-request output cap; also the worst-case output hold for a Reservation. */
 const MAX_OUTPUT_TOKENS = 300;
-/**
- * Conservative chars-per-token for the worst-case input hold. Deliberately low
- * (English averages ~4) so the Reservation can never under-estimate input and
- * let actual spend slip past a ceiling. Output dominates cost, so over-holding
- * input only ever errs toward refusing early — the safe direction.
- */
-const INPUT_CHARS_PER_TOKEN = 3;
+const TOKEN_OVERHEAD_FOR_SYSTEM = 64;
+const TOKEN_OVERHEAD_PER_MESSAGE = 64;
+const textEncoder = new TextEncoder();
 
 // Monthly spend caps come in via SpendLedgerEnv (the ledger reads them); this
 // interface adds the route's own provider/model + KV throttle vars.
@@ -39,6 +40,16 @@ interface ChatEnv extends SpendLedgerEnv {
 	TURNSTILE_SECRET?: string;
 }
 
+const PROVIDER_API_KEY_ENV = {
+	claude: 'ANTHROPIC_API_KEY',
+	openai: 'OPENAI_API_KEY'
+} satisfies Record<LlmProvider, 'ANTHROPIC_API_KEY' | 'OPENAI_API_KEY'>;
+
+const PROVIDER_MODEL_ENV = {
+	claude: 'ANTHROPIC_MODEL',
+	openai: 'OPENAI_MODEL'
+} satisfies Record<LlmProvider, 'ANTHROPIC_MODEL' | 'OPENAI_MODEL'>;
+
 function parseProviderOrder(raw: string | undefined): LlmProvider[] {
 	const providerOrder = (raw ?? 'claude')
 		.split(',')
@@ -51,7 +62,7 @@ function parseProviderOrder(raw: string | undefined): LlmProvider[] {
 
 	const providers: LlmProvider[] = [];
 	for (const provider of providerOrder) {
-		if (provider !== 'claude' && provider !== 'openai') {
+		if (!isLlmProvider(provider)) {
 			throw error(500, `Unsupported LLM provider "${provider}"`);
 		}
 		if (!providers.includes(provider)) {
@@ -71,13 +82,11 @@ function resolveLlmProviders(env: ChatEnv): LlmProviderConfig[] {
 	// owns them (resolveCeilings reads ANTHROPIC/OPENAI_MONTHLY_SPEND_CAP). Here we
 	// only resolve which providers are configured and which model each uses.
 	return providerOrder.flatMap((provider) => {
-		const apiKey = provider === 'claude' ? env.ANTHROPIC_API_KEY : env.OPENAI_API_KEY;
+		const apiKey = env[PROVIDER_API_KEY_ENV[provider]];
 		if (!apiKey) return [];
 
 		const model =
-			provider === 'claude'
-				? (env.ANTHROPIC_MODEL ?? (legacyProvider === 'claude' ? env.MODEL : undefined))
-				: (env.OPENAI_MODEL ?? (legacyProvider === 'openai' ? env.MODEL : undefined));
+			env[PROVIDER_MODEL_ENV[provider]] ?? (legacyProvider === provider ? env.MODEL : undefined);
 
 		return [{ provider, apiKey, model }];
 	});
@@ -104,19 +113,62 @@ function validateMessages(raw: unknown): ChatMessage[] {
 	});
 }
 
+function parseRateLimitPerHour(raw: string | undefined): number {
+	if (raw === undefined || raw.trim() === '') return 30;
+	const value = Number(raw);
+	return Number.isFinite(value) && value >= 0 ? value : 30;
+}
+
 /** Worst-case input tokens for the Reservation — a true upper bound, not a guess. */
 function worstCaseInputTokens(systemPrompt: string, messages: ChatMessage[]): number {
-	const chars =
-		systemPrompt.length + messages.reduce((sum, m) => sum + m.role.length + m.content.length, 0);
-	return Math.ceil(chars / INPUT_CHARS_PER_TOKEN);
+	let tokens = textEncoder.encode(systemPrompt).length + TOKEN_OVERHEAD_FOR_SYSTEM;
+	for (const message of messages) {
+		tokens +=
+			textEncoder.encode(message.role).length +
+			textEncoder.encode(message.content).length +
+			TOKEN_OVERHEAD_PER_MESSAGE;
+	}
+	return tokens;
+}
+
+function resolvedModel(config: LlmProviderConfig): string {
+	return config.model ?? defaultModelFor(config.provider);
 }
 
 /** Map the ledger's provider preference order onto concrete candidate models. */
 function toCandidates(providers: LlmProviderConfig[]): CandidateProvider[] {
 	return providers.map((config) => ({
 		provider: config.provider,
-		model: config.model ?? defaultModelFor(config.provider)
+		model: resolvedModel(config)
 	}));
+}
+
+function toReservedProviders(
+	providers: LlmProviderConfig[],
+	reservations: ProviderReservation[]
+): LlmProviderConfig[] {
+	return reservations.flatMap((reservation) => {
+		const config = providers.find(
+			(provider) =>
+				provider.provider === reservation.provider && resolvedModel(provider) === reservation.model
+		);
+		return config ? [{ ...config, model: reservation.model }] : [];
+	});
+}
+
+function reservationForUsage(
+	reservations: ProviderReservation[],
+	usage: LlmTokenUsage
+): ProviderReservation | undefined {
+	const exact = reservations.find(
+		(reservation) => reservation.provider === usage.provider && reservation.model === usage.model
+	);
+	if (exact) return exact;
+
+	const providerMatches = reservations.filter(
+		(reservation) => reservation.provider === usage.provider
+	);
+	return providerMatches.length === 1 ? providerMatches[0] : undefined;
 }
 
 /**
@@ -256,7 +308,7 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 
 	// Per-IP fairness throttle (approximate, KV) — unchanged.
 	const gate = await canRespond(
-		{ kv: env.KV, rateLimitPerHour: parseInt(env.RATE_LIMIT_PER_HOUR || '30') },
+		{ kv: env.KV, rateLimitPerHour: parseRateLimitPerHour(env.RATE_LIMIT_PER_HOUR) },
 		ip
 	);
 	if (!gate.allowed) {
@@ -284,8 +336,10 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		throw error(503, 'No LLM providers are configured');
 	}
 
-	// The Spend Ledger owns every dollar ceiling: reserve worst-case cost and let
-	// it pick the first candidate provider that fits, before any money is spent.
+	// The Spend Ledger owns every dollar ceiling: reserve worst-case cost for each
+	// fallback candidate that fits before any provider can spend.
+	await recordMessage(env.KV, ip);
+
 	const ledger = getSpendLedger(env);
 	const reservation = await ledger.reserve(
 		{
@@ -306,48 +360,66 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		);
 	}
 
-	const admitted = providers.find((config) => config.provider === reservation.provider);
-	if (!admitted) {
-		await ledger.release(reservation.reservationId, new Date());
+	const reservations = reservation.reservations;
+	const admittedProviders = toReservedProviders(providers, reservations);
+	if (admittedProviders.length === 0) {
+		await Promise.all(reservations.map((hold) => ledger.release(hold.reservationId, new Date())));
 		throw error(500, 'Admitted provider is not configured');
 	}
-
-	await recordMessage(env.KV, ip);
 
 	const stream = await streamCompletion({
 		systemPrompt: chatSession.systemPrompt,
 		messages,
-		providers: [{ ...admitted, model: reservation.model }],
+		providers: admittedProviders,
 		options: { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.8 }
 	});
 
-	// Settle the Reservation to actual cost once the stream ends; release it if the
-	// request produced no billable usage. Runs in the SSE close hook so it fires
-	// even when the client disconnects mid-stream.
-	let actualUsd = 0;
-	let sawUsage = false;
+	// Settle each provider Reservation to actual cost once the stream ends; release
+	// unused fallback holds. Runs in the SSE close hook so it fires even when the
+	// client disconnects mid-stream.
+	const actualByReservation = new Map<string, { provider: LlmProvider; usd: number }>();
+	function settleLedger(): Promise<void> {
+		const now = new Date();
+		return Promise.all(
+			reservations.map((hold) => {
+				const actual = actualByReservation.get(hold.reservationId);
+				if (actual) {
+					return ledger.reconcile(hold.reservationId, actual, now);
+				}
+				return ledger.release(hold.reservationId, now);
+			})
+		).then(() => undefined);
+	}
+
 	return sseResponse(
 		stream,
 		{
 			onUsage: (chunk) => {
 				if (!chunk.usage) return;
-				sawUsage = true;
 				try {
-					actualUsd += actualCostUsd(chunk.usage);
+					const hold = reservationForUsage(reservations, chunk.usage);
+					if (!hold) {
+						console.error('[chat SSE] usage reported for an unreserved provider:', chunk.usage);
+						return;
+					}
+					const previous = actualByReservation.get(hold.reservationId);
+					actualByReservation.set(hold.reservationId, {
+						provider: chunk.usage.provider,
+						usd: (previous?.usd ?? 0) + actualCostUsd(chunk.usage)
+					});
 				} catch (e) {
 					console.error('[chat SSE] cost calculation failed:', e);
 				}
 			},
-			onClose: async () => {
-				if (sawUsage) {
-					await ledger.reconcile(
-						reservation.reservationId,
-						{ provider: reservation.provider, usd: actualUsd },
-						new Date()
-					);
-				} else {
-					await ledger.release(reservation.reservationId, new Date());
+			onClose: () => {
+				const settlement = settleLedger().catch((e) => {
+					console.error('[chat SSE] ledger settlement failed:', e);
+				});
+				if (platform.context?.waitUntil) {
+					platform.context.waitUntil(settlement);
+					return;
 				}
+				return settlement;
 			}
 		},
 		sessionHeaders

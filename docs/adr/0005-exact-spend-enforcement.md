@@ -12,14 +12,14 @@ and rate limits were tracked in Cloudflare KV with read-modify-write counters
 consistent, which produces two failures for a money ceiling:
 
 1. **Lost updates.** Concurrent requests read the same counter and overwrite
-   each other, so recorded spend *undercounts* real spend.
+   each other, so recorded spend _undercounts_ real spend.
 2. **Stale reads under burst.** A flood of requests within KV's propagation
    window all read a pre-cap value and all pass the gate.
 
-The gate also recorded cost *after* the stream finished, so N requests could
+The gate also recorded cost _after_ the stream finished, so N requests could
 pass the check before any of them recorded — overshoot independent of the KV
 weakness above. And `isProviderOverBudget` returned "available" when KV was
-missing, i.e. it failed *open*: an infrastructure problem removed the cap.
+missing, i.e. it failed _open_: an infrastructure problem removed the cap.
 
 The owner's requirement is explicit: the cap must be **exact**, not "probably
 fine." A fuzzy guarantee was rejected. At the same time, this codebase is meant
@@ -38,7 +38,7 @@ Alternatives considered:
   the ceiling stays approximate (±a few dollars), which the owner explicitly
   rejected.
 - **Per-IP sharded counters in many DO instances.** Scales better, but per-IP
-  shards cannot enforce a single *global* dollar ceiling without cross-shard
+  shards cannot enforce a single _global_ dollar ceiling without cross-shard
   aggregation — the opposite of what an exact global cap needs.
 - **Single global DO counter (chosen).** Exact and simple, at the cost of a
   global serialization point.
@@ -60,23 +60,30 @@ behind one port with two adapters.
 - **`InMemorySpendLedger`** (development and tests) — no deployed dependency.
 
 **Reserve-then-reconcile.** On admission the ledger debits the request's
-worst-case cost (derived from `maxTokens` and the model's price) as a
-**Reservation**. When the stream finishes, **Reconciliation** swaps the estimate
-for actual cost. Ceilings therefore reflect money *committed*, not only money
-*spent*, which closes the check-before/record-after gap. The design deliberately
-errs safe: when reservations fill a ceiling, requests are refused even if actual
-spend would have fit. Overshoot is impossible; occasional early refusal is
-accepted.
+worst-case cost (derived from conservative input tokens, `maxTokens`, cache-aware
+input rates, and the model's output price) as a **Reservation**. If the route is
+willing to fail over across providers, the reserve call creates one Reservation
+per fallback candidate that also fits the daily and monthly ceilings; the route
+streams only those reserved providers. When the stream finishes,
+**Reconciliation** swaps each used estimate for actual cost and releases unused
+fallback holds. Ceilings therefore reflect money _committed_, not only money
+_spent_, which closes the check-before/record-after gap. The design deliberately
+errs safe: when reservations fill a ceiling, requests are refused or fallbacks
+are omitted even if actual spend would have fit. Overshoot is impossible;
+occasional early refusal is accepted.
 
 **Reservation expiry.** Each Reservation carries a short TTL (default 60s, well
 above a 300-token stream). A request that dies after reserving but before
 reconciling has its hold auto-refunded, so the ledger cannot drift upward from
 orphaned holds.
 
-**Scope split.** The ledger owns all *dollar* ceilings — the global Daily
-Circuit Breaker and the per-provider Monthly Provider Cap — exactly. The per-IP
-*rate* throttle remains in KV: it is a fairness control, not a money guarantee,
-and approximate counting there is acceptable.
+**Scope split.** The ledger owns all _dollar_ ceilings — the global Daily
+Circuit Breaker and the per-provider Monthly Provider Cap — exactly. Its daily
+request backstop counts every ledger-adjudicated chat attempt, including
+over-budget refusals, so a valid session cannot hammer the global Durable Object
+for free after a dollar cap trips. The per-IP _rate_ throttle remains in KV: it
+is a fairness control, not a money guarantee, and approximate counting there is
+acceptable.
 
 **Fail closed.** If the ledger is unreachable, production refuses the request
 (no authority ⇒ no budget). Development uses the in-memory adapter, so it fails

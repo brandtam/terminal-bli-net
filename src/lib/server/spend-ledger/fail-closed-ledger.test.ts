@@ -8,7 +8,16 @@ const OK_RESERVE: ReserveResult = {
 	provider: 'openai',
 	model: 'gpt-4o-mini',
 	reservedUsd: 0.05,
-	expiresAt: 1_000
+	expiresAt: 1_000,
+	reservations: [
+		{
+			reservationId: 'r1',
+			provider: 'openai',
+			model: 'gpt-4o-mini',
+			reservedUsd: 0.05,
+			expiresAt: 1_000
+		}
+	]
 };
 
 const REQUEST = {

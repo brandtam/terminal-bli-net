@@ -3,7 +3,8 @@ import {
 	evaluateChatGate,
 	issueSessionToken,
 	verifySessionToken,
-	verifyTurnstileToken
+	verifyTurnstileToken,
+	verifyTurnstileTokenResult
 } from './turnstile';
 
 const SECRET = 'test-turnstile-secret';
@@ -62,8 +63,17 @@ describe('verifyTurnstileToken', () => {
 	});
 
 	it('returns false on a non-2xx siteverify response', async () => {
-		expect(await verifyTurnstileToken(SECRET, 'tok', undefined, siteverify(true, false))).toBe(
-			false
+		const fetchImpl = siteverify(true, false);
+		expect(await verifyTurnstileToken(SECRET, 'tok', undefined, fetchImpl)).toBe(false);
+		expect(fetchImpl).toHaveBeenCalledTimes(2);
+	});
+
+	it('distinguishes verifier outages from invalid tokens', async () => {
+		expect(
+			await verifyTurnstileTokenResult(SECRET, 'tok', undefined, siteverify(true, false))
+		).toBe('unavailable');
+		expect(await verifyTurnstileTokenResult(SECRET, 'tok', undefined, siteverify(false))).toBe(
+			'invalid'
 		);
 	});
 });
@@ -96,6 +106,21 @@ describe('evaluateChatGate', () => {
 			NOW,
 			siteverify(false)
 		);
+		expect(result).toEqual({ ok: false });
+	});
+
+	it('soft-admits a token-bearing request when siteverify is unavailable', async () => {
+		const result = await evaluateChatGate(
+			SECRET,
+			{ turnstileToken: 'tok' },
+			NOW,
+			siteverify(true, false)
+		);
+		expect(result).toEqual({ ok: true });
+	});
+
+	it('does not soft-admit siteverify outages without a token', async () => {
+		const result = await evaluateChatGate(SECRET, {}, NOW, siteverify(true, false));
 		expect(result).toEqual({ ok: false });
 	});
 });

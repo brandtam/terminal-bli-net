@@ -15,34 +15,15 @@
  * everything, so local development needs no Turnstile keys.
  */
 
+import { signHmacBase64Url, timingSafeEqual } from './hmac';
+
 const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 const SESSION_TTL_MS = 30 * 60 * 1000;
 const SESSION_PREFIX = 'chat-session';
-const ALGO = { name: 'HMAC', hash: 'SHA-256' } as const;
 const SIG_BYTES = 24;
 
-// ---------------------------------------------------------------------------
-// Crypto (mirrors the HMAC pattern in email-composer.ts)
-// ---------------------------------------------------------------------------
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-	const bin = [...bytes].map((byte) => String.fromCharCode(byte)).join('');
-	return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
 async function sign(secret: string, payload: string): Promise<string> {
-	const enc = new TextEncoder();
-	const key = await crypto.subtle.importKey('raw', enc.encode(secret), ALGO, false, ['sign']);
-	const sig = await crypto.subtle.sign('HMAC', key, enc.encode(payload));
-	return bytesToBase64Url(new Uint8Array(sig).slice(0, SIG_BYTES));
-}
-
-/** Constant-time compare of two equal-length strings. */
-function timingSafeEqual(a: string, b: string): boolean {
-	if (a.length !== b.length) return false;
-	let mismatch = 0;
-	for (let i = 0; i < a.length; i += 1) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-	return mismatch === 0;
+	return signHmacBase64Url(secret, payload, SIG_BYTES);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,13 +63,14 @@ interface SiteverifyResponse {
 	success?: boolean;
 }
 
-/** Validate a Turnstile token with Cloudflare's siteverify endpoint. */
-export async function verifyTurnstileToken(
+export type TurnstileVerificationResult = 'valid' | 'invalid' | 'unavailable';
+
+async function verifyTurnstileTokenOnce(
 	secret: string,
 	token: string,
 	remoteIp: string | undefined,
 	fetchImpl: typeof fetch = fetch
-): Promise<boolean> {
+): Promise<TurnstileVerificationResult> {
 	const body = new FormData();
 	body.append('secret', secret);
 	body.append('response', token);
@@ -96,13 +78,35 @@ export async function verifyTurnstileToken(
 
 	try {
 		const response = await fetchImpl(SITEVERIFY_URL, { method: 'POST', body });
-		if (!response.ok) return false;
+		if (!response.ok) return 'unavailable';
 		const data = (await response.json()) as SiteverifyResponse;
-		return data.success === true;
+		return data.success === true ? 'valid' : 'invalid';
 	} catch (err) {
 		console.error('[turnstile] siteverify failed', err);
-		return false;
+		return 'unavailable';
 	}
+}
+
+/** Validate a Turnstile token with Cloudflare's siteverify endpoint. */
+export async function verifyTurnstileTokenResult(
+	secret: string,
+	token: string,
+	remoteIp: string | undefined,
+	fetchImpl: typeof fetch = fetch
+): Promise<TurnstileVerificationResult> {
+	const first = await verifyTurnstileTokenOnce(secret, token, remoteIp, fetchImpl);
+	if (first !== 'unavailable') return first;
+	return verifyTurnstileTokenOnce(secret, token, remoteIp, fetchImpl);
+}
+
+/** Boolean compatibility wrapper for callers that only need valid/invalid. */
+export async function verifyTurnstileToken(
+	secret: string,
+	token: string,
+	remoteIp: string | undefined,
+	fetchImpl: typeof fetch = fetch
+): Promise<boolean> {
+	return (await verifyTurnstileTokenResult(secret, token, remoteIp, fetchImpl)) === 'valid';
 }
 
 // ---------------------------------------------------------------------------
@@ -140,11 +144,20 @@ export async function evaluateChatGate(
 		return { ok: true };
 	}
 
-	if (
-		input.turnstileToken &&
-		(await verifyTurnstileToken(secret, input.turnstileToken, input.remoteIp, fetchImpl))
-	) {
-		return { ok: true, issuedSessionToken: await issueSessionToken(secret, now) };
+	if (input.turnstileToken) {
+		const tokenResult = await verifyTurnstileTokenResult(
+			secret,
+			input.turnstileToken,
+			input.remoteIp,
+			fetchImpl
+		);
+		if (tokenResult === 'valid') {
+			return { ok: true, issuedSessionToken: await issueSessionToken(secret, now) };
+		}
+		if (tokenResult === 'unavailable') {
+			console.error('[turnstile] siteverify unavailable; admitting token-bearing request');
+			return { ok: true };
+		}
 	}
 
 	return { ok: false };

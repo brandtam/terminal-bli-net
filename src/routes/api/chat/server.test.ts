@@ -12,7 +12,8 @@ import type { SpendLedger } from '$lib/server/spend-ledger';
 vi.mock('$lib/server/llm', () => ({
 	streamCompletion: vi.fn(),
 	defaultModelFor: (provider: 'claude' | 'openai') =>
-		provider === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001'
+		provider === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001',
+	isLlmProvider: (provider: string) => provider === 'claude' || provider === 'openai'
 }));
 
 vi.mock('$lib/server/spend', () => ({
@@ -131,7 +132,7 @@ function makeCatalog(channels: Channel[]): ContentCatalog {
 	};
 }
 
-function makeEvent(body: Record<string, unknown>) {
+function makeEvent(body: Record<string, unknown>, envOverrides: Record<string, unknown> = {}) {
 	return {
 		request: new Request('http://localhost/api/chat', {
 			method: 'POST',
@@ -144,7 +145,8 @@ function makeEvent(body: Record<string, unknown>) {
 				LLM_PROVIDER_ORDER: 'openai',
 				OPENAI_API_KEY: 'test-openai-key',
 				OPENAI_MODEL: 'gpt-4o-mini',
-				OPENAI_MONTHLY_SPEND_CAP: '25'
+				OPENAI_MONTHLY_SPEND_CAP: '25',
+				...envOverrides
 			}
 		},
 		getClientAddress: () => '127.0.0.1'
@@ -183,7 +185,16 @@ describe('POST /api/chat', () => {
 			provider: 'openai',
 			model: 'gpt-4o-mini',
 			reservedUsd: 0.05,
-			expiresAt: Date.now() + 60_000
+			expiresAt: Date.now() + 60_000,
+			reservations: [
+				{
+					reservationId: 'res-1',
+					provider: 'openai',
+					model: 'gpt-4o-mini',
+					reservedUsd: 0.05,
+					expiresAt: Date.now() + 60_000
+				}
+			]
 		});
 		reconcileMock.mockResolvedValue();
 		releaseMock.mockResolvedValue();
@@ -300,6 +311,136 @@ describe('POST /api/chat', () => {
 		expect(reconcileMock.mock.calls[0][1]).toEqual({ provider: 'openai', usd: 0.05 });
 	});
 
+	it('streams all reserved fallback providers and settles spend to the provider that emitted usage', async () => {
+		const event = makeEvent(makeBody('Asia/Kathmandu'), {
+			LLM_PROVIDER_ORDER: 'openai,claude',
+			ANTHROPIC_API_KEY: 'test-anthropic-key',
+			ANTHROPIC_MODEL: 'claude-haiku-4-5-20251001'
+		});
+		reserveMock.mockResolvedValueOnce({
+			ok: true,
+			reservationId: 'res-openai',
+			provider: 'openai',
+			model: 'gpt-4o-mini',
+			reservedUsd: 0.05,
+			expiresAt: Date.now() + 60_000,
+			reservations: [
+				{
+					reservationId: 'res-openai',
+					provider: 'openai',
+					model: 'gpt-4o-mini',
+					reservedUsd: 0.05,
+					expiresAt: Date.now() + 60_000
+				},
+				{
+					reservationId: 'res-claude',
+					provider: 'claude',
+					model: 'claude-haiku-4-5-20251001',
+					reservedUsd: 0.08,
+					expiresAt: Date.now() + 60_000
+				}
+			]
+		});
+		streamCompletionMock.mockResolvedValueOnce(
+			makeTokenStream([
+				{
+					type: 'usage',
+					tokenCount: 9,
+					usage: {
+						provider: 'openai',
+						model: 'gpt-4o-mini',
+						inputTokens: 5,
+						outputTokens: 4,
+						estimated: true
+					}
+				},
+				{ type: 'text', text: 'Fallback answer.' },
+				{
+					type: 'done',
+					tokenCount: 7,
+					usage: {
+						provider: 'claude',
+						model: 'claude-haiku-4-5-20251001',
+						inputTokens: 5,
+						outputTokens: 2
+					}
+				}
+			])
+		);
+		actualCostUsdMock.mockReturnValueOnce(0.02).mockReturnValueOnce(0.03);
+
+		const response = await POST(event);
+		await response.text();
+
+		expect(streamCompletionMock.mock.calls[0][0].providers).toEqual([
+			{
+				provider: 'openai',
+				apiKey: 'test-openai-key',
+				model: 'gpt-4o-mini'
+			},
+			{
+				provider: 'claude',
+				apiKey: 'test-anthropic-key',
+				model: 'claude-haiku-4-5-20251001'
+			}
+		]);
+		expect(reconcileMock).toHaveBeenCalledTimes(2);
+		expect(reconcileMock).toHaveBeenCalledWith(
+			'res-openai',
+			{ provider: 'openai', usd: 0.02 },
+			expect.any(Date)
+		);
+		expect(reconcileMock).toHaveBeenCalledWith(
+			'res-claude',
+			{ provider: 'claude', usd: 0.03 },
+			expect.any(Date)
+		);
+		expect(releaseMock).not.toHaveBeenCalled();
+	});
+
+	it('releases reserved fallback holds that never emit usage', async () => {
+		const event = makeEvent(makeBody('Asia/Kathmandu'), {
+			LLM_PROVIDER_ORDER: 'openai,claude',
+			ANTHROPIC_API_KEY: 'test-anthropic-key',
+			ANTHROPIC_MODEL: 'claude-haiku-4-5-20251001'
+		});
+		reserveMock.mockResolvedValueOnce({
+			ok: true,
+			reservationId: 'res-openai',
+			provider: 'openai',
+			model: 'gpt-4o-mini',
+			reservedUsd: 0.05,
+			expiresAt: Date.now() + 60_000,
+			reservations: [
+				{
+					reservationId: 'res-openai',
+					provider: 'openai',
+					model: 'gpt-4o-mini',
+					reservedUsd: 0.05,
+					expiresAt: Date.now() + 60_000
+				},
+				{
+					reservationId: 'res-claude',
+					provider: 'claude',
+					model: 'claude-haiku-4-5-20251001',
+					reservedUsd: 0.08,
+					expiresAt: Date.now() + 60_000
+				}
+			]
+		});
+
+		const response = await POST(event);
+		await response.text();
+
+		expect(reconcileMock).toHaveBeenCalledTimes(1);
+		expect(reconcileMock).toHaveBeenCalledWith(
+			'res-openai',
+			{ provider: 'openai', usd: 0.01 },
+			expect.any(Date)
+		);
+		expect(releaseMock).toHaveBeenCalledWith('res-claude', expect.any(Date));
+	});
+
 	it('releases the reservation when the stream produces no billable usage', async () => {
 		streamCompletionMock.mockResolvedValueOnce(
 			makeTokenStream([{ type: 'text', text: 'silence' }])
@@ -338,7 +479,7 @@ describe('POST /api/chat', () => {
 		expect(text).not.toContain('"type":"error"');
 
 		expect(streamCompletionMock).not.toHaveBeenCalled();
-		expect(recordMessageMock).not.toHaveBeenCalled();
+		expect(recordMessageMock).toHaveBeenCalledWith({}, '127.0.0.1');
 		expect(reconcileMock).not.toHaveBeenCalled();
 		expect(releaseMock).not.toHaveBeenCalled();
 	});

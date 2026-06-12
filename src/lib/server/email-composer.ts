@@ -1,25 +1,14 @@
 /**
  * Email composition and HMAC-signed unsubscribe helpers for reminder emails.
  */
-/* eslint-disable no-undef */
+import { signHmacBase64Url } from './hmac';
 
 // ---------------------------------------------------------------------------
 // HMAC helpers
 // ---------------------------------------------------------------------------
 
-const ALGO = { name: 'HMAC', hash: 'SHA-256' } as const;
 const TOKEN_BYTES = 24;
 const DOMAIN = 'bli.net';
-
-async function importKey(secret: string): Promise<CryptoKey> {
-	const enc = new TextEncoder();
-	return crypto.subtle.importKey('raw', enc.encode(secret), ALGO, false, ['sign', 'verify']);
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-	const bin = [...bytes].map((byte) => String.fromCharCode(byte)).join('');
-	return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
 
 /**
  * Produce a compact deterministic token for email ownership flows.
@@ -28,10 +17,7 @@ function bytesToBase64Url(bytes: Uint8Array): string {
  * accepted again from email routing or confirmation links.
  */
 export async function createEmailActionToken(payload: string, secret: string): Promise<string> {
-	const key = await importKey(secret);
-	const enc = new TextEncoder();
-	const sig = await crypto.subtle.sign('HMAC', key, enc.encode(payload));
-	return bytesToBase64Url(new Uint8Array(sig).slice(0, TOKEN_BYTES));
+	return signHmacBase64Url(secret, payload, TOKEN_BYTES);
 }
 
 /**

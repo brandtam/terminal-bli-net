@@ -7,7 +7,9 @@ import type { LlmProvider } from '$lib/types';
  * The ledger works by reserve-then-reconcile: a request reserves its worst-case
  * cost before streaming, then reconciles to the actual cost once the stream
  * finishes. Reservations count against the ceilings immediately, so concurrent
- * requests can never push committed-plus-reserved spend past a cap.
+ * requests can never push committed-plus-reserved spend past a cap. When the
+ * route is willing to fail over across providers, the reserve call returns one
+ * hold per fallback candidate that also fits the configured ceilings.
  */
 
 /** A ceiling the ledger can refuse against. Used for denial reasons + metrics. */
@@ -28,7 +30,7 @@ export interface CandidateProvider {
 }
 
 export interface ReserveRequest {
-	/** Ordered provider/model preferences. The ledger admits the first that fits. */
+	/** Ordered provider/model preferences. The ledger reserves each candidate that fits. */
 	candidates: CandidateProvider[];
 	/** Upper-bound input tokens for this request (used for the worst-case hold). */
 	maxInputTokens: number;
@@ -36,19 +38,28 @@ export interface ReserveRequest {
 	maxOutputTokens: number;
 }
 
+export interface ProviderReservation {
+	/** Opaque id passed back to reconcile/release. */
+	reservationId: string;
+	/** Provider/model covered by this hold. */
+	provider: LlmProvider;
+	model: string;
+	/** Worst-case dollars held against the ceilings until reconciled. */
+	reservedUsd: number;
+	/** Epoch ms after which an un-reconciled hold auto-refunds. */
+	expiresAt: number;
+}
+
 export type ReserveResult =
-	| {
+	| ({
 			ok: true;
-			/** Opaque id passed back to reconcile/release. */
-			reservationId: string;
-			/** The provider/model the ledger admitted (first candidate that fit). */
-			provider: LlmProvider;
-			model: string;
-			/** Worst-case dollars held against the ceilings until reconciled. */
-			reservedUsd: number;
-			/** Epoch ms after which an un-reconciled hold auto-refunds. */
-			expiresAt: number;
-	  }
+			/**
+			 * Provider holds reserved up front for operational failover. The first
+			 * entry is the preferred provider; later entries are fallbacks that also
+			 * fit their monthly cap and the remaining daily spend headroom.
+			 */
+			reservations: ProviderReservation[];
+	  } & ProviderReservation)
 	| {
 			ok: false;
 			/** Why the request was refused (a ceiling, or the ledger being unreachable). */
@@ -83,7 +94,7 @@ export interface LedgerStatus {
  * in-memory adapter.
  */
 export interface SpendLedger {
-	/** Reserve worst-case cost and admit a provider, or refuse with a ceiling. */
+	/** Reserve worst-case cost for the provider fallback plan, or refuse with a ceiling. */
 	reserve(req: ReserveRequest, now: Date): Promise<ReserveResult>;
 	/** Settle a completed request to its actual cost (releases the hold). */
 	reconcile(reservationId: string, actual: ReconcileInput, now: Date): Promise<void>;

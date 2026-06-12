@@ -1,4 +1,5 @@
-import type { LedgerCeilings } from './types';
+import { LLM_PROVIDERS, type LlmProvider } from '$lib/types';
+import type { LedgerCeilings, MonthlyProviderCaps } from './types';
 
 /**
  * Ceiling configuration for the Spend Ledger. Lives in its own module so both
@@ -22,6 +23,11 @@ export interface CeilingEnv {
 	OPENAI_MONTHLY_SPEND_CAP?: string;
 }
 
+const MONTHLY_CAP_ENV: Record<LlmProvider, keyof CeilingEnv> = {
+	claude: 'ANTHROPIC_MONTHLY_SPEND_CAP',
+	openai: 'OPENAI_MONTHLY_SPEND_CAP'
+};
+
 function positiveNumber(raw: string | undefined, fallback: number): number {
 	if (raw === undefined || raw.trim() === '') return fallback;
 	const value = Number(raw);
@@ -30,18 +36,16 @@ function positiveNumber(raw: string | undefined, fallback: number): number {
 
 /** Build ceilings from environment variables, falling back to the defaults. */
 export function resolveCeilings(env: CeilingEnv): LedgerCeilings {
+	const monthlyProviderUsd = Object.fromEntries(
+		LLM_PROVIDERS.map((provider) => [
+			provider,
+			positiveNumber(env[MONTHLY_CAP_ENV[provider]], DEFAULT_CEILINGS.monthlyProviderUsd[provider])
+		])
+	) as MonthlyProviderCaps;
+
 	return {
 		dailySpendUsd: positiveNumber(env.DAILY_SPEND_CAP_USD, DEFAULT_CEILINGS.dailySpendUsd),
 		dailyRequests: positiveNumber(env.DAILY_REQUEST_CAP, DEFAULT_CEILINGS.dailyRequests),
-		monthlyProviderUsd: {
-			claude: positiveNumber(
-				env.ANTHROPIC_MONTHLY_SPEND_CAP,
-				DEFAULT_CEILINGS.monthlyProviderUsd.claude
-			),
-			openai: positiveNumber(
-				env.OPENAI_MONTHLY_SPEND_CAP,
-				DEFAULT_CEILINGS.monthlyProviderUsd.openai
-			)
-		}
+		monthlyProviderUsd
 	};
 }

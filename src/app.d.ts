@@ -7,6 +7,7 @@ declare global {
 				KV: KVNamespace;
 				REMINDER_SERVICE?: Fetcher;
 				SPEND_LEDGER?: Fetcher;
+				SPEND_LEDGER_REQUIRED?: string;
 				DAILY_SPEND_CAP_USD?: string;
 				DAILY_REQUEST_CAP?: string;
 				TURNSTILE_SECRET?: string;
@@ -22,6 +23,9 @@ declare global {
 				PROVIDER?: string;
 				MONTHLY_SPEND_CAP?: string;
 				MODEL?: string;
+			};
+			context?: {
+				waitUntil(promise: Promise<unknown>): void;
 			};
 		}
 	}

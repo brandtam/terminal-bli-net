@@ -25,8 +25,7 @@ export class InMemorySpendLedger implements SpendLedger {
 	}
 
 	async release(reservationId: string, now: Date) {
-		void now;
-		this.core.release(reservationId);
+		this.core.release(reservationId, now);
 	}
 
 	async status(now: Date) {

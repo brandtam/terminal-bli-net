@@ -8,8 +8,9 @@ import { calculateTokenCostUsd, getModelPricing } from '../spend';
 
 /**
  * Upper-bound dollar cost for a request before it runs. Prices every input and
- * output token at full (non-cached) rate so the reservation can never be too
- * small. Throws on an unknown model — spend must never silently under-reserve.
+ * output token at the most expensive configured input/cache rate so the
+ * reservation can never be too small, including Anthropic prompt-cache writes.
+ * Throws on an unknown model — spend must never silently under-reserve.
  */
 export function worstCaseCostUsd(
 	model: string,
@@ -17,8 +18,14 @@ export function worstCaseCostUsd(
 	maxOutputTokens: number
 ): number {
 	const pricing = getModelPricing(model);
+	const maxInputUnitPrice = Math.max(
+		pricing.input,
+		pricing.cacheCreationInput ?? pricing.input * 1.25,
+		pricing.cacheReadInput ?? pricing.input
+	);
 	return (
-		(maxInputTokens * pricing.input) / 1_000_000 + (maxOutputTokens * pricing.output) / 1_000_000
+		(maxInputTokens * maxInputUnitPrice) / 1_000_000 +
+		(maxOutputTokens * pricing.output) / 1_000_000
 	);
 }
 

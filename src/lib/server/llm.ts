@@ -1,11 +1,21 @@
 /* eslint-disable no-undef */
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import type { ChatMessage, LlmProvider, LlmTokenUsage, TextChunk } from '$lib/types';
+import {
+	LLM_PROVIDERS,
+	type ChatMessage,
+	type LlmProvider,
+	type LlmTokenUsage,
+	type TextChunk
+} from '$lib/types';
 import { getModelPricing } from './spend';
 
 const CLAUDE_FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
 const OPENAI_FALLBACK_MODEL = 'gpt-4o-mini';
+const DEFAULT_MODELS: Record<LlmProvider, string> = {
+	claude: CLAUDE_FALLBACK_MODEL,
+	openai: OPENAI_FALLBACK_MODEL
+};
 const MID_STREAM_RETRY_NOTICE =
 	'\n\n[signal drops for a beat]\n\nOops, brain fart... let me try that again.\n\n';
 
@@ -47,7 +57,11 @@ interface ProviderStreamParams {
 }
 
 export function defaultModelFor(provider: LlmProvider): string {
-	return provider === 'openai' ? OPENAI_FALLBACK_MODEL : CLAUDE_FALLBACK_MODEL;
+	return DEFAULT_MODELS[provider];
+}
+
+export function isLlmProvider(value: string): value is LlmProvider {
+	return (LLM_PROVIDERS as readonly string[]).includes(value);
 }
 
 function isRetryableProviderError(err: unknown): boolean {
@@ -99,10 +113,12 @@ function usageOnlyChunk(usage: LlmTokenUsage): TextChunk {
 	};
 }
 
-function estimateTokens(text: string): number {
+function estimateTokens(text: string, maxTokens?: number): number {
 	const normalized = text.trim();
 	if (!normalized) return 0;
-	return Math.max(1, Math.ceil(normalized.length / 4));
+	const byteUpperBound = new TextEncoder().encode(normalized).length;
+	const capped = maxTokens === undefined ? byteUpperBound : Math.min(byteUpperBound, maxTokens);
+	return Math.max(1, capped);
 }
 
 function estimateFailedStreamUsage(
@@ -110,18 +126,30 @@ function estimateFailedStreamUsage(
 	attempt: ProviderAttempt,
 	outputText: string
 ): LlmTokenUsage | null {
-	const outputTokens = estimateTokens(outputText);
+	const outputTokens = estimateTokens(outputText, params.options?.maxTokens);
 	if (outputTokens === 0) return null;
 
 	const inputText = [
 		params.systemPrompt,
 		...params.messages.map((message) => `${message.role}: ${message.content}`)
 	].join('\n');
+	const inputTokens = estimateTokens(inputText);
+
+	if (attempt.provider === 'claude') {
+		return {
+			provider: attempt.provider,
+			model: attempt.model,
+			inputTokens: 0,
+			cacheCreationInputTokens: inputTokens,
+			outputTokens,
+			estimated: true
+		};
+	}
 
 	return {
 		provider: attempt.provider,
 		model: attempt.model,
-		inputTokens: estimateTokens(inputText),
+		inputTokens,
 		outputTokens,
 		estimated: true
 	};
@@ -360,10 +388,8 @@ export async function streamCompletion(
 
 	return new ReadableStream<TextChunk>({
 		async start(controller) {
-			// The Spend Ledger already chose the provider by budget, so this loop only
-			// handles transient provider errors: try the given attempts in order, and
-			// after partial output retry once on the next attempt (a no-op when the
-			// route passes a single admitted provider).
+			// The chat route only passes attempts that already have Spend Ledger holds,
+			// so this loop may fail over without opening an unreserved spend path.
 			for (let index = 0; index < attempts.length; index += 1) {
 				const result = await pipeProviderAttempt(controller, params, attempts[index], false);
 				if (result === 'success' || result === 'fatal-pre-token' || result === 'stop') {

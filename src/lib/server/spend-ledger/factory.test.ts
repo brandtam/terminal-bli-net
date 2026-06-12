@@ -28,4 +28,12 @@ describe('getSpendLedger', () => {
 		// No external authority to be unreachable — a normal request is admitted.
 		expect(result.ok).toBe(true);
 	});
+
+	it('fails closed when the binding is required but absent', async () => {
+		const ledger = getSpendLedger({ SPEND_LEDGER_REQUIRED: 'true' });
+		const result = await ledger.reserve(REQUEST, new Date('2026-06-11T12:00:00Z'));
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.reason).toBe('ledger-unavailable');
+	});
 });
