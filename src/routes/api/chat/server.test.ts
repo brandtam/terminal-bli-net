@@ -319,8 +319,8 @@ describe('POST /api/chat', () => {
 	it('returns a graceful in-voice message and spends nothing when a ceiling is hit', async () => {
 		reserveMock.mockResolvedValueOnce({
 			ok: false,
-			ceiling: 'daily-spend',
-			reason: 'Daily spend cap reached ($3/day).'
+			reason: 'daily-spend',
+			detail: 'Daily spend cap reached ($3/day).'
 		});
 
 		const response = await POST(makeEvent(makeBody('Asia/Kathmandu')));

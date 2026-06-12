@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { streamCompletion, defaultModelFor } from '$lib/server/llm';
 import { canRespond, recordMessage } from '$lib/server/spend';
 import { getSpendLedger, actualCostUsd } from '$lib/server/spend-ledger';
-import type { CandidateProvider, CeilingId, SpendLedgerEnv } from '$lib/server/spend-ledger';
+import type { CandidateProvider, DenialReason, SpendLedgerEnv } from '$lib/server/spend-ledger';
 import { loadContentCatalog } from '$lib/server/content-catalog';
 import { createChatSession, validateChatTimezone } from '$lib/server/chat-session';
 import type { ChatMessage, LlmProvider, TextChunk } from '$lib/types';
@@ -128,12 +128,15 @@ function toCandidates(providers: LlmProviderConfig[]): CandidateProvider[] {
 }
 
 /**
- * In-voice "off the air" copy for a ceiling refusal. The chat window renders it
+ * In-voice "off the air" copy for a refused request. The chat window renders it
  * as a normal assistant turn so the retro-OS fiction stays intact — never a raw
  * HTTP error (see PRD decision 11).
  */
-function overBudgetMessage(ceiling: CeilingId): string {
-	if (ceiling === 'monthly-provider') {
+function overBudgetMessage(reason: DenialReason): string {
+	if (reason === 'ledger-unavailable') {
+		return '[ STATIC ] ...technical difficulties — the transmitter dropped out for a sec. Give it a moment and try again.';
+	}
+	if (reason === 'monthly-provider') {
 		return "[ STATIC ] ...this channel's gone dark for the month — the dial's tapped out. Try another network, or check back when the new month rolls around.";
 	}
 	return "[ STATIC ] ...that's all she wrote for today — we're off the air until the tower fires back up tomorrow. Same station, same dial.";
@@ -276,7 +279,7 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 
 	if (!reservation.ok) {
 		// Ceiling hit — render a graceful in-voice "off the air" turn, not an error.
-		return sseResponse(messageStream(overBudgetMessage(reservation.ceiling)));
+		return sseResponse(messageStream(overBudgetMessage(reservation.reason)));
 	}
 
 	const admitted = providers.find((config) => config.provider === reservation.provider);

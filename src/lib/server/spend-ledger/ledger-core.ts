@@ -110,8 +110,8 @@ export class LedgerCore {
 		return sum;
 	}
 
-	private deny(ceiling: CeilingId, reason: string): ReserveResult {
-		return { ok: false, ceiling, reason };
+	private deny(reason: CeilingId, detail: string): ReserveResult {
+		return { ok: false, reason, detail };
 	}
 
 	reserve(req: ReserveRequest, now: Date): ReserveResult {
@@ -175,11 +175,11 @@ export class LedgerCore {
 			};
 		}
 
-		const reason =
+		const detail =
 			lastReason === 'daily-spend'
 				? `Daily spend cap reached ($${this.ceilings.dailySpendUsd}/day).`
 				: 'All candidate providers are over their monthly cap.';
-		return this.deny(lastReason, reason);
+		return this.deny(lastReason, detail);
 	}
 
 	reconcile(reservationId: string, actual: ReconcileInput, now: Date): void {

@@ -13,6 +13,14 @@ import type { LlmProvider } from '$lib/types';
 /** A ceiling the ledger can refuse against. Used for denial reasons + metrics. */
 export type CeilingId = 'daily-spend' | 'daily-requests' | 'monthly-provider';
 
+/**
+ * Why a reservation was refused: a specific ceiling, or the ledger being
+ * unreachable. `ledger-unavailable` is the fail-closed path — when the money
+ * authority can't be reached in production, the request is denied, never
+ * permitted (see the adapter factory).
+ */
+export type DenialReason = CeilingId | 'ledger-unavailable';
+
 /** One provider/model the request is willing to use, in preference order. */
 export interface CandidateProvider {
 	provider: LlmProvider;
@@ -43,10 +51,10 @@ export type ReserveResult =
 	  }
 	| {
 			ok: false;
-			/** Which ceiling refused the request. */
-			ceiling: CeilingId;
-			/** Human-readable reason, safe to log. */
-			reason: string;
+			/** Why the request was refused (a ceiling, or the ledger being unreachable). */
+			reason: DenialReason;
+			/** Human-readable detail, safe to log. */
+			detail: string;
 	  };
 
 /** Actual settled cost for a completed request, from real token usage. */

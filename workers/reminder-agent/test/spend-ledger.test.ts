@@ -70,6 +70,6 @@ describe('SpendLedgerDO', () => {
 			NOW
 		);
 		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.ceiling).toBe('daily-spend');
+		if (!result.ok) expect(result.reason).toBe('daily-spend');
 	});
 });

@@ -41,7 +41,7 @@ describe('LedgerCore — exactness invariant', () => {
 
 		const fourth = core.reserve(ONE_M_INPUT, NOW);
 		expect(fourth.ok).toBe(false);
-		if (!fourth.ok) expect(fourth.ceiling).toBe('daily-spend');
+		if (!fourth.ok) expect(fourth.reason).toBe('daily-spend');
 
 		const status = core.status(NOW);
 		expect(status.daily.reservedUsd).toBeCloseTo(3 * COST_PER_RESERVE, 6);
@@ -89,7 +89,7 @@ describe('LedgerCore — request-count backstop', () => {
 		expect(core.reserve(ONE_M_INPUT, NOW).ok).toBe(true);
 		const third = core.reserve(ONE_M_INPUT, NOW);
 		expect(third.ok).toBe(false);
-		if (!third.ok) expect(third.ceiling).toBe('daily-requests');
+		if (!third.ok) expect(third.reason).toBe('daily-requests');
 	});
 
 	it('counts the request at reserve time and never refunds the count', () => {
@@ -120,7 +120,7 @@ describe('LedgerCore — monthly provider cap with fallback', () => {
 			NOW
 		);
 		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.ceiling).toBe('monthly-provider');
+		if (!result.ok) expect(result.reason).toBe('monthly-provider');
 	});
 
 	it('settles actual spend against the reserved provider and month', () => {
