@@ -11,6 +11,7 @@ export type {
 } from './types';
 export { LedgerCore, type LedgerState } from './ledger-core';
 export { InMemorySpendLedger } from './in-memory-ledger';
+export { DurableObjectSpendLedger, SPEND_LEDGER_ROUTES } from './do-adapter';
 export { worstCaseCostUsd, actualCostUsd } from './cost';
 export {
 	DEFAULT_CEILINGS,

@@ -9,7 +9,16 @@
 	// "kv_namespaces": [{ "binding": "KV", "id": "YOUR_KV_NAMESPACE_ID" }],
 	// ReminderAgent runs as a separate Worker because Cloudflare Pages cannot
 	// export Durable Object classes from the Pages adapter output.
-	"services": [{ "binding": "REMINDER_SERVICE", "service": "terminal-reminder-agent" }],
+	// REMINDER_SERVICE → the reminder Worker's subscribe/confirm endpoints.
+	// SPEND_LEDGER → the same Worker's /ledger/* endpoints, which front the single
+	// global SpendLedgerDO that enforces every dollar ceiling exactly (docs/adr/0005).
+	"services": [
+		{ "binding": "REMINDER_SERVICE", "service": "terminal-reminder-agent" },
+		{ "binding": "SPEND_LEDGER", "service": "terminal-reminder-agent" }
+	],
+	// Spend Ledger ceilings — keep ANTHROPIC/OPENAI monthly caps in step with the
+	// reminder Worker's vars (the DO reads its limits from the Worker's env, not these).
+	// DAILY_SPEND_CAP_USD / DAILY_REQUEST_CAP default to $3 / 5000 when unset.
 	// Secrets (set via `wrangler secret put`):
 	// ANTHROPIC_API_KEY and/or OPENAI_API_KEY.
 	//

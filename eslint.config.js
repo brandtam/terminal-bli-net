@@ -43,6 +43,8 @@ export default [
 				PointerEvent: 'readonly',
 				DataTransfer: 'readonly',
 				DurableObjectNamespace: 'readonly',
+				DurableObjectState: 'readonly',
+				RequestInit: 'readonly',
 				EmailAddress: 'readonly',
 				EventSource: 'readonly',
 				ExportedHandler: 'readonly',

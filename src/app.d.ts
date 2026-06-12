@@ -6,6 +6,9 @@ declare global {
 			env: {
 				KV: KVNamespace;
 				REMINDER_SERVICE?: Fetcher;
+				SPEND_LEDGER?: Fetcher;
+				DAILY_SPEND_CAP_USD?: string;
+				DAILY_REQUEST_CAP?: string;
 				REMINDER_SUBSCRIBE_RATE_LIMIT_PER_HOUR?: string;
 				ANTHROPIC_API_KEY?: string;
 				OPENAI_API_KEY?: string;

@@ -32,7 +32,17 @@ export default defineConfig(({ mode }) => {
 		],
 		resolve: {
 			alias: {
-				$lib: new URL('./src/lib', import.meta.url).pathname
+				$lib: new URL('./src/lib', import.meta.url).pathname,
+				// The `unit` project runs the reminder Worker's handler tests in Node,
+				// where `cloudflare:workers` doesn't exist. Point it at a no-op shim so
+				// the import graph loads; the DO's real behaviour is covered in the
+				// Cloudflare pool project (workers/reminder-agent/test).
+				...(isTest
+					? {
+							'cloudflare:workers': new URL('./vitest-shims/cloudflare-workers.ts', import.meta.url)
+								.pathname
+						}
+					: {})
 			}
 		},
 		define: {
