@@ -1,6 +1,6 @@
 # 1-Bit Booth — PRD
 
-App exploration for TerminalOS. A photo booth that renders your webcam the way a 1987 computer would have: 1-bit ordered dither, Game Boy green, or amber phosphor. Stills only — the OS already has Camera (Recorder) for video clips; this app never touches MediaRecorder.
+App exploration for TerminalOS. A photo booth that renders your webcam the way a 1987 computer would have: eight film stocks from 1-bit Mac dither to CGA magenta, plus INVERT and AGC auto-exposure. Stills only — the OS already has Camera (Recorder) for video clips; this app never touches MediaRecorder.
 
 Status: exploration. Companion interactive demo: [`demo.html`](demo.html).
 
@@ -8,7 +8,9 @@ Status: exploration. Companion interactive demo: [`demo.html`](demo.html).
 
 1-Bit Booth is a creative toy, not a utility. You point it at your face and it shows you, live, at 160×120 and two (or four) colors. A big shutter button captures the frame to a photo strip; strip photos save to Terminal HD or download as PNG.
 
-Target audience: people raised on touchscreen selfie cameras. The selfie is their most rehearsed gesture; the app hijacks it and returns the most alien possible output. Nothing to learn — the entire UI is a viewfinder, three mode buttons, some stamps, and a shutter.
+Target audience: people raised on touchscreen selfie cameras. The selfie is their most rehearsed gesture; the app hijacks it and returns the most alien possible output. Nothing to learn — the entire UI is a viewfinder, a row of film stocks, some stamps, and a shutter.
+
+Guardrail (review decision, July 2026): this replicates **old computing, not an old camera**. No camera-culture gimmicks — no multi-shot booth sequences, no self-timer countdowns, no date-back stamps, no film-advance sounds. Mode/palette play is the toy; macOS Photo Booth territory is explicitly off-concept.
 
 Distinct from Camera/Recorder: Recorder captures video/webm clips played by Player. 1-Bit Booth captures image/png stills it can view itself. No shared code, no shared file types, no `recorder` window ids.
 
@@ -36,8 +38,8 @@ Plainly: all processing happens locally in the browser tab. Frames go from the c
 
 1. **Launch.** Buy in Computer Store → install → double-click `1-Bit Booth.app`. One fixed window opens (~420×560). Viewfinder shows the test pattern immediately with a "START CAMERA" button and the privacy copy overlaid.
 2. **Permission.** User clicks Start Camera → we call `getUserMedia` → browser prompt. Grant: preview crossfades from test pattern to live dithered feed, status LED reads `LIVE`. Deny/fail: short alert ("No camera — running the test pattern instead"), test pattern keeps going.
-3. **Live dither.** Feed is mirrored (selfie convention), downscaled to 160×120, ordered-dithered, upscaled 4× with nearest-neighbor into a CRT-styled viewport. Brightness/contrast sliders below the viewfinder feed the luminance stage.
-4. **Mode switching.** Three chunky radio buttons: `1-BIT`, `GAME BOY`, `AMBER`. Instant switch, applies to preview and future captures. UI blip on press.
+3. **Live dither.** Feed is mirrored (selfie convention), downscaled to 160×120, ordered-dithered, upscaled 4× with nearest-neighbor into a CRT-styled viewport. AGC auto-exposure (default on) stretches the luma range per frame so faces read in any lighting; brightness/contrast sliders fine-tune after it.
+4. **Mode switching.** Eight chunky radio buttons: `1-BIT`, `PAPER`, `GREEN`, `AMBER`, `PLASMA`, `GAME BOY`, `CGA`, `C64` — plus `INVERT` and `AGC` toggles. Instant switch, applies to preview and future captures. UI blip on press.
 5. **Stamps.** Toggle buttons: deal-with-it sunglasses, pixel crown, "RAD!" speech bubble. Drawn over the dithered frame in palette colors at fixed positions; toggling is instant; active stamps bake into captures.
 6. **Shutter.** One oversized round button. Press → WebAudio camera-clunk + 120 ms white flash → still is captured with Floyd–Steinberg ("fine" dither, see below) at 640×480 and slides into the photo strip.
 7. **Strip.** Horizontal row of recent shots below the shutter (newest first, capped at 12 in-session). Click a shot → small action row: **Save to Disk** (Terminal HD), **Download PNG**, **Trash**.
@@ -56,7 +58,11 @@ Two dither paths: **ordered (Bayer 4×4)** for the live preview — cheap, stabl
 
 ### Luminance
 
-Rec. 601 luma per pixel: `L = 0.299·R + 0.587·G + 0.114·B` (0–255). Then brightness/contrast: `L' = clamp((L − 128) · contrast + 128 + brightness, 0, 255)` with contrast ∈ [0.5, 2.0] default 1.0, brightness ∈ [−100, +100] default 0.
+Rec. 601 luma per pixel: `L = 0.299·R + 0.587·G + 0.114·B` (0–255).
+
+**AGC (auto gain control), default on.** Dither is unforgiving of bad exposure — an under-lit face goes solid level-0. Per frame: build a 256-bin histogram of raw luma, find the 2% and 98% percentile values `lo`/`hi`, then linearly stretch `[lo, hi]` to `[0, 255]`. Two stabilizers: (a) if `hi − lo < 32`, widen symmetrically to 32 around their midpoint so near-flat scenes don't amplify noise into full-range flicker; (b) smooth `lo`/`hi` across frames with an EMA (α = 0.15) so exposure glides rather than pops. Toggling AGC off resets to the identity mapping immediately (no glide-out). The label is `AGC` — the real camcorder-era term.
+
+Then brightness/contrast on the (possibly AGC-stretched) luma: `L' = clamp((L − 128) · contrast + 128 + brightness, 0, 255)` with contrast ∈ [0.5, 2.0] default 1.0, brightness ∈ [−100, +100] default 0.
 
 ### Ordered dither (live)
 
@@ -107,16 +113,24 @@ Author each stamp as a tiny grid of `#` (dark = palette[0]), `o` (light = palett
 | Mode | Levels | Palette (dark → light) | Homage |
 | --- | --- | --- | --- |
 | `1-BIT` | 2 | `#0a0a0a`, `#e8e8e0` | Classic Mac 1-bit (slightly warm white, not pure `#fff`) |
-| `GAME BOY` | 4 | `#0f380f`, `#306230`, `#8bac0f`, `#9bbc0f` | Game Boy Camera / DMG LCD |
+| `PAPER` | 2 | `#33302a`, `#f4f0e4` | Dot-matrix printout — dark ink on near-white |
+| `GREEN` | 4 | `#001500`, `#0a4f0a`, `#15a115`, `#33ff33` | Green phosphor monitor (IBM 5151) |
 | `AMBER` | 4 | `#140a00`, `#663c00`, `#c27800`, `#ffb000` | Amber phosphor terminal |
+| `PLASMA` | 4 | `#140200`, `#5c1400`, `#b33000`, `#ff5f1f` | Gas-plasma portable (Toshiba T3100-era) |
+| `GAME BOY` | 4 | `#0f380f`, `#306230`, `#8bac0f`, `#9bbc0f` | Game Boy Camera / DMG LCD |
+| `CGA` | 4 | `#000000`, `#ff55ff`, `#55ffff`, `#ffffff` | CGA palette 1, high intensity — the loudest thing 1987 had |
+| `C64` | 4 | `#0f0b33`, `#40318d`, `#7869c4`, `#cbd6ff` | Commodore 64 blues |
 
-Mode is app-level state; switching costs nothing (same kernel, different palette array). Default on first launch: `1-BIT`.
+Every palette is a luma-monotonic dark→light ramp — that's the kernel's only requirement, so new stocks are one array each. Mode is app-level state; switching costs nothing (same kernel, different palette array). Default on first launch: `1-BIT`.
+
+**INVERT** (toggle, default off) reverses the active palette array before dithering — MacPaint-iconic in 1-bit, and it effectively doubles every stock. Stamps draw with palette endpoints, so they invert along with the image, which is correct. Applies to preview and captures alike.
 
 ## Feature list v1 + scope cuts
 
 **v1:**
 
-- Live Bayer-dithered preview, three modes, ≥15 fps.
+- Live Bayer-dithered preview, eight film stocks, ≥15 fps.
+- AGC auto-exposure (default on) + INVERT palette flip.
 - Brightness/contrast sliders.
 - Three stamps (sunglasses, crown, RAD! bubble), toggleable, baked into captures.
 - Shutter with sound + flash; FS fine-dither capture at 640×480 PNG.
@@ -127,11 +141,11 @@ Mode is app-level state; switching costs nothing (same kernel, different palette
 
 **v2 (explicitly cut from v1):**
 
-- Animated GIF strip (4 shots → looping GIF; needs a GIF encoder, real work).
-- Self-timer (3-2-1 beeps).
-- Extra filters (invert, threshold-only "no dither", Bayer 8×8).
+- Extra dither kernels (threshold-only "no dither", Bayer 8×8).
 - Camera picker for multi-camera machines.
 - Custom stamp editor.
+
+**Cut entirely (not deferred — review decision, see the guardrail in Overview):** multi-shot booth sequences, GIF strip composites, self-timer countdowns, date stamps, film-advance sounds. Old computing, not an old camera.
 
 ## Sound spec
 
@@ -225,11 +239,17 @@ defineApp({
 			]
 		},
 		{
-			label: 'Mode',
+			label: 'Film',
 			items: [
-				{ type: 'action', label: '1-Bit', action: () => boothState.setMode('onebit') },
-				{ type: 'action', label: 'Game Boy', action: () => boothState.setMode('gameboy') },
-				{ type: 'action', label: 'Amber', action: () => boothState.setMode('amber') }
+				// one entry per film stock, generated from the MODES table
+				...boothState.modeIds.map((id) => ({
+					type: 'action' as const,
+					label: boothState.modeLabel(id),
+					action: () => boothState.setMode(id)
+				})),
+				{ type: 'separator' },
+				{ type: 'action', label: 'Invert', shortcut: '⌘I', action: () => boothState.toggleInvert() },
+				{ type: 'action', label: 'Auto Exposure (AGC)', action: () => boothState.toggleAgc() }
 			]
 		},
 		{
@@ -259,8 +279,8 @@ Notes:
 	tagline: 'Say cheese in two colors.',
 	icon: 'camera',
 	sticker: 'NEW',
-	back: 'A photo booth from a timeline where cameras never got better. Your face, live, at 160×120 in exactly two colors — or four, if you spring for Game Boy green. Big red button. Real clunk. Photo strip included.',
-	inside: ['3 film stocks: 1-bit, Game Boy, amber', 'Deal-with-it sunglasses, crown, RAD! bubble', 'Photo strip · saves to Terminal HD'],
+	back: 'A photo booth from a timeline where cameras never got better. Your face, live, at 160×120 in exactly two colors — or four, in stocks from Game Boy green to CGA magenta. Big red button. Real clunk. Photo strip included.',
+	inside: ['8 film stocks: 1-bit, paper, green, amber, plasma, Game Boy, CGA, C64', 'AGC auto-exposure · INVERT', 'Deal-with-it sunglasses, crown, RAD! bubble', 'Photo strip · saves to Terminal HD'],
 	reqs: 'Terminal OS 1.0 · A face · A camera (optional)'
 }
 ```
@@ -309,14 +329,15 @@ navigator.mediaDevices.getUserMedia({
 2. Launch with no camera interaction shows the animated test pattern dithered in the current mode; every control works against it.
 3. Start Camera on a machine with a webcam: live mirrored preview within 2 s of grant, sustained ≥15 fps at 160×120 (measure with a frame counter in dev).
 4. Deny the permission: alert appears once, test pattern continues, no console errors, Start Camera can be retried.
-5. Mode buttons switch preview palette instantly; endpoint colors match the table in Modes exactly.
+5. Mode buttons switch preview palette instantly; endpoint colors match the table in Modes exactly. INVERT flips endpoint colors in preview and capture.
 6. Dither correctness: 50% gray input in 1-BIT mode produces a checkerboard-density field (8/16 white per Bayer tile) — verified by the kernel unit tests and eyeball-verified via the test pattern's gradient bar.
-7. Shutter produces clunk + flash + a strip entry; captured PNG is 640×480, nearest-neighbor chunky, includes active stamps, uses FS dithering when the fine toggle is on.
-8. Save to Disk creates a blob file with `contentType: 'image/png'`, `fileType: 'photo'`, `opensWith: 'onebit-booth'`; double-clicking it in Finder opens the Booth viewer window showing the photo.
-9. Download PNG works with no network (file downloads from a data/object URL).
-10. Disk cap: 49th save is refused with the alert; nothing corrupts.
-11. Closing the window stops the camera (OS/browser tally light goes off) and the rAF loop.
-12. `pnpm check`, `pnpm test:unit` (including app-conformance, zero-os-edit, and the new dither tests) pass.
+7. AGC: a dim scene (all luma ≤ 60) renders using the full palette range within ~1 s of AGC settling; a near-flat scene (span < 32) does not flicker; toggling AGC off restores the identity mapping on the next frame.
+8. Shutter produces clunk + flash + a strip entry; captured PNG is 640×480, nearest-neighbor chunky, includes active stamps, uses FS dithering when the fine toggle is on.
+9. Save to Disk creates a blob file with `contentType: 'image/png'`, `fileType: 'photo'`, `opensWith: 'onebit-booth'`; double-clicking it in Finder opens the Booth viewer window showing the photo.
+10. Download PNG works with no network (file downloads from a data/object URL).
+11. Disk cap: 49th save is refused with the alert; nothing corrupts.
+12. Closing the window stops the camera (OS/browser tally light goes off) and the rAF loop.
+13. `pnpm check`, `pnpm test:unit` (including app-conformance, zero-os-edit, and the new dither tests) pass.
 
 ## Test plan
 
@@ -327,6 +348,8 @@ navigator.mediaDevices.getUserMedia({
   - Ordered kernel: solid endpoints; 128 → 50%, 64 → 25%, 191 → 75% density at N = 2; monotonic tile density for N ∈ {2, 4}; all four levels emitted across a ramp at N = 4.
   - Luma: `luma(255,255,255) === 255`, `luma(0,0,0) === 0`, green outweighs red outweighs blue.
   - Brightness/contrast clamp to [0, 255].
+  - Every mode palette in the table is luma-monotonic dark → light (guards future stock additions).
+  - AGC percentile picker on synthetic histograms: uniform ramp → (≈5, ≈250); all-dark scene stretches; flat scene (single bin) triggers the min-span-32 guard; off → identity.
   - Floyd–Steinberg on a fixture 8×8 50%-gray tile at N = 2: output mean within 1/64 of input mean (error conservation), and total error rows sum ≈ 0.
 - **`booth-save.test.ts`** — `createBlobFile` metadata shape, name-collision bumping, cap-at-48 refusal (mirror `body-gc.test.ts` patterns).
 - **Manual matrix** — Chrome/Firefox/Safari desktop + iOS Safari: grant, deny, no-device, device-busy, backgrounded tab, quota-full.
