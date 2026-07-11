@@ -560,6 +560,46 @@ updateAllCells();
 setCursor(0, 0);
 setView(0);
 requestAnimationFrame(frame);
+
+/* ---------------- local songs (optional, never shipped) ----------------
+ * Personal song data can live in a local-songs.js next to this file; that
+ * file is gitignored, so it never lands in the repo or on a public host.
+ * Format:
+ *   window.LOCAL_SONGS = [{ name: 'MY SONG', bpm: 150, tracks: [t0,t1,t2,t3] }]
+ * where each track is [[row, 'E-5', vol], …] for channels
+ * 0 pulse lead · 1 pulse arp · 2 triangle bass · 3 noise (C-2 kick, C-4 snare, C-6 hat). */
+function loadLocalSong(song) {
+  pattern = Array.from({ length: CHS }, () => new Array(ROWS).fill(null));
+  song.tracks.forEach((tr, c) => {
+    if (c < CHS) (tr || []).forEach(([r, s, v]) => { if (r >= 0 && r < ROWS) put(c, r, s, v); });
+  });
+  if (song.bpm) {
+    bpm = Math.max(+bpmSlider.min, Math.min(+bpmSlider.max, song.bpm));
+    bpmSlider.value = bpm;
+    document.getElementById('bpmVal').textContent = bpm;
+  }
+  updateAllCells();
+  setCursor(0, 0);
+  demoLoaded = false;
+  if (!playing) playBtn.innerHTML = '&#9654; PLAY';
+}
+(function () {
+  const s = document.createElement('script');
+  s.src = 'local-songs.js';
+  s.onload = () => {
+    if (!Array.isArray(window.LOCAL_SONGS)) return;
+    const clearBtn = document.getElementById('clearBtn');
+    for (const song of window.LOCAL_SONGS) {
+      const b = document.createElement('button');
+      b.className = 'tbtn';
+      b.textContent = song.name;
+      b.addEventListener('click', () => { b.blur(); loadLocalSong(song); });
+      clearBtn.parentNode.insertBefore(b, clearBtn);
+    }
+  };
+  s.onerror = () => s.remove(); // no local songs file — nothing to do
+  document.body.appendChild(s);
+})();
 </script>
 </body>
 </html>

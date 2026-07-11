@@ -64,7 +64,7 @@ In scope:
 - Play/stop from row 0, loop at row 63 → 0. Fixed playhead, scrolling grid, per-channel VU meters, per-channel mute (click the channel header).
 - Tempo: BPM 60–240, rows-per-beat fixed at 4 (each row is a 16th note).
 - Effects (per §5): `0xy` arpeggio, `1xx` slide up, `2xx` slide down, `Cxx` set channel volume.
-- Bundled demo song + "Play Demo Song" (empty-state button and File menu item).
+- Bundled songs (review decision, July 2026): the demo tune plus a small starter folder — 2–3 public-domain classics arranged for the 4 voices (era-authentic precedent: Tetris shipped Korobeiniki; 8-bit games mined Bach and Joplin constantly) and 2–3 original adventure/platformer-style tracks. Instant play-before-compose is what keeps the tracker a toy, not a tool. **Everything bundled must be legally clean — no copyrighted game music ships, ever.** Personal transcriptions of anything else stay in local, gitignored song files (the demo's `local-songs.js` seam is the model; the built app gets the same via module files on Terminal HD, which are user data and never in the repo).
 - Save / open module files on Terminal HD (format in §8).
 - New Module (⌘N) resets to an empty pattern in the current window if saved/clean, else prompts.
 
