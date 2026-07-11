@@ -21,7 +21,7 @@ Four fixed channels, classic 8-bit voicing, all synthesized with WebAudio — no
 
 Audience: retro computing enthusiasts — people who remember (or wish they remembered) ProTracker on an Amiga 500. They want the ritual: hex rows, monospace grid, the pattern scrolling under the playbar. Secondary audience: anyone who screen-records the demo song and posts it.
 
-Not a DAW. No mixing console, no automation lanes, no MIDI. One pattern grid, four voices, a handful of effects.
+Not a DAW. No automation lanes, no MIDI. One pattern grid, four voices, a level knob per channel, a handful of effects.
 
 ## 2. Viral hook
 
@@ -44,9 +44,11 @@ Two things make this spread:
 - In the volume column, `0–9 A–F` type a hex volume; `+` / `-` nudge it.
 - In the effect columns, hex keys type the effect number and parameter (see §5).
 
+A placed note leaves its volume column empty and plays at the channel's running volume (per-channel default; `Cxx` changes it). Typing a hex digit in the volume column pins that row's level. Drum entry pins per-drum levels (kick E, snare C, hat 6) since one channel carries all three.
+
 Every placed note previews immediately through its channel voice (a keydown is a user gesture, so the AudioContext may start here).
 
-**Playing.** `Space` toggles play/stop (also a Playback menu item and a transport button). Playback starts at row 0. The playhead is a fixed bright bar in the vertical center of the grid; rows scroll beneath it. Channel headers carry VU meters that kick on each note trigger and decay. Tempo is a BPM field in the transport bar; changes apply on the next scheduled row.
+**Playing.** `Space` toggles play/stop (also a Playback menu item and a transport button). Playback starts at row 0. The playhead is a fixed bright bar in the vertical center of the grid; rows scroll beneath it. Channel headers carry VU meters that kick on each note trigger and decay, plus a level knob — click-hold and drag up/down to turn it (live, mid-playback), double-click to reset to 100%. Tempo is a BPM field in the transport bar; changes apply on the next scheduled row.
 
 **Saving.** `⌘S` (File → Save). First save prompts for a name (default `untitled.mtk`) and writes a module file to `/Documents`. Subsequent saves overwrite the same file's body. The window title shows the file name, with a `•` dirty marker when there are unsaved edits. Closing a dirty window asks save / discard / cancel via `os` alert.
 
@@ -61,7 +63,7 @@ In scope:
 - One pattern, 64 rows, 4 fixed channels. Cell = note + volume (hex 0–F) + effect (1 hex digit) + effect param (2 hex digits).
 - Keyboard piano entry (two-row layout above), base octave switch, cell clear, edit-step of 1.
 - Arrow-key navigation across rows, channels, and sub-columns (note / vol / fx / param). `Tab` jumps a whole channel.
-- Play/stop from row 0, loop at row 63 → 0. Fixed playhead, scrolling grid, per-channel VU meters, per-channel mute (click the channel header).
+- Play/stop from row 0, loop at row 63 → 0. Fixed playhead, scrolling grid, per-channel VU meters, per-channel mute (click the channel header), per-channel level knob (drag vertically, 0–150%, double-click resets).
 - Tempo: BPM 60–240, rows-per-beat fixed at 4 (each row is a 16th note).
 - Effects (per §5): `0xy` arpeggio, `1xx` slide up, `2xx` slide down, `Cxx` set channel volume.
 - Bundled songs (review decision, July 2026): the demo tune plus a small starter folder — 2–3 public-domain classics arranged for the 4 voices (era-authentic precedent: Tetris shipped Korobeiniki; 8-bit games mined Bach and Joplin constantly) and 2–3 original adventure/platformer-style tracks. Instant play-before-compose is what keeps the tracker a toy, not a tool. **Everything bundled must be legally clean — no copyrighted game music ships, ever.** Personal transcriptions of anything else stay in local, gitignored song files (the demo's `local-songs.js` seam is the model; the built app gets the same via module files on Terminal HD, which are user data and never in the repo).
@@ -87,19 +89,20 @@ All audio lives in a `TrackerEngine` class (plain TS, no Svelte), one instance p
 One `AudioContext` per engine. Persistent per-channel nodes — voices are *retriggered*, never rebuilt, so there is no per-note node churn and no click management beyond envelopes:
 
 ```
-Pulse A:  OscillatorNode (PeriodicWave, 50% duty) ─→ GainNode ─┐
-Pulse B:  OscillatorNode (PeriodicWave, 25% duty) ─→ GainNode ─┤
-Triangle: OscillatorNode (type 'triangle')        ─→ GainNode ─┼─→ master GainNode ─→ DynamicsCompressorNode ─→ destination
-Noise:    AudioBufferSourceNode (1 s white noise, ─→ GainNode ─┘
+Pulse A:  OscillatorNode (PeriodicWave, 50% duty) ─→ GainNode (env) ─→ GainNode (level) ─┐
+Pulse B:  OscillatorNode (PeriodicWave, 25% duty) ─→ GainNode (env) ─→ GainNode (level) ─┤
+Triangle: OscillatorNode (type 'triangle')        ─→ GainNode (env) ─→ GainNode (level) ─┼─→ master GainNode ─→ DynamicsCompressorNode ─→ destination
+Noise:    AudioBufferSourceNode (1 s white noise, ─→ GainNode (env) ─→ GainNode (level) ─┘
           loop: true, playbackRate automated)
 ```
 
 - Pulse waves come from `createPeriodicWave(real, imag)` with 32 harmonics, `imag[n] = (2 / (nπ)) · sin(πnd)` for duty `d` (0.5 and 0.25). PeriodicWave is band-limited by the implementation, so no aliasing work needed.
 - Noise is one shared 1-second `Float32Array` of `Math.random()*2-1`, wrapped in a looping buffer source started once. Drum types are shaped by `playbackRate` + envelope: kick = rate swept 0.8 → 0.12 over 60 ms with a ~55 ms gain decay; snare = rate 0.95, ~70 ms decay; hat = rate 2.5, ~20 ms decay.
 - Per-channel gain doubles as the envelope. Note trigger at time `t`:
-  `gain.cancelScheduledValues(t); gain.setValueAtTime(0, t); gain.linearRampToValueAtTime(a, t + 0.004); gain.setTargetAtTime(a · sustain, t + 0.03, τ)` where `a = (vol/15) · channelBase`. Lead sustains (`sustain ≈ 0.45`, τ ≈ 0.18 — held notes ring until the next trigger); arp and bass decay to 0 (τ ≈ 0.07 / 0.13). Channel base gains ≈ 0.20 / 0.12 / 0.32 / 0.25; master ≈ 0.85 into the compressor.
+  `gain.cancelScheduledValues(t); gain.setValueAtTime(0, t); gain.linearRampToValueAtTime(a, t + 0.004); gain.setTargetAtTime(a · sustain, t + 0.03, τ)` where `a = (vol/15) · channelBase`. Lead sustains (`sustain ≈ 0.45`, τ ≈ 0.18 — held notes ring until the next trigger); arp and bass decay to 0 (τ ≈ 0.07 / 0.13). Channel base gains ≈ 0.20 / 0.12 / 0.34 / 0.18; master ≈ 0.85 into the compressor.
+- The per-channel level GainNode sits between envelope and master; the header knob writes it live via `setTargetAtTime(v, now, 0.02)`, range 0–1.5, default 1. Knob values live outside the engine so they survive engine creation (set knob, then press play).
 - Pitch: `freq = 440 · 2^((n − 57) / 12)` with `n` the semitone index, `n = 57` = A-4. Set with `osc.frequency.setValueAtTime(freq, t)`.
-- Mute = skip the channel in `scheduleRow` (not a gain hack, so unmuting doesn't resurrect a stale envelope).
+- Mute = skip the channel in `scheduleRow`, plus one envelope kill at toggle time (`cancelScheduledValues` + `setTargetAtTime(0)`) — otherwise a sustaining lead note rings forever, since its release is the *next* trigger. Unmuting just resumes scheduling; the next trigger rebuilds the envelope from zero.
 
 ### Scheduler
 
@@ -128,7 +131,7 @@ Effects are scheduled entirely inside the row's time window using the same audio
 Era target: FastTracker II / ProTracker on a sharp dark CRT — not the OS's paper-and-ink desktop chrome. The window frame is standard TerminalOS chrome; everything inside the content area is tracker-dark. That contrast is intentional and reads as "a pro tool from a different subculture," exactly like DPaint or FT2 felt next to Workbench.
 
 - **Palette** (inside the content area): background `#0b0d12`; panel/toolbar `#131722`; grid lines `#1c2230`; row numbers cyan `#5ad7e0`; note text warm off-white `#e8e6d0`; empty cells dim `#3a4254` (rendered as `···`); volume digits amber `#ffb347`; effect digits `#9a8cff`; playhead bar `#233551` with full-bright text; beat rows (every 4) faintly lifted `#11141d`; bar rows (every 16) `#151a26`; VU fill green→amber gradient; record/danger accents `#ff5d5d`.
-- **Layout**: transport bar on top (play/stop, BPM spinner, octave indicator, module name); channel header strip (channel number, voice name, VU meter, mute state); the pattern grid filling the rest, playhead bar fixed at vertical center with rows translating beneath it; one-line status/legend footer.
+- **Layout**: transport bar on top (play/stop, BPM spinner, octave indicator, module name); channel header strip (channel number, voice name, VU meter, mute state, level knob); the pattern grid filling the rest, playhead bar fixed at vertical center with rows translating beneath it; one-line status/legend footer.
 - **Typography**: the OS monospace stack only (`ui-monospace, Menlo, Consolas, monospace`) — no webfonts, nothing fetched. Grid at ~13 px, tabular figures via monospace, uppercase everywhere in chrome. Row numbers and row indices in **hex** (`00`–`3F`).
 - **Cell format**: `A-4 C 0xy` — three-char note (`C#5`, `···` when empty), one hex volume digit, three hex effect digits. Noise channel renders `KCK`/`SNR`/`HAT` in the note slot.
 - Default window 640×480 (min 560×400). The grid shows ~16 rows; everything else is fixed-height.
@@ -305,7 +308,8 @@ Every item is checkable by hand or by test:
 - [ ] Clicking a cell selects it; arrow keys move across rows/channels/sub-columns; the Z-row and Q-row piano keys place the expected notes; `[`/`]` change octave; Delete clears; entering a note previews it audibly.
 - [ ] Effects behave per §5: `037` arpeggiates a minor chord audibly; `1xx`/`2xx` bend pitch; `Cxx` changes channel volume from that row on.
 - [ ] BPM change during playback takes effect within one row and does not glitch or reset the position.
-- [ ] Mute toggles per channel take effect on the next row.
+- [ ] Mute silences a channel immediately, including a note mid-sustain; unmute picks up on the next row.
+- [ ] Dragging a channel's level knob changes its loudness live during playback; double-click returns it to 100%; a knob set before first play applies once audio starts.
 - [ ] ⌘S on a scratch window creates a `.mtk` file in `/Documents` with a blob body and `contentType: 'application/x-microtracker-module'`; the window title becomes the file name; a second ⌘S replaces the body (no duplicate files).
 - [ ] Double-clicking the saved file in Finder opens a `microtracker:<fileId>` window with the identical pattern (round-trip equality on the serialized form). Double-clicking again focuses the existing window.
 - [ ] A corrupted module body (hand-edited garbage) produces the damaged-file alert, not a crash.
