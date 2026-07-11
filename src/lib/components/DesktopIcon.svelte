@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { longPress, isTouchLikePointer } from '$lib/os/touch';
 
 	let {
 		label,
@@ -34,6 +35,20 @@
 		ondrop?: (e: DragEvent) => void;
 		children: Snippet;
 	} = $props();
+
+	// Touch can't rely on dblclick (double-tap synthesis varies by browser), so
+	// icons open classic-Mac style there: first tap selects, second tap opens.
+	// The last pointerdown's type tells the click handler which world it's in —
+	// pointerdown always precedes the click it produces, for mouse and touch.
+	let lastPointerType = '';
+
+	function handleLongPress(p: { clientX: number; clientY: number }) {
+		// iOS Safari never fires contextmenu for touch; synthesize the same
+		// select-then-menu path the native event takes.
+		if (!oncontextmenu) return;
+		onselect?.();
+		oncontextmenu(new MouseEvent('contextmenu', { clientX: p.clientX, clientY: p.clientY }));
+	}
 </script>
 
 <div
@@ -45,11 +60,17 @@
 	{draggable}
 	role="button"
 	tabindex="0"
+	onpointerdown={(e) => (lastPointerType = e.pointerType)}
 	onclick={(e) => {
 		e.stopPropagation();
+		if (isTouchLikePointer(lastPointerType) && selected) {
+			ondblclick();
+			return;
+		}
 		onselect?.();
 	}}
 	{ondblclick}
+	use:longPress={handleLongPress}
 	onkeydown={(e) => {
 		if (e.key === 'Enter') {
 			ondblclick();
@@ -88,6 +109,10 @@
 		cursor: pointer;
 		color: var(--paper);
 		text-shadow: 1px 1px 0 var(--ink);
+		/* Long-press opens our context menu — keep the platform's text-selection
+		   callout out of the way. */
+		-webkit-touch-callout: none;
+		user-select: none;
 	}
 	.desktop-icon.disabled {
 		opacity: 0.5;

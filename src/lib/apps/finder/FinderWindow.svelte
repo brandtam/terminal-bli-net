@@ -23,6 +23,7 @@
 		writeFilesystemDragNode,
 		type FilesystemDropTarget
 	} from '$lib/os/filesystem-drag';
+	import { longPress, isTouchLikePointer, type PressPoint } from '$lib/os/touch';
 
 	// Zero-prop: os/fs come from the host context. The starting folder is an
 	// explicit static arg on the matched window (finder → ROOT_ID, trash → TRASH_ID)
@@ -100,6 +101,28 @@
 
 	function handleSelect(id: string) {
 		selectedId = id;
+	}
+
+	// Touch can't rely on dblclick, so items open classic-Mac style there:
+	// first tap selects, second tap opens. pointerdown always precedes the
+	// click it produces, so its pointerType tells the click handler apart.
+	let lastPointerType = '';
+
+	function handleItemClick(node: FsNode) {
+		if (isTouchLikePointer(lastPointerType) && selectedId === node.id) {
+			handleOpen(node);
+			return;
+		}
+		handleSelect(node.id);
+	}
+
+	function handleItemLongPress(p: PressPoint, node: FsNode) {
+		// iOS Safari never fires contextmenu for touch; synthesize it.
+		selectedId = node.id;
+		handleContextMenu(
+			new MouseEvent('contextmenu', { clientX: p.clientX, clientY: p.clientY }),
+			node
+		);
 	}
 
 	function handleOpen(node: FsNode) {
@@ -317,9 +340,11 @@
 				class:selected={selectedId === node.id}
 				class:drop-target={folderDropId === node.id}
 				draggable={canDragFilesystemNode(node)}
-				onclick={() => handleSelect(node.id)}
+				onpointerdown={(e) => (lastPointerType = e.pointerType)}
+				onclick={() => handleItemClick(node)}
 				ondblclick={() => handleOpen(node)}
 				oncontextmenu={(e) => handleContextMenu(e, node)}
+				use:longPress={(p) => handleItemLongPress(p, node)}
 				ondragstart={(e) => handleDragStart(e, node)}
 				ondragend={clearDropTarget}
 				ondragover={(e) => handleFolderDragOver(e, node)}
@@ -450,6 +475,10 @@
 		font: inherit;
 		color: inherit;
 		text-align: center;
+		/* Long-press opens our context menu — keep the platform's text-selection
+		   callout out of the way. */
+		-webkit-touch-callout: none;
+		user-select: none;
 	}
 
 	.finder-item[draggable='true'] {

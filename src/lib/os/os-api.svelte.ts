@@ -25,6 +25,7 @@ import {
 	matchWindow
 } from '$lib/terminalos/apps/app-catalog';
 import { resolveOpenTarget } from './window-host';
+import { isViewportBlocked, readViewport } from './viewport-gate';
 import type { BodyGcReport, FsResult, TerminalFS, FsFile } from '$lib/terminalos';
 import { TRASH_ID } from '$lib/terminalos/filesystem/well-known-ids';
 
@@ -73,7 +74,7 @@ export class OsApiClass implements OsApi {
 		// Load persisted state
 		this.tweaks = loadTweaks();
 		this.timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-		this.isMobile = window.innerWidth < 720;
+		this.isMobile = isViewportBlocked(readViewport());
 
 		// Fetch guide data from API
 		try {
@@ -129,9 +130,12 @@ export class OsApiClass implements OsApi {
 			}
 		}, 1000);
 
-		// Resize listener
+		// Resize listener. Re-evaluate the wall only while it's up: the gate can
+		// lift mid-session (a desktop window widened past the minimum) but never
+		// drops — rotating a tablet or summoning the on-screen keyboard shrinks
+		// the viewport and must not replace a running desktop with the wall.
 		const handleResize = () => {
-			this.isMobile = window.innerWidth < 720;
+			if (this.isMobile) this.isMobile = isViewportBlocked(readViewport());
 		};
 		window.addEventListener('resize', handleResize);
 		this.resizeCleanup = () => window.removeEventListener('resize', handleResize);
