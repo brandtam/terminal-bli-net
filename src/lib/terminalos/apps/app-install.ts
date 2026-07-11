@@ -2,6 +2,7 @@ import type { AppId, PersistedAppId } from '../filesystem/types';
 import {
 	synthAppWindowId,
 	synthAppIconKind,
+	synthAppIconSprite,
 	synthAppLaunchStrategy,
 	synthIsSpecialLaunchApp,
 	type SynthAppLaunchStrategy
@@ -32,6 +33,15 @@ export function getAppWindowId(appId: PersistedAppId): string | undefined {
  */
 export function getAppIconKind(appId: PersistedAppId): string {
 	return synthAppIconKind(appId);
+}
+
+/**
+ * An app's self-supplied pixel sprite (manifest `iconSprite`), or undefined if
+ * it draws through a shared PixelIcon kind. Pass both to PixelIcon — the
+ * sprite wins when present.
+ */
+export function getAppIconSprite(appId: PersistedAppId): string[] | undefined {
+	return synthAppIconSprite(appId);
 }
 
 /**

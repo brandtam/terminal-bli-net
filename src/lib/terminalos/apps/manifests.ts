@@ -652,6 +652,16 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tvguide',
+		store: {
+			category: 'ent',
+			publisher: 'PREVUE',
+			tagline: "What's on now.",
+			boxIcon: 'tvguide',
+			sticker: 'STAFF_PICK',
+			back: "The cable guide. Six channels, 48 half-hour slots, scrolling right-to-left like the Prevue Channel did. Tells you what's on so you know when to come back.",
+			inside: ['Six channels', '24-hour rolling grid', 'Marquee at the bottom'],
+			reqs: 'Terminal OS 1.0'
+		},
 		// A fixed main window + a prefs dialog. TVGuide / TVGuidePrefs read
 		// everything (channels, clock, tweaks) off getAppContext(), so neither takes props.
 		windows: [
@@ -773,6 +783,16 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'doc',
+		store: {
+			category: 'ent',
+			publisher: 'TERMINAL',
+			tagline: "They'll text back.",
+			boxIcon: 'cb',
+			sticker: 'NEW',
+			back: 'Talks to AI versions of TV characters. Only when their show is airing on the TV Guide. Wait for your show. Like real TV. This is the entire point of Terminal.',
+			inside: ['Six show casts', 'Group chat (sometimes)', 'No save function'],
+			reqs: 'Terminal OS 1.0 · TV Guide'
+		},
 		// One minted instance per show, keyed `chat:<slug>`, plus a prefs dialog. The
 		// `:` separator (not `-`) keeps the arg unambiguous since show slugs contain
 		// `-` (e.g. `breaking-bad`). The title is derived from the slug alone —
@@ -903,6 +923,15 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tv',
+		store: {
+			category: 'ent',
+			publisher: 'POLAROID-ISH',
+			tagline: 'Short clips.',
+			boxIcon: 'camera',
+			back: 'Records 8-second video clips from your webcam. They are square. They are low resolution. You will use this exactly twice and then never again.',
+			inside: ['Record button', 'Flip front/back', 'One sepia filter'],
+			reqs: 'Terminal OS 1.0 · A webcam'
+		},
 		// Camera is exact-only: one fixed `recorder` window. There is NO
 		// `recorder-`/`recorder:` prefix — recorded clips are tagged
 		// opensWith:'player' and open in the system Player (the bug_002 fix) — and
@@ -1036,6 +1065,15 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'calc',
+		store: {
+			category: 'ent',
+			publisher: 'NUMBERS LTD.',
+			tagline: 'Suspicious data.',
+			boxIcon: 'chart',
+			back: 'Shows numbers about your Terminal usage. None of the numbers are real. The bar chart is for vibes. "Messages sent today: 14,209." No there weren\'t.',
+			inside: ['Three charts', 'One leaderboard', 'Honesty (none)'],
+			reqs: 'Terminal OS 1.0'
+		},
 		// One fixed window; StatsWindow reads its counts off getAppContext(), no props.
 		windows: [
 			{
@@ -1093,6 +1131,18 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'floppy',
+		store: {
+			category: 'business',
+			publisher: '???',
+			tagline: "Don't.",
+			boxIcon: 'bomb',
+			back: 'You were told not to open this. The name is right there. DO_NOT_OPEN. And yet here you are, reading the back of the box. There is no refund. There is no support. There is only whatever happens next.',
+			inside: ['One warning', 'One consequence', 'No undo'],
+			reqs: 'Terminal OS 1.0 · Hubris',
+			// Shelved after Calc and Pixel Paint even though its manifest entry
+			// comes first (manifest order is OS identity order, not shelf order).
+			shelfOrder: 1
+		},
 		// ErrorDialog reads its close action off getAppContext().window, no props. role:'app'
 		// because this is a launchable window (error has a desktop alias, so
 		// getAppWindowId('error') must resolve to it). Its menu-bar identity reads as
@@ -1123,6 +1173,36 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'coming-soon',
 		iconKind: 'doc',
+		// App-supplied sprite (falling blocks) — proves the open icon model: no
+		// PixelIcon glyph branch, just palette rows rendered generically.
+		iconSprite: [
+			'................',
+			'................',
+			'..KKKK..........',
+			'..KBBK..........',
+			'..KBBK....KKKK..',
+			'..KKKK....KPPK..',
+			'..KKKK....KPPK..',
+			'..KBBK....KKKK..',
+			'..KBBK....KKKK..',
+			'..KKKK....KPPK..',
+			'..KKKKKKKKKPPK..',
+			'..KBBKKBBKKKKK..',
+			'..KBBKKBBK......',
+			'..KKKKKKKK......',
+			'................',
+			'................'
+		],
+		store: {
+			category: 'games',
+			publisher: 'ELORG-ISH',
+			tagline: "Stack 'em up.",
+			boxIcon: 'tetra',
+			sticker: 'STAFF_PICK',
+			back: "Falling blocks. Build rows. Don't lose. There are no levels, no story, no characters. The blocks fall faster the longer you play. That's the whole game and that has always been enough.",
+			inside: ['Endless mode', 'Two-player attack', 'MIDI soundtrack'],
+			reqs: 'Terminal OS 1.0 · 256K RAM'
+		},
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -1139,6 +1219,34 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'coming-soon',
 		iconKind: 'doc',
+		// A diamond playing card.
+		iconSprite: [
+			'................',
+			'....KKKKKKKK....',
+			'....KWWWWWWK....',
+			'....KRWWWWWK....',
+			'....KWWRRWWK....',
+			'....KWRRRRWK....',
+			'....KRRRRRRK....',
+			'....KRRRRRRK....',
+			'....KWRRRRWK....',
+			'....KWWRRWWK....',
+			'....KWWWWWWK....',
+			'....KWWWWWWK....',
+			'....KWWWWWRK....',
+			'....KKKKKKKK....',
+			'................',
+			'................'
+		],
+		store: {
+			category: 'games',
+			publisher: 'KLONDIKE CO.',
+			tagline: 'A patience.',
+			boxIcon: 'card',
+			back: 'The version of solitaire your aunt plays during conference calls. Drag cards. Win or restart. The deck shuffles. It is, in fact, winnable.',
+			inside: ['Klondike', 'FreeCell', 'Spider (broken)'],
+			reqs: 'Terminal OS 1.0'
+		},
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -1155,6 +1263,35 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'coming-soon',
 		iconKind: 'doc',
+		// A round bomb with a lit fuse.
+		iconSprite: [
+			'................',
+			'................',
+			'.........KY.....',
+			'.........KKO....',
+			'................',
+			'.....KKKKKK.....',
+			'....KKKKKKKK....',
+			'...KKAAKKKKKK...',
+			'...KKAKKKKKKK...',
+			'...KKKKKKKKKK...',
+			'...KKKKKKKKKK...',
+			'...KKKKKKKKKK...',
+			'...KKKKKKKKKK...',
+			'....KKKKKKKK....',
+			'.....KKKKKK.....',
+			'................'
+		],
+		store: {
+			category: 'games',
+			publisher: 'BOMB SQUAD',
+			tagline: 'Click. Pray.',
+			boxIcon: 'bomb',
+			sticker: 'SALE',
+			back: "A grid. Some squares have bombs. Most don't. Numbers tell you how many bombs are adjacent. You will lose. Repeatedly. Then suddenly you'll be very good at this.",
+			inside: ['Beginner / Intermediate / Expert', 'Hi-score table', 'One unfair custom mode'],
+			reqs: 'Terminal OS 1.0'
+		},
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -1171,6 +1308,34 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'coming-soon',
 		iconKind: 'doc',
+		// A parchment scroll with wooden rollers.
+		iconSprite: [
+			'................',
+			'................',
+			'..SSKKKKKKKKSS..',
+			'..SSKCCCCCCKSS..',
+			'..SSKCCCCCCKSS..',
+			'..SSKCCCCCCKSS..',
+			'....KCDDDDCK....',
+			'....KCCCCCCK....',
+			'....KCDDDCCK....',
+			'....KCCCCCCK....',
+			'..SSKCDDDDCKSS..',
+			'..SSKCCCCCCKSS..',
+			'..SSKCCCCCCKSS..',
+			'..SSKKKKKKKKSS..',
+			'................',
+			'................'
+		],
+		store: {
+			category: 'games',
+			publisher: 'INFOCOMME',
+			tagline: 'Eaten by a grue.',
+			boxIcon: 'scroll',
+			back: 'A text adventure. You type GO NORTH. The game says "It is dark. You are likely to be eaten by a grue." Then it eats you. This goes on for about 60 hours.',
+			inside: ['Map (sold separately)', 'Adventure parser', 'One unsolvable puzzle'],
+			reqs: 'Terminal OS 1.0 · A pencil'
+		},
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -1187,6 +1352,34 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'coming-soon',
 		iconKind: 'doc',
+		// A desk calculator with a green display.
+		iconSprite: [
+			'................',
+			'...KKKKKKKKKK...',
+			'...KGGGGGGGGK...',
+			'...KGGGGGKKGK...',
+			'...KGGGGGGGGK...',
+			'...KTTTTTTTTK...',
+			'...KKKTKKTKKK...',
+			'...KTTTTTTTTK...',
+			'...KKKTKKTKKK...',
+			'...KTTTTTTTTK...',
+			'...KKKTKKTKKK...',
+			'...KTTTTTTTTK...',
+			'...KKKTKKTOOK...',
+			'...KTTTTTTTTK...',
+			'...KKKKKKKKKK...',
+			'................'
+		],
+		store: {
+			category: 'business',
+			publisher: 'TI-ISH',
+			tagline: 'Adds numbers.',
+			boxIcon: 'calc',
+			back: 'A calculator. It adds, subtracts, multiplies, divides. There is one button labeled "sqrt". There is no "log". You don\'t need "log".',
+			inside: ['Basic mode', 'Programmer mode (broken)', 'Tape printout'],
+			reqs: 'Terminal OS 1.0'
+		},
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -1203,6 +1396,35 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'coming-soon',
 		iconKind: 'doc',
+		// A canvas of paint dabs beside a brush.
+		iconSprite: [
+			'................',
+			'...........OO...',
+			'...........OO...',
+			'...........OO...',
+			'..........SSSS..',
+			'.KKKKKKKKKSSSS..',
+			'.KWOWBWGWK.DD...',
+			'.KWWWWWWWK.DD...',
+			'.KWYWPWVWK......',
+			'.KWWWWWWWK......',
+			'.KWGWOWBWK......',
+			'.KWWWWWWWK......',
+			'.KKKKKKKKK......',
+			'................',
+			'................',
+			'................'
+		],
+		store: {
+			category: 'business',
+			publisher: 'CLARIS-ISH',
+			tagline: '256 colors.',
+			boxIcon: 'brush',
+			sticker: 'STAFF_PICK',
+			back: "A bitmap painting program. Click to make pixels. The pixels are square. The pixels are the point. Saves to .bmp because .png hadn't been invented.",
+			inside: ['256-color palette', 'Bucket fill', "One spray-paint tool that doesn't work right"],
+			reqs: 'Terminal OS 1.0 · 1MB RAM'
+		},
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),
@@ -1219,6 +1441,16 @@ export const MANIFESTS = [
 		isSystem: false,
 		status: 'released',
 		iconKind: 'tv',
+		store: {
+			category: 'ent',
+			publisher: 'ARCHIVE LABS',
+			tagline: 'Be kind, rewind.',
+			boxIcon: 'vcr',
+			sticker: 'NEW',
+			back: 'A video cassette recorder for your desktop. Loads tapes from the Internet Archive — full episodes of The Computer Chronicles, BBS: The Documentary, and other relics of early computing. Hit play. Watch Stewart Cheifet explain the World Wide Web in 1996.',
+			inside: ['Four show collections', 'Internet Archive streaming', 'CRT display mode'],
+			reqs: 'Terminal OS 1.0 · Internet'
+		},
 		// The main VCR window + its prefs dialog. The main window's
 		// title/size/component are device-aware: SpecCtx bans the reactive `os` but
 		// NOT module stores, so these read `vcrPrefs.device` directly (generic carries

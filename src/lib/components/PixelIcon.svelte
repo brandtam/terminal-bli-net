@@ -12,20 +12,47 @@
 	 *   - `tv`  uses `color` for its screen fill (defaults to #a6f000).
 	 *   - `doc` uses `accent` to flip its page fill yellow vs white.
 	 * Every other kind ignores both props by design.
+	 *
+	 * The glyph set is OPEN: an app can pass `sprite` (rows of palette chars,
+	 * see pixel-sprite.ts) and it renders generically — no new branch here. An
+	 * unknown `kind` with no sprite falls through to a generic app glyph, so an
+	 * icon is never a render hole.
 	 */
+	import { SPRITE_PALETTE } from './pixel-sprite';
+
 	let {
-		kind,
+		kind = '',
+		sprite,
 		color,
-		accent = false
+		accent = false,
+		size = 52
 	}: {
-		kind: string;
+		kind?: string;
+		/** App-supplied pixel grid: one char per pixel, `.`/space transparent. */
+		sprite?: string[];
 		color?: string;
 		accent?: boolean;
+		/** Rendered box size in px. */
+		size?: number;
 	} = $props();
 </script>
 
-<svg viewBox="0 0 16 16" class="pixel-icon" shape-rendering="crispEdges">
-	{#if kind === 'hd'}
+<svg
+	viewBox="0 0 16 16"
+	class="pixel-icon"
+	shape-rendering="crispEdges"
+	style:width="{size}px"
+	style:height="{size}px"
+>
+	{#if sprite && sprite.length > 0}
+		{#each sprite as row, y (y)}
+			{#each row.split('') as ch, x (x)}
+				{#if SPRITE_PALETTE[ch]}
+					<rect {x} {y} width="1" height="1" fill={SPRITE_PALETTE[ch]} />
+				{/if}
+			{/each}
+		{/each}
+	{:else if kind === 'hd'}
 		<rect x="2" y="13" width="13" height="1" fill="rgba(0,0,0,0.25)" />
 		<rect x="1" y="3" width="14" height="10" fill="#dcd6c8" stroke="#0a0a0a" />
 		<rect x="1" y="3" width="14" height="3" fill="#9b8f70" />
@@ -134,13 +161,20 @@
 		<rect x="5" y="1" width="1" height="2" fill="#0a0a0a" />
 		<rect x="10" y="1" width="1" height="2" fill="#0a0a0a" />
 		<rect x="5" y="0" width="6" height="1" fill="#0a0a0a" />
+	{:else}
+		<!-- Fallback: a generic app window, so an unknown kind never renders blank. -->
+		<rect x="2" y="14" width="12" height="1" fill="rgba(0,0,0,0.25)" />
+		<rect x="1" y="2" width="14" height="12" fill="#dcd6c8" stroke="#0a0a0a" />
+		<rect x="1" y="2" width="14" height="3" fill="#f9bd2b" stroke="#0a0a0a" />
+		<rect x="3" y="3" width="1" height="1" fill="#0a0a0a" />
+		<rect x="3" y="7" width="8" height="1" fill="#0a0a0a" />
+		<rect x="3" y="9" width="10" height="1" fill="#0a0a0a" />
+		<rect x="3" y="11" width="6" height="1" fill="#0a0a0a" />
 	{/if}
 </svg>
 
 <style>
 	.pixel-icon {
-		width: 52px;
-		height: 52px;
 		image-rendering: pixelated;
 	}
 </style>

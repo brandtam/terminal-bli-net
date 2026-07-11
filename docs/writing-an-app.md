@@ -91,23 +91,25 @@ To make your own app: copy this block, change `id` and the strings, point `compo
 
 ## The manifest fields
 
-| Field                   | What it's for                                                                                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                    | Unique app id. The closed `AppId` union is _derived_ from these, so keep it a plain string literal — `defineApp` infers it.                             |
-| `name` / `fileName`     | Display name and the `.app` file name in `/Applications`.                                                                                               |
-| `category`              | Groups the app in the store / library.                                                                                                                  |
-| `description`           | One-liner for store and library lists.                                                                                                                  |
-| `icon`                  | Emoji or short string for lists.                                                                                                                        |
-| `iconKind`              | Which shared pixel sprite to draw (e.g. `'doc'`, `'tv'`, `'floppy'`, `'calc'`). Must match a real `PixelIcon` glyph — the conformance test checks this. |
-| `removable`             | Can the user trash it? System apps are `false`.                                                                                                         |
-| `desktopAliasByDefault` | Drop an alias on the Desktop on install.                                                                                                                |
-| `isSystem`              | System apps are always owned and never sold in the store.                                                                                               |
-| `status`                | Store-app lifecycle: `'released'`, `'coming-soon'`, `'deprecated'`. Omit for system apps. Set `'released'` so a store app can actually launch.          |
-| `windows`               | The flat list of windows the app owns (see below).                                                                                                      |
-| `menus(os)`             | Builds the menu-bar menus when your app is frontmost.                                                                                                   |
-| `aboutSpec`             | Content for the About dialog. `os.openAbout('yourId')` mints it for free — no separate About window.                                                    |
-| `statusExtra(os)`       | Optional menu-bar status item (e.g. the Camera REC badge). Return `null` if you have none.                                                              |
-| `launch`                | Optional custom launch handler. Apps with a fixed `role:'app'` window launch through it automatically; you only need this for prefix-only apps.         |
+| Field                   | What it's for                                                                                                                                                                                                                                      |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                    | Unique app id. The closed `AppId` union is _derived_ from these, so keep it a plain string literal — `defineApp` infers it.                                                                                                                        |
+| `name` / `fileName`     | Display name and the `.app` file name in `/Applications`.                                                                                                                                                                                          |
+| `category`              | Groups the app in the store / library.                                                                                                                                                                                                             |
+| `description`           | One-liner for store and library lists.                                                                                                                                                                                                             |
+| `icon`                  | Emoji or short string — the text fallback where no pixel icon renders.                                                                                                                                                                             |
+| `iconKind`              | Which shared pixel sprite to draw (e.g. `'doc'`, `'tv'`, `'floppy'`, `'calc'`). Must match a real `PixelIcon` glyph unless you ship an `iconSprite`.                                                                                               |
+| `iconSprite`            | Optional app-supplied pixel icon: rows of palette chars (one char = one pixel, `.` transparent — palette in `$lib/components/pixel-sprite.ts`). Wins over `iconKind`; no OS edit needed. See the coming-soon games in `manifests.ts` for examples. |
+| `store`                 | The Computer Store listing (aisle, publisher, tagline, box art, box copy). Required for store apps — see "Making your app launchable".                                                                                                             |
+| `removable`             | Can the user trash it? System apps are `false`.                                                                                                                                                                                                    |
+| `desktopAliasByDefault` | Drop an alias on the Desktop on install.                                                                                                                                                                                                           |
+| `isSystem`              | System apps are always owned and never sold in the store.                                                                                                                                                                                          |
+| `status`                | Store-app lifecycle: `'released'`, `'coming-soon'`, `'deprecated'`. Omit for system apps. Set `'released'` so a store app can actually launch.                                                                                                     |
+| `windows`               | The flat list of windows the app owns (see below).                                                                                                                                                                                                 |
+| `menus(os)`             | Builds the menu-bar menus when your app is frontmost.                                                                                                                                                                                              |
+| `aboutSpec`             | Content for the About dialog. `os.openAbout('yourId')` mints it for free — no separate About window.                                                                                                                                               |
+| `statusExtra(os)`       | Optional menu-bar status item (e.g. the Camera REC badge). Return `null` if you have none.                                                                                                                                                         |
+| `launch`                | Optional custom launch handler. Apps with a fixed `role:'app'` window launch through it automatically; you only need this for prefix-only apps.                                                                                                    |
 
 ## The window spec
 
@@ -128,9 +130,24 @@ A manifest entry makes the app _exist_. Two flavors decide how a user gets to it
 
 **System app** (`isSystem: true`) — bundled with the OS, always owned, never sold. On a fresh disk it's seeded straight into `/Applications`, and with `desktopAliasByDefault: true` it also drops an alias on the Desktop. Run `pnpm dev` and it's just _there_ — double-click to open. This is the fastest way to see a new app, and it's how Finder, Stickies, and TextEdit ship. Omit `status` (it's for store apps only).
 
-**Store app** (`isSystem: false`, `status: 'released'`) — sold in the Computer Store. This needs a **second edit**: the store list does not derive from the manifest. Add the app to `src/lib/apps/computer-store/store-data.ts` — both the `APPS` array (its box art, tagline, publisher) and a `CATEGORIES` entry. Only then does it show up to buy. The flow is then Computer Store → buy → My Shelf → Install, which creates the `/Applications` file.
+**Store app** (`isSystem: false`, `status: 'released'`) — sold in the Computer Store. Add a `store` block to the same manifest entry; the store shelves derive from it, no second file to edit:
 
-The OS enforces this: `os.launchApp(id)` blocks a non-system app that isn't installed (`os-api.svelte.ts:429`) and shows a "buy it / install it" alert. System apps skip the gate because they're always installed. So a brand-new `isSystem: false` app with no `store-data.ts` entry is unreachable — it's in the manifest, but nothing surfaces it. When you're developing and just want to see your window, start with `isSystem: true`; flip to a store app when you're ready to wire up the storefront.
+```ts
+store: {
+	category: 'games', // 'games' | 'business' | 'ent' — which aisle
+	publisher: 'ELORG-ISH',
+	tagline: "Stack 'em up.",
+	boxIcon: 'tetra', // box-art glyph (the computer-store PixelIcon set)
+	sticker: 'STAFF_PICK', // optional: 'STAFF_PICK' | 'SALE' | 'NEW'
+	back: 'Back-of-box copy…',
+	inside: ['Endless mode', 'MIDI soundtrack'],
+	reqs: 'Terminal OS 1.0 · 256K RAM'
+}
+```
+
+The box title is your `name` uppercased. The flow is then Computer Store → buy → My Shelf → Install, which creates the `/Applications` file. A drift test enforces the contract: a released non-system app with no `store` block (and no explicit omission entry) fails `store-data.test.ts`.
+
+The OS enforces the buy gate too: `os.launchApp(id)` blocks a non-system app that isn't installed (`os-api.svelte.ts:429`) and shows a "buy it / install it" alert. System apps skip the gate because they're always installed. When you're developing and just want to see your window, start with `isSystem: true`; flip to a store app when you're ready for the storefront.
 
 ## What your component gets: AppContext
 
@@ -174,7 +191,7 @@ pnpm test:unit
 
 Two tests guard the app contract:
 
-- **`app-conformance.test.ts`** — every window routes back to its app, loads a real component, has a unique id, and uses a valid icon kind.
+- **`app-conformance.test.ts`** — every window routes back to its app, loads a real component, has a unique id, and every icon resolves (a known `iconKind` or a valid `iconSprite`).
 - **`zero-os-edit.test.ts`** — proves the OS resolves and launches a brand-new app with no OS-code edit. If you broke the manifest model, this fails.
 
 Run them before you push, and `pnpm check` for types.
