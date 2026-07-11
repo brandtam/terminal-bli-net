@@ -14,8 +14,10 @@ import {
 	loadConversations,
 	saveConversations,
 	isFirstVisit,
-	clearAllPreferences
+	clearAllPreferences,
+	onPersistenceQuotaExceeded
 } from '$lib/persistence';
+import { estimateCapacity, shouldWarnCapacity } from './capacity';
 import { getAppLaunchStrategy } from '$lib/terminalos/apps/app-install';
 import { getAppDef } from '$lib/terminalos/apps/app-library';
 import type { TerminalAppDefinition } from '$lib/terminalos/apps/app-types';
@@ -59,6 +61,7 @@ export class OsApiClass implements OsApi {
 	private tickInterval?: ReturnType<typeof setInterval>;
 	private resizeCleanup?: () => void;
 	private keydownCleanup?: () => void;
+	private fsWatchCleanup?: () => void;
 
 	// ── Dock alias map ────────────────────────────────────────────────────
 	private DOCK_ALIASES: Record<string, () => void> = {};
@@ -70,6 +73,17 @@ export class OsApiClass implements OsApi {
 	// ── Initialization ────────────────────────────────────────────────────
 
 	async init(): Promise<void> {
+		// Disk-full surfacing. persistence.ts can't import the alert system
+		// (cycle), so it reports quota failures through this callback — already
+		// gated to once per session inside persistence. Blob-file creation is the
+		// choke point for large writes, so watch it for capacity checks; the boot
+		// check below catches a disk that filled up while the tab was closed.
+		onPersistenceQuotaExceeded(() => this.showDiskFullAlert());
+		this.fsWatchCleanup = this.fs.watch((e) => {
+			if (e.operation === 'create_file' && !e.remote) void this.warnIfNearCapacity();
+		});
+		void this.warnIfNearCapacity();
+
 		// Load persisted state
 		this.tweaks = loadTweaks();
 		this.timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -170,6 +184,7 @@ export class OsApiClass implements OsApi {
 		if (this.tickInterval) clearInterval(this.tickInterval);
 		this.resizeCleanup?.();
 		this.keydownCleanup?.();
+		this.fsWatchCleanup?.();
 	}
 
 	// ── Dock aliases ──────────────────────────────────────────────────────
@@ -340,6 +355,33 @@ export class OsApiClass implements OsApi {
 
 	alert(spec: AlertSpec): void {
 		this.showAlert(spec);
+	}
+
+	// ── Disk-full surfacing ───────────────────────────────────────────────
+
+	showDiskFullAlert(): void {
+		this.showAlert({
+			title: 'Disk Full',
+			body: 'Terminal HD is full. Your latest changes could not be written to disk and will be lost when this session ends. Empty the Trash or delete old recordings to free up space.',
+			buttons: [
+				{ label: 'Open Trash', action: () => this.openFolder(TRASH_ID) },
+				{ label: 'OK', primary: true }
+			]
+		});
+	}
+
+	private async warnIfNearCapacity(): Promise<void> {
+		const estimate = await estimateCapacity();
+		if (!estimate || !shouldWarnCapacity(estimate)) return;
+		const pct = Math.round(estimate.ratio * 100);
+		this.showAlert({
+			title: 'Disk Almost Full',
+			body: `Terminal HD is about ${pct}% full (browser storage estimate). Empty the Trash or delete old recordings before the disk fills up. System Maintenance shows the full breakdown.`,
+			buttons: [
+				{ label: 'Open Maintenance', action: () => this.openSystemMaintenance() },
+				{ label: 'OK', primary: true }
+			]
+		});
 	}
 
 	// ── Tweaks ────────────────────────────────────────────────────────────

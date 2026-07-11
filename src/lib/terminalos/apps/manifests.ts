@@ -926,11 +926,11 @@ export const MANIFESTS = [
 			sections: [
 				{
 					h: 'WHAT IT IS',
-					body: 'A camcorder on your desktop. Open Camera, look at the lens, record up to 10 seconds. Clips are saved locally in your browser.'
+					body: 'A camcorder on your desktop. Open Camera, look at the lens, record up to 30 seconds. Clips are saved locally in your browser.'
 				},
 				{
 					h: 'LIMITS',
-					body: 'Max 10 seconds per clip. Max 5 clips stored. The disk manifest lives in localStorage; clip bytes live in IndexedDB, so backup before clearing site data.'
+					body: 'Max 30 seconds per clip. Clips are limited by free disk space — Camera warns before saving when Terminal HD is nearly full. The disk manifest lives in localStorage; clip bytes live in IndexedDB, so backup before clearing site data.'
 				}
 			]
 		},
