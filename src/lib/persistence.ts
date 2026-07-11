@@ -36,7 +36,8 @@ const KEYS = {
 	timezone: 'terminal.os.timezone',
 	sessionId: 'terminal.os.session',
 	firstVisit: 'terminal.os.firstVisit',
-	chatSessionToken: 'terminal.app.chatrbot.sessionToken'
+	chatSessionToken: 'terminal.app.chatrbot.sessionToken',
+	sound: 'terminal.os.sound'
 } as const;
 
 const LEGACY_KEYS: Record<string, string> = {
@@ -192,6 +193,36 @@ export function appRead<T>(appId: string, key: string, fallback: T): T {
 
 export function appWrite<T>(appId: string, key: string, value: T): void {
 	set(`terminal.app.${appId}.${key}`, value);
+}
+
+export function appDelete(appId: string, key: string): void {
+	if (typeof localStorage === 'undefined') return;
+	try {
+		localStorage.removeItem(`terminal.app.${appId}.${key}`);
+	} catch {
+		// storage unavailable
+	}
+}
+
+// ── OS sound preferences ─────────────────────────────────────────────────────
+
+export type SoundPrefs = { muted: boolean; volume: number };
+
+const SOUND_DEFAULTS: SoundPrefs = { muted: false, volume: 0.6 };
+
+function isSoundPrefs(v: unknown): v is SoundPrefs {
+	if (typeof v !== 'object' || v === null) return false;
+	const o = v as Record<string, unknown>;
+	return typeof o.muted === 'boolean' && typeof o.volume === 'number';
+}
+
+export function loadSoundPrefs(): SoundPrefs {
+	const raw = get<unknown>(KEYS.sound, SOUND_DEFAULTS);
+	return isSoundPrefs(raw) ? raw : SOUND_DEFAULTS;
+}
+
+export function saveSoundPrefs(prefs: SoundPrefs): void {
+	set(KEYS.sound, prefs);
 }
 
 export function clearAllPreferences(): void {

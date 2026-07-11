@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { AppDef, AppMenuItem, OsApi } from '$lib/os/os-api';
 	import { isTouchLikePointer } from '$lib/os/touch';
+	import { osAudio } from '$lib/os/audio.svelte';
 
 	let {
 		app,
@@ -153,6 +154,8 @@
 	function handleMenuItemClick(item: AppMenuItem) {
 		if (item.type === 'separator') return;
 		openMenu = null;
+		// A tiny UI tick on every menu pick — the OS voice layer drops it when muted.
+		osAudio.blip();
 		if (item.type === 'check') {
 			item.toggle(os);
 			return;

@@ -64,6 +64,12 @@ export default [
 				Blob: 'readonly',
 				btoa: 'readonly',
 				atob: 'readonly',
+				AudioContext: 'readonly',
+				AudioContextState: 'readonly',
+				AudioBuffer: 'readonly',
+				AudioScheduledSourceNode: 'readonly',
+				GainNode: 'readonly',
+				PeriodicWave: 'readonly',
 				__APP_VERSION__: 'readonly'
 			}
 		},

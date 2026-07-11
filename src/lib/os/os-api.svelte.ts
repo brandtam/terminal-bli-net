@@ -28,6 +28,8 @@ import {
 } from '$lib/terminalos/apps/app-catalog';
 import { resolveOpenTarget } from './window-host';
 import { isViewportBlocked, readViewport } from './viewport-gate';
+import { osAudio } from './audio.svelte';
+import { pageVisibility } from './page-visibility.svelte';
 import type { BodyGcReport, FsResult, TerminalFS, FsFile } from '$lib/terminalos';
 import { TRASH_ID } from '$lib/terminalos/filesystem/well-known-ids';
 
@@ -55,6 +57,11 @@ export class OsApiClass implements OsApi {
 	isMobile = $state(false);
 	mounted = $state(false);
 
+	// ── OS voice layer ────────────────────────────────────────────────────
+	// The shared synth (beep/blip/error/tone) — one AudioContext for the OS
+	// and every app, reached as `os.audio` off AppContext. See audio.svelte.ts.
+	readonly audio = osAudio;
+
 	// ── Private state ─────────────────────────────────────────────────────
 	private fs: TerminalFS;
 	private zCounter = 10;
@@ -75,6 +82,11 @@ export class OsApiClass implements OsApi {
 	// ── Initialization ────────────────────────────────────────────────────
 
 	async init(): Promise<void> {
+		// Arm the voice layer (gesture unlock + hidden-tab suspend) and the
+		// reactive visibility signal every window's lifecycle.hidden reads.
+		this.audio.init();
+		pageVisibility.start();
+
 		// Disk-full surfacing. persistence.ts can't import the alert system
 		// (cycle), so it reports quota failures through this callback — already
 		// gated to once per session inside persistence. Blob-file creation is the
@@ -213,6 +225,8 @@ export class OsApiClass implements OsApi {
 		this.resizeCleanup?.();
 		this.keydownCleanup?.();
 		this.fsWatchCleanup?.();
+		this.audio.destroy();
+		pageVisibility.stop();
 	}
 
 	// ── Dock aliases ──────────────────────────────────────────────────────
@@ -374,6 +388,9 @@ export class OsApiClass implements OsApi {
 	// ── Alert system ──────────────────────────────────────────────────────
 
 	showAlert(spec: AlertSpec): void {
+		// The system alert voice. Progress alerts (backup et al.) stay silent —
+		// they announce work, not a problem. Muting is handled by the audio layer.
+		if (!spec.progress) this.audio.error();
 		this.alertSpec = { ...spec, id: Math.random() };
 	}
 
