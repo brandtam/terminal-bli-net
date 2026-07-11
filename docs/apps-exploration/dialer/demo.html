@@ -257,13 +257,15 @@ function handshake(t0){
     n.g.gain.linearRampToValueAtTime(0,t0+3.05);
     for(let t=1.6;t<3.0;t+=0.125){ tone(L,[1650],t0+t,0.06,0.11); tone(L,[1850],t0+t+0.062,0.06,0.11); }
   }
-  // D) carrier settle: lowpassed hiss decaying to a faint persistent bed (3.0 ->)
+  // D) carrier settle: lowpassed hiss decaying to silence (3.0 -> 4.5)
   {
-    const n=noise(L,t0+3.0,0); carrierSrc=n.src; // runs until line killed
+    const n=noise(L,t0+3.0,0); carrierSrc=n.src;
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3000;
     n.g.disconnect(); n.g.connect(lp); lp.connect(L);
     n.g.gain.setValueAtTime(0.16,t0+3.0);
     n.g.gain.exponentialRampToValueAtTime(0.015,t0+4.2);
+    n.g.gain.linearRampToValueAtTime(0,t0+4.5);
+    n.src.stop(t0+4.6);
   }
   return 4.2;
 }
@@ -441,7 +443,7 @@ const POSTS=[
 'the good stuff is never posted, you have to hunt it.\n\n'+
 'heard NO.CARRIER ran his autodialer over the whole 555 exchange\n'+
 'last weekend. post the log!! the people demand the log\n'},
- {date:'10-29-87',from:'NO.CARRIER',subj:'wardial results, 555 exchange',body:
+ {date:'10-29-87',from:'NO.CARRIER',subj:'sweep results, 555 exchange',body:
 'fine. ran the autodialer fri-sun, whole exchange. mostly VOICE\n'+
 'and BUSY. the interesting ones:\n\n'+
 '  555-2323 .. CARRIER 2400 .. (this place. hi dale)\n'+
@@ -453,7 +455,7 @@ const POSTS=[
 '              like it was waiting for the phone to ring.\n\n'+
 'anyone know what 0113 is? because i called it four times and\n'+
 'now i keep thinking about it\n',find:true},
- {date:'10-30-87',from:'CAPT.VECTOR',subj:'re: wardial results',body:
+ {date:'10-30-87',from:'CAPT.VECTOR',subj:'re: sweep results',body:
 'Leave 0113 alone.\n\n'+
 'I mean it. Some doors are shut for a reason.\n\n'+
 '                                        -- CV\n'}
