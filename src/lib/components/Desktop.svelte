@@ -380,12 +380,13 @@
 			<p class="mobile-tagline">Previously on screens…</p>
 			<div class="mobile-body">
 				<p>
-					Terminal is a retro desktop OS that lives in a browser tab. It's built for screens wide
+					Terminal is a retro desktop OS that lives in a browser tab. It's built for screens big
 					enough to drag windows around on.
 				</p>
 				<p>
-					Open this on a laptop or desktop to get the full experience — menu bar, draggable windows,
-					a TV Guide, and characters you can chat with.
+					Open this on a laptop, a desktop, or a tablet (landscape is the sweet spot) to get the
+					full experience — menu bar, draggable windows, a TV Guide, and characters you can chat
+					with.
 				</p>
 			</div>
 			<div class="mobile-footer">terminal.bli.net · one tab, one desktop</div>
@@ -639,6 +640,10 @@
 		cursor: default;
 		user-select: none;
 		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
+		/* Disable double-tap zoom OS-wide so double taps reach the desktop as
+		   dblclicks without the browser's disambiguation delay. Panning stays
+		   allowed, so scrolling inside window bodies still works. */
+		touch-action: manipulation;
 	}
 	.desktop.drop-active::after {
 		content: '';
