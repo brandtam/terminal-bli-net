@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel Pal — demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: #241c14;
+    color: #f3dcae;
+    font-family: "Courier New", ui-monospace, Menlo, monospace;
+    display: flex; flex-direction: column; align-items: center;
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .bar {
+    width: 100%; max-width: 420px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; font-size: 13px; letter-spacing: 2px;
+  }
+  .bar a { color: #c9a86a; text-decoration: none; }
+  .bar a:hover { color: #ffe9b0; }
+  .bar .title { font-weight: bold; }
+  .bar button {
+    background: none; border: 1px solid #5a4830; color: #c9a86a;
+    font: inherit; font-size: 11px; padding: 2px 8px; border-radius: 4px; cursor: pointer;
+  }
+  .bar button:hover { color: #ffe9b0; border-color: #8a7048; }
+  .device {
+    width: min(94vw, 380px);
+    background: linear-gradient(#f7e3b2, #e8ca8c);
+    border: 3px solid #4a3222;
+    border-radius: 26px;
+    padding: 16px 16px 20px;
+    box-shadow: 0 10px 0 #17110b, 0 14px 30px rgba(0,0,0,.6);
+    margin-bottom: 30px;
+  }
+  .screenwrap {
+    position: relative;
+    border: 3px solid #4a3222; border-radius: 10px; overflow: hidden;
+    background: #eee0b0;
+  }
+  canvas {
+    display: block; width: 100%;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+  }
+  .hint {
+    position: absolute; left: 50%; top: 10%;
+    transform: translateX(-50%);
+    background: #4a3222; color: #ffe9b0;
+    font-size: 11px; letter-spacing: 2px; padding: 4px 10px; border-radius: 8px;
+    pointer-events: none; animation: pulse 1s infinite;
+    transition: opacity .5s; white-space: nowrap;
+  }
+  .hint.gone { opacity: 0; }
+  @keyframes pulse { 50% { transform: translateX(-50%) translateY(3px); } }
+  .meters { margin: 12px 2px 10px; display: grid; gap: 6px; }
+  .meter { display: flex; align-items: center; gap: 8px; }
+  .meter .ic { width: 20px; text-align: center; font-size: 14px; filter: saturate(.9); }
+  .segs { display: flex; gap: 3px; flex: 1; }
+  .seg {
+    flex: 1; height: 12px; border: 2px solid #4a3222; border-radius: 3px;
+    background: #efe0bd;
+  }
+  .seg.on.h { background: #f5883c; } /* hunger */
+  .seg.on.p { background: #ef6a8a; } /* happiness */
+  .seg.on.e { background: #f4c33c; } /* energy */
+  .meter.low .seg.on { animation: blinklow .6s infinite; }
+  @keyframes blinklow { 50% { background: #d33a2a; } }
+  .btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .btns button {
+    font: inherit; font-weight: bold; font-size: 11px; letter-spacing: 1px;
+    padding: 10px 2px 8px; cursor: pointer;
+    color: #3a2a18;
+    background: linear-gradient(#ffedbf, #f0cf90);
+    border: 3px solid #4a3222; border-radius: 12px;
+    box-shadow: 0 4px 0 #4a3222;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .btns button .g { font-size: 18px; line-height: 1; }
+  .btns button:active { transform: translateY(3px); box-shadow: 0 1px 0 #4a3222; }
+  .btns button.dim { opacity: .4; }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <span class="title">PIXEL PAL</span>
+    <a href="../index.html">&larr; APPS</a>
+    <button id="mute" title="sound">SND ON</button>
+  </div>
+
+  <div class="device">
+    <div class="screenwrap">
+      <canvas id="c" width="64" height="48"></canvas>
+      <div class="hint" id="hint">TAP THE EGG</div>
+    </div>
+    <div class="meters">
+      <div class="meter" id="m-h"><span class="ic">&#127831;</span><div class="segs"></div></div>
+      <div class="meter" id="m-p"><span class="ic">&#10084;&#65039;</span><div class="segs"></div></div>
+      <div class="meter" id="m-e"><span class="ic">&#9889;</span><div class="segs"></div></div>
+    </div>
+    <div class="btns">
+      <button id="b-feed"><span class="g">&#127850;</span>FEED</button>
+      <button id="b-play"><span class="g">&#9917;</span>PLAY</button>
+      <button id="b-clean"><span class="g">&#10024;</span>CLEAN</button>
+      <button id="b-lights"><span class="g">&#128161;</span>LIGHTS</button>
+    </div>
+  </div>
+
+<script>
+'use strict';
+/* ============================== SPRITES ==============================
+   16x16 pet frames are composed from a POSE (body) + FACE (3 rows spliced
+   at pose.faceAt). Chars: . transparent, o outline, b body, l belly,
+   w eye-white, e pupil, k cheek, f feet, m mouth, s spot.
+*/
+const POSE = {
+  tall: { faceAt: 6, rows: [
+    "................",
+    "...oo......oo...",
+    "..obbo....obbo..",
+    ".obbbboooobbbbo.",
+    ".obbbbbbbbbbbbo.",
+    "obbbbbbbbbbbbbbo",
+    "obwwweebbwwweebo",
+    "obwwweebbwwweebo",
+    "obbbbbbmmbbbbbbo",
+    "obkkbllllllbkkbo",
+    "obbbllllllllbbbo",
+    ".obbllllllllbbo.",
+    ".obbbllllllbbbo.",
+    "..obbbbbbbbbbo..",
+    "...offo..offo...",
+    "................"
+  ]},
+  squash: { faceAt: 6, rows: [
+    "................",
+    "................",
+    "...oo......oo...",
+    "..obbo....obbo..",
+    ".obbbboooobbbbo.",
+    "obbbbbbbbbbbbbbo",
+    "obwwweebbwwweebo",
+    "obwwweebbwwweebo",
+    "obbbbbbmmbbbbbbo",
+    "obkkbllllllbkkbo",
+    "obbbllllllllbbbo",
+    ".obbllllllllbbo.",
+    ".obbbllllllbbbo.",
+    "..obbbbbbbbbbo..",
+    "...offo..offo...",
+    "................"
+  ]}
+};
+// jump = tall with feet tucked
+POSE.jump = { faceAt: 6, rows: POSE.tall.rows.slice(0, 14).concat([
+    "....ff....ff....",
+    "................"
+]) };
+// Stage 2: taller ears. Replacement top rows per pose.
+const STAGE2_TOP = {
+  tall: [
+    "...oo......oo...",
+    "..obbo....obbo..",
+    "..obbo....obbo..",
+    ".obbbboooobbbbo."
+  ],
+  squash: [
+    "................",
+    "...oo......oo...",
+    "..obbo....obbo..",
+    "..obbo....obbo..",
+    ".obbbboooobbbbo."
+  ]
+};
+STAGE2_TOP.jump = STAGE2_TOP.tall;
+
+const FACE = {
+  open:    ["obweebbbbbbweebo","obeeebbbbbbeeebo","obbbbbbmmbbbbbbo"],
+  blink:   ["obbbbbbbbbbbbbbo","obeeeebbbbeeeebo","obbbbbbmmbbbbbbo"],
+  happy:   ["obbbebbbbbbebbbo","obbebebbbbebebbo","obbbbbmmmmbbbbbo"],
+  eatopen: ["obbbebbbbbbebbbo","obbebebbbbebebbo","obbbbmmmmmmbbbbo"],
+  eatchew: ["obbbbbbbbbbbbbbo","obeeeebbbbeeeebo","okkbbbmmmmbbbkko"],
+  sleep:   ["obbbbbbbbbbbbbbo","obbeeebbbbeeebbo","obbbbbbmbbbbbbbo"],
+  sulk:    ["obeeeebbbbeeeebo","obweebbbbbbweebo","obbbbmmbbmmbbbbo"]
+};
+
+const EGG = [
+  "................",
+  "................",
+  "......oooo......",
+  ".....obbbbo.....",
+  "....obbbbbbo....",
+  "...obbwbbbbbo...",
+  "...obwbbbbbbo...",
+  "..obbbbbbbbbbo..",
+  "..obbsbbbbsbbo..",
+  "..obbbbbbbbbbo..",
+  "..obsbbbbbbsbo..",
+  "...obbbbbbbbo...",
+  "....obbbbbbo....",
+  ".....oooooo.....",
+  "................",
+  "................"
+];
+const CRACKS = [ // cumulative dark pixels per crack stage, [col,row] on egg grid
+  [[7,6],[8,7],[7,8]],
+  [[6,7],[9,8],[10,7],[8,9],[5,8]],
+  [[4,9],[11,9],[6,10],[9,10],[7,11],[10,6],[5,6]]
+];
+
+const HEART   = [".o.o.","ooooo","ooooo",".ooo.","..o.."];
+const ZEE     = ["oooo","..o.",".o..","oooo"];
+const NOTE    = ["...oo","...o.","...o.",".ooo.",".ooo."];
+const SPARK   = ["..o..","..o..","ooooo","..o..","..o.."];
+const COOKIE  = [".ooooo.","obcbbbo","obbbcbo","ocbbbbo","obbcbbo","obbbbco",".ooooo."];
+const BALL    = [".oooo.","obwwbo","obwbbo","obbbbo","obbbbo",".oooo."];
+const BUG     = ["o....o",".o..o.",".oooo.","obbbbo"];
+const DIRTSPR = ["..oo.oo.",".oooooo.","oooooooo",".oooooo."];
+const EXCLAIM = ["o","o","o",".","o"];
+
+/* ============================== END SPRITES ============================== */
+
+const BASE_PAL = { o:'#4a3222', b:'#f5a15c', l:'#ffe9c0', w:'#fff9ea', e:'#33221a', k:'#ef7d57', f:'#c9713d', m:'#7a3b2e' };
+const BRANCH_PAL = {
+  sunny: { b:'#ffc95c', f:'#e09a3a', k:'#ff8a5c' },
+  grump: { b:'#a8b56b', f:'#7c8a4a', k:'#8fa05a' }
+};
+const EGG_PAL   = { o:'#4a3222', b:'#fff3d0', w:'#ffffff', s:'#e8c890' };
+const COL = {
+  dayBg: '#eee0b0', dayGround: '#d0a868', grass: '#a08850',
+  nightBg: '#39395c', nightGround: '#5a4a58', star: '#e8e0c0',
+  sun: '#f4c33c', moon: '#e8e0c0',
+  heart: '#e0485c', z: '#7a6ab0', note: '#4a6ab0', spark: '#f4c33c',
+  cookie: '#c98b4a', chip: '#5a3620', ball: '#d05050', ballW: '#ffd0d0',
+  bug: '#3a3020', dirt: '#8a7040', crumb: '#c98b4a', dust: '#c0a878',
+  ex: '#c03030', flash: '#fffbe8'
+};
+
+// ------------------------------ state ------------------------------
+const SAVE_KEY = 'pixelpal-demo-v1';
+let S = {
+  v: 1, mode: 'egg', stage: 1, branch: null,
+  hunger: 80, happiness: 80, energy: 90,
+  care: 0, born: 0, last: Date.now(),
+  dirt: [], lights: false, muted: false
+};
+// demo-compressed decay, points per minute
+const RATE = { hungerAwake: 12, hungerSleep: 4, happy: 8, energyAwake: 6, energySleep: -40 };
+
+let eggScore = 0, crackStage = 0;
+let pet = { x: 24, dir: 1, yoff: 0 };
+let act = { name: 'idle', t: 0, d: {} };
+let frame = 0, blinkT = 0;
+let particles = [], items = [];   // items: cookie / ball / bug
+let surpriseIn = 0, flashT = 0;
+let firstGesture = false;
+
+const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const isNight = () => { const h = new Date().getHours(); return h >= 21 || h < 7; };
+
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (d && d.v === 1) { S = Object.assign(S, d); return true; }
+  } catch (e) { /* corrupt save -> fresh egg */ }
+  return false;
+}
+function save() {
+  S.last = Date.now();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
+}
+function catchUp() {
+  const now = Date.now();
+  let mins = (now - S.last) / 60000;
+  if (!(mins > 0)) mins = 0;          // clock rolled back -> no decay
+  mins = Math.min(mins, 60);          // cap offline catch-up
+  if (S.mode !== 'alive' || mins < 0.05) return 0;
+  if (S.lights) {
+    S.hunger = clamp(S.hunger - RATE.hungerSleep * mins, 0, 100);
+    S.energy = clamp(S.energy - RATE.energySleep * mins, 0, 100);
+  } else {
+    S.hunger = clamp(S.hunger - RATE.hungerAwake * mins, 0, 100);
+    const mult = S.hunger <= 0 ? 2 : 1;
+    S.happiness = clamp(S.happiness - RATE.happy * mult * mins, 0, 100);
+    S.energy = clamp(S.energy - RATE.energyAwake * mins, 0, 100);
+    const newDirt = Math.min(Math.floor(mins / 4), 3 - S.dirt.length);
+    for (let i = 0; i < newDirt; i++) S.dirt.push(4 + Math.floor(Math.random() * 50));
+  }
+  return mins;
+}
+
+// ------------------------------ audio ------------------------------
+let AC = null;
+function tone(f, d, at, type, v) {
+  if (S.muted || !firstGesture) return;
+  if (!AC) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return; AC = new C(); }
+  if (AC.state === 'suspended') AC.resume();
+  const t = AC.currentTime + (at || 0);
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'square'; o.frequency.value = f;
+  g.gain.setValueAtTime(v || 0.1, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + d);
+  o.connect(g); g.connect(AC.destination);
+  o.start(t); o.stop(t + d + 0.02);
+}
+function jingle(notes, step, type, v) {
+  step = step || 0.09;
+  notes.forEach((n, i) => { if (n) tone(n, step * 0.9, i * step, type, v); });
+}
+const SND = {
+  blip:  () => tone(587, 0.05),
+  wob:   () => tone(220, 0.06, 0, 'triangle', 0.12),
+  hatch: () => jingle([523, 659, 784, 1047], 0.1),
+  eat:   () => jingle([196, 165], 0.08, 'triangle', 0.14),
+  happy: () => jingle([659, 784, 988], 0.07),
+  sad:   () => jingle([392, 330, 262], 0.16, 'triangle', 0.1),
+  sleep: () => jingle([523, 392, 330], 0.22, 'sine', 0.08),
+  wake:  () => jingle([330, 523, 659], 0.08),
+  clean: () => jingle([1319, 1568, 1760], 0.06, 'square', 0.06),
+  zoom:  () => jingle([523, 659, 784, 1047, 784, 1047], 0.06),
+  bop:   (i) => tone(880 + i * 120, 0.07),
+  nope:  () => jingle([220, 0, 220], 0.09, 'triangle', 0.12),
+  evolve:() => jingle([392, 523, 659, 784, 1047, 1319], 0.09)
+};
+
+// ------------------------------ drawing ------------------------------
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+function drawRows(rows, x, y, pal, flip) {
+  x = Math.round(x); y = Math.round(y); // keep pixels crisp — no anti-aliased fractions
+  for (let r = 0; r < rows.length; r++) {
+    const s = rows[r];
+    for (let c = 0; c < s.length; c++) {
+      const ch = s[c];
+      if (ch === '.') continue;
+      const col = pal[ch];
+      if (!col) continue;
+      ctx.fillStyle = col;
+      ctx.fillRect(x + (flip ? s.length - 1 - c : c), y + r, 1, 1);
+    }
+  }
+}
+function mono(rows, x, y, color, flip) {
+  drawRows(rows, x, y, { o: color, b: color, w: color, c: color }, flip);
+}
+
+function petPal() {
+  const p = Object.assign({}, BASE_PAL);
+  if (S.stage >= 2 && S.branch && BRANCH_PAL[S.branch]) Object.assign(p, BRANCH_PAL[S.branch]);
+  return p;
+}
+function petFrame(poseName, faceName) {
+  const pose = POSE[poseName] || POSE.tall;
+  let rows = pose.rows.slice();
+  const face = FACE[faceName] || FACE.open;
+  for (let i = 0; i < 3; i++) rows[pose.faceAt + i] = face[i];
+  if (S.stage >= 2) {
+    const top = STAGE2_TOP[poseName] || STAGE2_TOP.tall;
+    for (let i = 0; i < top.length; i++) rows[i] = top[i];
+  }
+  return rows;
+}
+
+// ------------------------------ activity helpers ------------------------------
+function setAct(name, d) { act = { name: name, t: 0, d: d || {} }; }
+function burst(kind, x, y, n, spread) {
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      kind: kind, x: x + rnd(-spread, spread), y: y + rnd(-2, 2),
+      vx: kind === 'crumb' ? rnd(-0.6, 0.6) : rnd(-0.2, 0.2),
+      vy: kind === 'crumb' ? rnd(-0.8, -0.2) : (kind === 'heart' || kind === 'note' ? rnd(-0.5, -0.3) : 0),
+      t: kind === 'spark' ? 6 : 14
+    });
+  }
+}
+function petCX() { return pet.x + 8; }
+
+function moodFace() {
+  if (blinkT > 0) return 'blink';
+  if (S.hunger < 20 || S.happiness < 20) return 'sulk';
+  return 'open';
+}
+
+// ------------------------------ actions (buttons) ------------------------------
+function busy() {
+  return ['eat', 'play', 'clean', 'nope', 'evolve', 'wake', 'hatchburst'].indexOf(act.name) >= 0;
+}
+function onAction(kind) {
+  firstGesture = true;
+  if (S.mode === 'egg') { pokeEgg(); return; }
+  if (S.mode !== 'alive') return;
+  if (kind !== 'lights' && S.lights) { SND.blip(); return; } // asleep: only lights work
+  if (busy() && kind !== 'lights') return;
+
+  if (kind === 'feed') {
+    if (S.hunger > 90) { setAct('nope'); SND.nope(); return; }
+    S.hunger = clamp(S.hunger + 30, 0, 100);
+    S.care++;
+    items = items.filter(i => i.type !== 'cookie');
+    items.push({ type: 'cookie', x: clamp(pet.x + (pet.dir > 0 ? 18 : -9), 2, 55), stage: 3 });
+    setAct('eat');
+    SND.eat();
+  } else if (kind === 'play') {
+    if (S.energy < 10) { setAct('tired'); SND.sad(); return; }
+    S.happiness = clamp(S.happiness + 25, 0, 100);
+    S.energy = clamp(S.energy - 10, 0, 100);
+    S.care++;
+    items = items.filter(i => i.type !== 'ball');
+    items.push({ type: 'ball', x: clamp(petCX() + rnd(-10, 10), 6, 54), y: -6, vy: 0, vx: 0, bounces: 0 });
+    setAct('play');
+    SND.blip();
+  } else if (kind === 'clean') {
+    if (S.dirt.length) { S.happiness = clamp(S.happiness + 10, 0, 100); S.care++; }
+    setAct('clean', { sx: -4 });
+    SND.clean();
+  } else if (kind === 'lights') {
+    S.lights = !S.lights;
+    if (S.lights) { setAct('sleep'); SND.sleep(); }
+    else { setAct('wake'); SND.wake(); }
+  }
+  updateMeters(); save(); syncButtons();
+}
+
+function pokeEgg() {
+  if (S.mode !== 'egg') return;
+  eggScore += 2;
+  setAct('wobble');
+  SND.wob();
+  advanceEgg();
+}
+function advanceEgg() {
+  if (eggScore >= 8) startHatch();
+  else if (eggScore >= 6) crackStage = 3;
+  else if (eggScore >= 4) crackStage = 2;
+  else if (eggScore >= 2) crackStage = 1;
+}
+function startHatch() {
+  if (S.mode !== 'egg') return;
+  S.mode = 'hatching';
+  flashT = 8;
+  setAct('hatchburst');
+  SND.hatch();
+  document.getElementById('hint').classList.add('gone');
+}
+
+// ------------------------------ step (140ms animation tick) ------------------------------
+function step() {
+  frame++;
+  if (flashT > 0) flashT--;
+  // particles
+  for (const p of particles) {
+    p.x += p.vx; p.y += p.vy; p.t--;
+    if (p.kind === 'crumb') p.vy += 0.15;
+    if (p.kind === 'z') p.x += Math.sin(p.t * 0.8) * 0.3;
+  }
+  particles = particles.filter(p => p.t > 0);
+
+  if (S.mode === 'egg') {
+    act.t++;
+    if (act.name === 'wobble' && act.t > 4) setAct('idle');
+    if (frame % 14 === 0) { eggScore += 1; setAct('wobble'); SND.wob(); advanceEgg(); }
+    return;
+  }
+  if (S.mode === 'hatching') {
+    act.t++;
+    if (act.t === 4) {
+      burst('spark', 32, 30, 8, 8);
+    }
+    if (act.t >= 8) {
+      S.mode = 'alive';
+      S.born = Date.now();
+      pet.x = 24; pet.yoff = 3;
+      burst('heart', petCX(), 22, 4, 6);
+      setAct('idle');
+      save();
+    }
+    return;
+  }
+
+  // ---- alive ----
+  act.t++;
+  if (blinkT > 0) blinkT--;
+
+  if (S.lights) {
+    if (act.name !== 'sleep') setAct('sleep');
+    if (act.t % 22 === 0) particles.push({ kind: 'z', x: petCX() + 6, y: 22, vx: 0.15, vy: -0.35, t: 18 });
+    return;
+  }
+
+  // surprises only while idling
+  if (act.name === 'idle') {
+    surpriseIn--;
+    if (surpriseIn <= 0) {
+      const pool = ['zoomies', 'bugchase', 'dance', 'sneeze'];
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      if (pick === 'bugchase') {
+        const fromLeft = Math.random() < 0.5;
+        items.push({ type: 'bug', x: fromLeft ? -6 : 64, dir: fromLeft ? 1 : -1 });
+      }
+      if (pick === 'zoomies') SND.zoom();
+      setAct(pick);
+      resetSurprise();
+    }
+  }
+
+  switch (act.name) {
+    case 'idle':
+      pet.yoff = 0;
+      if (blinkT <= 0 && Math.random() < 0.05) blinkT = 2;
+      if (Math.random() < 0.012) setAct('walk', { tx: Math.floor(rnd(4, 44)) });
+      else if (S.hunger < 15 && Math.random() < 0.02) { setAct('sulk'); SND.sad(); }
+      break;
+    case 'walk': {
+      const tx = act.d.tx;
+      pet.dir = tx > pet.x ? 1 : -1;
+      pet.x += pet.dir;
+      if (Math.abs(pet.x - tx) <= 1 || act.t > 50) setAct('idle');
+      break;
+    }
+    case 'eat': {
+      const ck = items.find(i => i.type === 'cookie');
+      if (!ck) { setAct('idle'); break; }
+      pet.dir = ck.x + 3 > petCX() ? 1 : -1;
+      if (act.t % 4 === 0) {
+        ck.stage--;
+        burst('crumb', ck.x + 3, 40, 3, 2);
+        SND.eat();
+        if (ck.stage <= 0) {
+          items = items.filter(i => i !== ck);
+          burst('heart', petCX(), 24, 3, 5);
+          SND.happy();
+          setAct('idle');
+        }
+      }
+      break;
+    }
+    case 'play': {
+      const b = items.find(i => i.type === 'ball');
+      if (!b) { setAct('idle'); break; }
+      b.vy += 0.35; b.y += b.vy; b.x += b.vx;
+      pet.dir = b.x + 3 > petCX() ? 1 : -1;
+      pet.yoff = b.y > 20 && b.bounces < 3 ? 3 : 0;
+      if (b.y >= 36) {
+        b.y = 36; b.bounces++;
+        if (b.bounces <= 3) {
+          b.vy = -2.4 + b.bounces * 0.2;
+          SND.bop(b.bounces);
+          particles.push({ kind: 'note', x: b.x + rnd(-2, 2), y: 30, vx: 0.1, vy: -0.4, t: 12 });
+        } else {
+          b.vy = 0; b.vx = b.x < 32 ? -1.4 : 1.4; // roll off
+        }
+      }
+      if (b.x < -8 || b.x > 66) {
+        items = items.filter(i => i !== b);
+        burst('heart', petCX(), 24, 3, 5);
+        SND.happy();
+        setAct('idle');
+      }
+      break;
+    }
+    case 'clean': {
+      act.d.sx += 3;
+      burst('spark', act.d.sx, rnd(28, 40), 1, 2);
+      S.dirt = S.dirt.filter(dx => {
+        if (Math.abs(dx + 4 - act.d.sx) < 4) { burst('spark', dx + 4, 42, 3, 3); return false; }
+        return true;
+      });
+      if (act.d.sx > 70) { setAct('idle'); }
+      break;
+    }
+    case 'zoomies': {
+      pet.x += pet.dir * 4;
+      particles.push({ kind: 'dust', x: petCX() - pet.dir * 9, y: 38, vx: -pet.dir * 0.3, vy: 0, t: 5 });
+      if (pet.x < 2) { pet.x = 2; pet.dir = 1; act.d.pass = (act.d.pass || 0) + 1; }
+      if (pet.x > 46) { pet.x = 46; pet.dir = -1; act.d.pass = (act.d.pass || 0) + 1; }
+      if ((act.d.pass || 0) >= 4) {
+        particles.push({ kind: 'ex', x: petCX(), y: 16, vx: 0, vy: 0, t: 8 });
+        setAct('idle');
+      }
+      break;
+    }
+    case 'bugchase': {
+      const bug = items.find(i => i.type === 'bug');
+      if (!bug) { setAct('idle'); break; }
+      bug.x += bug.dir * 0.8;
+      if (act.t === 5) particles.push({ kind: 'ex', x: petCX(), y: 16, vx: 0, vy: 0, t: 6 });
+      if (act.t > 5) {
+        pet.dir = bug.x + 3 > petCX() ? 1 : -1;
+        pet.x += pet.dir * 2;
+      }
+      if (Math.abs(bug.x + 3 - petCX()) < 5) {
+        items = items.filter(i => i !== bug);
+        burst('heart', petCX(), 24, 2, 4);
+        S.happiness = clamp(S.happiness + 5, 0, 100);
+        SND.happy();
+        setAct('munch');
+        updateMeters();
+      } else if (bug.x < -8 || bug.x > 70) {
+        items = items.filter(i => i !== bug);
+        setAct('idle');
+      }
+      break;
+    }
+    case 'munch':
+      if (act.t > 6) setAct('idle');
+      break;
+    case 'dance':
+      if (act.t === 1) SND.happy();
+      if (act.t % 2 === 0) pet.dir = -pet.dir;
+      pet.yoff = act.t % 4 < 2 ? 2 : 0;
+      if (act.t % 3 === 0) particles.push({ kind: 'note', x: petCX() + rnd(-8, 8), y: 20, vx: 0, vy: -0.4, t: 12 });
+      if (act.t > 12) { pet.yoff = 0; setAct('idle'); }
+      break;
+    case 'sneeze':
+      if (act.t < 4) { pet.yoff = 0; }
+      else if (act.t === 4) {
+        pet.yoff = 3;
+        particles.push({ kind: 'ex', x: petCX(), y: 14, vx: 0, vy: 0, t: 6 });
+        burst('dust', petCX() + pet.dir * 8, 30, 4, 3);
+        tone(1047, 0.08); tone(523, 0.1, 0.08);
+      }
+      else if (act.t > 10) { pet.yoff = 0; setAct('idle'); }
+      break;
+    case 'sulk':
+      if (act.t === 1) pet.dir = -pet.dir;
+      if (act.t % 8 === 0) particles.push({ kind: 'z', x: petCX() - pet.dir * 6, y: 20, vx: 0, vy: -0.2, t: 10, gray: true });
+      if (act.t > 18) setAct('idle');
+      break;
+    case 'nope':
+      if (act.t % 2 === 0) pet.dir = -pet.dir;
+      if (act.t > 7) setAct('idle');
+      break;
+    case 'tired':
+      if (act.t > 8) setAct('idle');
+      break;
+    case 'wake':
+      pet.yoff = act.t < 3 ? 3 : 0;
+      if (act.t > 5) setAct('idle');
+      break;
+    case 'evolve':
+      flashT = 2;
+      if (act.t === 8) {
+        S.stage = 2;
+        S.branch = (S.hunger + S.happiness + S.energy) / 3 >= 55 ? 'sunny' : 'grump';
+        SND.evolve();
+      }
+      if (act.t > 16) {
+        burst('heart', petCX(), 20, 5, 7);
+        particles.push({ kind: 'ex', x: petCX(), y: 12, vx: 0, vy: 0, t: 10 });
+        setAct('idle');
+        save();
+      }
+      break;
+    case 'sleep': // lights came back on but act not reset
+      setAct('idle');
+      break;
+  }
+}
+function resetSurprise() { surpriseIn = Math.floor(rnd(140, 285)); } // ~20-40s
+
+// ------------------------------ stat tick (1s) ------------------------------
+let saveCountdown = 5;
+function statTick() {
+  if (S.mode !== 'alive') return;
+  const m = 1 / 60;
+  if (S.lights) {
+    S.hunger = clamp(S.hunger - RATE.hungerSleep * m, 0, 100);
+    S.energy = clamp(S.energy - RATE.energySleep * m, 0, 100);
+  } else {
+    S.hunger = clamp(S.hunger - RATE.hungerAwake * m, 0, 100);
+    const mult = S.hunger <= 0 ? 2 : 1;
+    S.happiness = clamp(S.happiness - RATE.happy * mult * m, 0, 100);
+    S.energy = clamp(S.energy - RATE.energyAwake * m, 0, 100);
+    if (S.dirt.length < 3 && Math.random() < 0.004) S.dirt.push(4 + Math.floor(Math.random() * 50));
+  }
+  // evolution: needs age + actual care, so waiting alone isn't enough
+  if (S.stage === 1 && S.care >= 3 && Date.now() - S.born > 120000 && act.name === 'idle' && !S.lights) {
+    setAct('evolve');
+  }
+  updateMeters();
+  if (--saveCountdown <= 0) { saveCountdown = 5; save(); }
+}
+
+// ------------------------------ render ------------------------------
+function render() {
+  const night = isNight();
+  const dark = S.lights || false;
+  const bg = dark || night ? COL.nightBg : COL.dayBg;
+  const ground = dark || night ? COL.nightGround : COL.dayGround;
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 64, 48);
+
+  if (dark || night) {
+    ctx.fillStyle = COL.star;
+    const stars = [[6,5],[18,9],[30,4],[44,7],[56,11],[12,14],[50,3]];
+    for (let i = 0; i < stars.length; i++) {
+      if ((frame + i * 3) % 16 < 13) ctx.fillRect(stars[i][0], stars[i][1], 1, 1);
+    }
+    // moon
+    ctx.fillStyle = COL.moon;
+    ctx.fillRect(53, 4, 4, 4); ctx.fillRect(52, 5, 1, 2); ctx.fillRect(57, 5, 1, 2);
+    ctx.fillStyle = bg; ctx.fillRect(52, 4, 2, 2);
+  } else {
+    ctx.fillStyle = COL.sun;
+    ctx.fillRect(53, 4, 4, 4); ctx.fillRect(52, 5, 1, 2); ctx.fillRect(57, 5, 1, 2);
+    ctx.fillRect(54, 3, 2, 1); ctx.fillRect(54, 8, 2, 1);
+  }
+
+  ctx.fillStyle = ground; ctx.fillRect(0, 40, 64, 8);
+  ctx.fillStyle = COL.grass;
+  for (let gx = 3; gx < 64; gx += 9) ctx.fillRect(gx, 40, 1, 1);
+
+  for (const dx of S.dirt) mono(DIRTSPR, dx, 37, COL.dirt);
+
+  for (const it of items) {
+    if (it.type === 'cookie' && it.stage > 0) {
+      // stage 3 = whole cookie (7 rows), each bite eats two rows off the top
+      const rows = COOKIE.slice((3 - it.stage) * 2);
+      drawRows(rows, it.x, 40 - rows.length, { o:'#8a5a2a', b: COL.cookie, c: COL.chip });
+    }
+    if (it.type === 'ball') drawRows(BALL, it.x, it.y, { o: COL.ball, b: COL.ball, w: COL.ballW });
+    if (it.type === 'bug') mono(BUG, it.x, 36, COL.bug, it.dir < 0);
+  }
+
+  // pet or egg
+  if (S.mode === 'egg' || S.mode === 'hatching') {
+    const wob = act.name === 'wobble' ? [0, -1, 1, -1, 0][Math.min(act.t, 4)] : 0;
+    drawRows(EGG, 24 + wob, 25, EGG_PAL);
+    ctx.fillStyle = EGG_PAL.o;
+    for (let cs = 0; cs < crackStage && cs < CRACKS.length; cs++) {
+      for (const p of CRACKS[cs]) ctx.fillRect(24 + wob + p[0], 25 + p[1], 1, 1);
+    }
+  } else {
+    let poseName, faceName;
+    if (S.lights) {
+      poseName = Math.floor(act.t / 6) % 2 ? 'tall' : 'squash';
+      faceName = 'sleep';
+    } else {
+      switch (act.name) {
+        case 'eat':   poseName = act.t % 4 < 2 ? 'tall' : 'squash'; faceName = act.t % 4 < 2 ? 'eatopen' : 'eatchew'; break;
+        case 'munch': poseName = 'squash'; faceName = 'eatchew'; break;
+        case 'play':  poseName = pet.yoff > 0 ? 'jump' : 'tall'; faceName = 'happy'; break;
+        case 'dance': poseName = pet.yoff > 0 ? 'jump' : 'squash'; faceName = 'happy'; break;
+        case 'zoomies': poseName = frame % 2 ? 'tall' : 'squash'; faceName = 'happy'; break;
+        case 'bugchase': poseName = frame % 2 ? 'tall' : 'squash'; faceName = 'open'; break;
+        case 'walk':  poseName = frame % 2 ? 'tall' : 'squash'; faceName = moodFace(); break;
+        case 'sulk':  poseName = 'squash'; faceName = 'sulk'; break;
+        case 'nope':  poseName = 'tall'; faceName = 'sulk'; break;
+        case 'tired': poseName = 'squash'; faceName = 'sleep'; break;
+        case 'sneeze': poseName = act.t < 4 ? 'squash' : 'jump'; faceName = act.t < 4 ? 'blink' : 'eatopen'; break;
+        case 'wake':  poseName = 'jump'; faceName = 'happy'; break;
+        case 'evolve': poseName = frame % 2 ? 'jump' : 'squash'; faceName = 'blink'; break;
+        case 'clean': poseName = 'tall'; faceName = 'happy'; break;
+        default:      poseName = Math.floor(frame / 3) % 2 ? 'squash' : 'tall'; faceName = moodFace();
+      }
+    }
+    drawRows(petFrame(poseName, faceName), pet.x, 25 - pet.yoff, petPal(), pet.dir < 0);
+  }
+
+  // night dim overlay (under particles so Z stays bright)
+  if (S.lights) { ctx.fillStyle = 'rgba(18,18,40,0.45)'; ctx.fillRect(0, 0, 64, 48); }
+
+  for (const p of particles) {
+    switch (p.kind) {
+      case 'heart': mono(HEART, p.x, p.y, COL.heart); break;
+      case 'z':     mono(ZEE, p.x, p.y, p.gray ? '#8a8a8a' : COL.z); break;
+      case 'note':  mono(NOTE, p.x, p.y, COL.note); break;
+      case 'spark': if (p.t % 2) mono(SPARK, p.x - 2, p.y - 2, COL.spark); break;
+      case 'crumb': ctx.fillStyle = COL.crumb; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); break;
+      case 'dust':  ctx.fillStyle = COL.dust; ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 1); break;
+      case 'ex':    mono(EXCLAIM, p.x, p.y - 5, COL.ex); break;
+    }
+  }
+
+  if (flashT > 0 && flashT % 2 === 0) { ctx.fillStyle = COL.flash; ctx.fillRect(0, 0, 64, 48); }
+}
+
+// ------------------------------ meters / buttons ------------------------------
+const METERS = [
+  { el: document.getElementById('m-h'), key: 'hunger', cls: 'h' },
+  { el: document.getElementById('m-p'), key: 'happiness', cls: 'p' },
+  { el: document.getElementById('m-e'), key: 'energy', cls: 'e' }
+];
+for (const m of METERS) {
+  const segs = m.el.querySelector('.segs');
+  for (let i = 0; i < 10; i++) {
+    const s = document.createElement('div');
+    s.className = 'seg ' + m.cls;
+    segs.appendChild(s);
+  }
+}
+function updateMeters() {
+  for (const m of METERS) {
+    const n = Math.round(S[m.key] / 10);
+    const segs = m.el.querySelectorAll('.seg');
+    segs.forEach((s, i) => s.classList.toggle('on', i < n));
+    m.el.classList.toggle('low', n <= 2 && S.mode === 'alive');
+  }
+}
+function syncButtons() {
+  const asleep = S.lights && S.mode === 'alive';
+  for (const id of ['b-feed', 'b-play', 'b-clean']) {
+    document.getElementById(id).classList.toggle('dim', asleep);
+  }
+}
+function syncMute() {
+  document.getElementById('mute').textContent = S.muted ? 'SND OFF' : 'SND ON';
+}
+
+document.getElementById('b-feed').addEventListener('click', () => onAction('feed'));
+document.getElementById('b-play').addEventListener('click', () => onAction('play'));
+document.getElementById('b-clean').addEventListener('click', () => onAction('clean'));
+document.getElementById('b-lights').addEventListener('click', () => onAction('lights'));
+document.getElementById('mute').addEventListener('click', () => {
+  firstGesture = true; S.muted = !S.muted; syncMute(); save();
+  if (!S.muted) SND.blip();
+});
+cv.addEventListener('pointerdown', () => {
+  firstGesture = true;
+  if (S.mode === 'egg') pokeEgg();
+  else if (S.mode === 'alive' && act.name === 'idle' && !S.lights) {
+    burst('heart', petCX(), 22, 1, 2);
+    blinkT = 2;
+    SND.blip();
+  }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+window.addEventListener('beforeunload', save);
+
+// ------------------------------ boot ------------------------------
+(function boot() {
+  const had = load();
+  const away = catchUp();
+  syncMute(); syncButtons(); updateMeters(); resetSurprise();
+  if (S.mode !== 'egg') document.getElementById('hint').classList.add('gone');
+  if (had && S.mode === 'alive' && !S.lights && away > 1) {
+    setAct('dance'); // welcome back wave
+  }
+  save();
+  let last = performance.now(), animAcc = 0, statAcc = 0;
+  function loop(ts) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(ts - last, 500);
+    last = ts; animAcc += dt; statAcc += dt;
+    while (animAcc >= 140) { animAcc -= 140; step(); }
+    while (statAcc >= 1000) { statAcc -= 1000; statTick(); }
+    render();
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
