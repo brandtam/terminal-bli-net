@@ -1,6 +1,6 @@
 # Turtle Garden — PRD
 
-LOGO turtle graphics rebuilt as a generative-art toy for TerminalOS. You type a command, a pixel turtle walks and draws glowing neon lines on a dark canvas. Three typed lines bloom into a spirograph.
+LOGO turtle graphics rebuilt as a toy for TerminalOS. You type a command, a pixel turtle walks and draws chunky phosphor lines on a dark canvas — every line you run joins an editable program pane beside the canvas. Three typed lines bloom into a spirograph.
 
 Status: exploration. Interactive demo at `docs/apps-exploration/turtle-garden/demo.html`.
 
@@ -16,7 +16,8 @@ That audience assumption drives every design decision:
 - **Forgiving parser.** Case-insensitive. Extra whitespace ignored. Short aliases (`FD`, `RT`) accepted everywhere. Commands chain on one line so copy-typing a whole spell works.
 - **Friendly errors.** Every error message contains a runnable fix, e.g. `FORWARD needs a number. TRY: FORWARD 50`. Unknown words get a nearest-match suggestion: `I don't know "FROWARD". Did you mean FORWARD?`. Errors never use words like "syntax", "invalid", "parse", or "token".
 - **Autocomplete hint bar.** A one-line bar under the input. While the input is empty it rotates gentle prompts (`TRY: FORWARD 50`, `TRY: REPEAT 8 [ FORWARD 60 RIGHT 45 ]`). While typing, it shows commands whose names start with the current word, with their argument shape (`FORWARD n · move ahead`). Purely informational in v1 — no tab-completion.
-- **Examples before docs.** Four spell buttons produce spectacular output and *show their code being typed into the input*, so the path from "press button" to "I typed that myself and changed the 5 to a 7" is one step.
+- **The program is visible and editable.** A program pane sits beside the canvas. Every line you run at the prompt appends to it; spells load their full source into it; you can edit any line and RUN redraws from the top. The pane *is* the artifact — what you see is what saves, and reading a program you can change is how the pedagogy actually lands.
+- **Examples before docs.** Four spell buttons produce spectacular output and *show their full source typing into the program pane*, so the path from "press button" to "I changed the 5 to a 7 and pressed RUN" is one step.
 
 The pedagogy target: within 10 seconds of launch a user has made the turtle move; within 2 minutes they have run a spell, changed a number in it, and seen the drawing change.
 
@@ -32,19 +33,19 @@ REPEAT 300 [ FORWARD 230 RIGHT 151 ]
 The turtle visibly walks every segment while the hue cycles — the drawing *grows* on screen over ~20 seconds at default speed. That growth is the screen-recordable moment. Design requirements that protect it:
 
 - Drawing is animated by default, never instant (instant is an opt-in speed setting).
-- Neon glow trails on a near-black canvas so phone screen recordings look good.
-- The GALAXY spell button reproduces the hook in one tap and leaves its code sitting in the input, inviting mutation.
+- Chunky-pixel phosphor lines on a near-black canvas — the period look — with an opt-in NEON glow mode for people who want the modern recording aesthetic.
+- The GALAXY spell button reproduces the hook in one tap and leaves its full source sitting in the program pane, inviting mutation.
 - Finished drawings save to Terminal HD, so the artifact persists inside the OS world.
 
 ## 3. UX walkthrough
 
-1. **Launch.** User double-clicks Turtle.app (installed from the Computer Store). One window opens: dark canvas filling most of the window, a command line beneath it with a blinking `?` prompt (the classic LOGO prompt), the hint bar under that, and a spell/controls strip. The turtle sits at canvas center pointing up, and blinks every few seconds — a small idle animation that says "I'm alive, talk to me."
-2. **First command.** Hint bar shows `TRY: FORWARD 50`. User types it (any casing), presses Enter. The turtle audibly plinks and visibly walks 50 pixels up, leaving a glowing line. The command echoes into a short scrollback log above the input.
-3. **First spell.** User taps STAR. The spell's command text types itself into the input character by character (fast, ~15 ms/char — visible but not tedious), then submits. A yellow five-pointed star draws itself. The code remains the last log entry.
-4. **Mutation.** User presses ArrowUp — the spell text returns to the input. They change `144` to `100`, press Enter, and get a different shape. This loop (recall → tweak → run) is the core play pattern and must be frictionless: history recall must preserve the full multi-command line exactly.
-5. **Going big.** GALAXY runs a 300-iteration rainbow rosette. User discovers the SPEED control to slow it down for recording or crank it to instant for iteration.
-6. **Saving.** File → Save Drawing (⌘S) prompts for a name and writes the *session's command list* to Terminal HD (see §8). The file appears in Documents; double-clicking it later reopens Turtle Garden and replays the drawing.
-7. **Starting over.** CLEAR (typed, or the button) wipes the canvas and homes the turtle. The session command list resets too — a save always reproduces exactly what is on the canvas.
+1. **Launch.** User double-clicks Turtle.app (installed from the Computer Store). One window opens: dark canvas on the left, the **program pane** on the right (header: PROGRAM · STOP · RUN ▶), a command line beneath the canvas with a blinking `?` prompt (the classic LOGO prompt), the hint bar under that, and a spell/controls strip. The turtle sits at canvas center pointing up, and blinks every few seconds — a small idle animation that says "I'm alive, talk to me."
+2. **First command.** Hint bar shows `TRY: FORWARD 50`. User types it (any casing), presses Enter. The turtle audibly plinks and visibly walks 50 pixels up, leaving a chunky phosphor line — and the line of code appears in the program pane. The prompt *writes the program*; a short scrollback log above the input echoes commands and errors.
+3. **First spell.** User taps STAR. The spell's full source types itself into the program pane (fast — visible but not tedious), then runs. A yellow five-pointed star draws itself, and the source sits in the pane: visible, editable, theirs now.
+4. **Mutation.** User clicks into the program pane, changes `144` to `100`, presses RUN (or ⌘-Enter). The canvas clears, the turtle homes, and the edited program redraws from the top. This loop (read → tweak → RUN) is the core play pattern; ArrowUp history at the prompt covers quick single-line pokes.
+5. **Going big.** GALAXY runs a 300-iteration rainbow rosette. User discovers the SPEED control to slow it down for recording or crank it to instant for iteration, and the PIXELS control to go chunkier or finer.
+6. **Saving.** File → Save Drawing (⌘S) prompts for a name and writes the *program pane's text* to Terminal HD (see §8). The file appears in Documents; double-clicking it later reopens Turtle Garden with the program in the pane and replays the drawing.
+7. **Starting over.** The CLEAR button wipes the canvas, homes the turtle, and empties the program pane — a save always reproduces exactly what is on the canvas. (Typed `CLEAR` is just a command: it wipes and homes mid-program and stays in the listing, so RUN still reproduces the canvas.)
 
 ## 4. Language spec v1
 
@@ -61,7 +62,7 @@ The turtle visibly walks every segment while the hue cycles — the drawing *gro
 | `COLOR x` | — | name or 0–360 | Set pen color; turns rainbow mode off |
 | `RAINBOW` | — | — | Rainbow pen: hue advances a few degrees per segment |
 | `REPEAT n [ … ]` | — | count + block | Run the bracketed commands n times; nests arbitrarily |
-| `CLEAR` | `CS` | — | Wipe canvas, home the turtle, reset session command list |
+| `CLEAR` | `CS` | — | Wipe canvas, home the turtle (stays in the program listing) |
 | `HOME` | — | — | Jump to center, heading up, **without** drawing |
 
 Color names: `RED ORANGE YELLOW GREEN CYAN BLUE PURPLE PINK WHITE`. A number is treated as an HSL hue (0–360, clamped).
@@ -69,7 +70,7 @@ Color names: `RED ORANGE YELLOW GREEN CYAN BLUE PURPLE PINK WHITE`. A number is 
 Semantics decisions (differ from classic LOGO where kid-friendliness wins):
 
 - `HOME` never draws. Classic LOGO draws a line home when the pen is down; that surprises beginners and ruins drawings. Documented in Help.
-- `CLEAR` also homes (classic `CLEARSCREEN` behavior) and resets the saveable command list.
+- `CLEAR` also homes (classic `CLEARSCREEN` behavior). As a command it stays in the program listing so RUN reproduces the canvas; only the CLEAR *button* empties the program pane.
 - Heading 0 = up (classic LOGO), `RIGHT` is clockwise.
 - Numbers may be negative or fractional (`FORWARD -20`, `RIGHT 172.5`). No expressions, no variables in v1.
 - The turtle may walk off-canvas; lines are simply clipped. No wrapping in v1.
@@ -78,8 +79,8 @@ Semantics decisions (differ from classic LOGO where kid-friendliness wins):
 
 - **Tokenize** on whitespace; `[` and `]` are always their own tokens even without surrounding spaces (`REPEAT 4[FD 50 RT 90]` works).
 - **Recursive descent** over the token stream producing an AST: a program is a list of `{cmd, arg}` nodes and `{repeat, count, body}` nodes; `body` is itself a program, giving nesting for free. REPEAT nesting depth is unlimited in grammar; execution caps total emitted segments (see below).
-- Case-insensitive throughout. Multiple commands per line. Blank input is a no-op, not an error.
-- On any error, **nothing executes** — the line is all-or-nothing so a half-run never corrupts the canvas relative to the session command list.
+- Case-insensitive throughout. Multiple commands per line; newlines are whitespace, so a `REPEAT` body may span lines in the program pane.
+- On any error, **nothing executes** — a prompt line or a RUN is all-or-nothing, so a half-run never corrupts the canvas relative to the program pane.
 - **Runaway guard:** a single line may expand to at most 100,000 primitive steps (multiplied REPEAT counts). Beyond that: `That's too many steps for one spell! Try a smaller REPEAT.` REPEAT count must be a whole number ≥ 1.
 
 ### Error messages
@@ -112,9 +113,11 @@ Deferred to v2, deliberately:
 - **Execution model.** The AST executes through a generator/iterator yielding primitive ops (`move`, `turn`, `pen`, `color`, …) so a `REPEAT 300` never materializes as recursion during animation and can be paused between any two ops.
 - **Never lock the UI.** All drawing happens inside `requestAnimationFrame` with a per-frame time budget (~12 ms). Each frame advances the current segment by `speed` pixels and pulls further ops until the budget is spent. Even "instant" speed is budget-chunked — a pathological spell degrades to fast animation, never a frozen window.
 - **Speed control.** Three settings: `1×` (10 px/frame ≈ 600 px/s, the default — a short FORWARD visibly walks, and GALAXY stays hypnotic for minutes), `4×` (40 px/frame — completes GALAXY in ~30 s, the recording speed), and `MAX` (as fast as the frame budget allows). A new command while a drawing is animating queues behind it.
-- **Glow rendering.** Two stacked canvases: a persistent **trail canvas** (segments are drawn once and accumulate — no per-frame full redraw) and a transparent **overlay canvas** redrawn each frame with just the turtle sprite. Glow = each segment stroked twice on the trail canvas: a wide low-alpha pass with `shadowBlur ≈ 12` in the pen color, then a thin bright core (near-white at high lightness). This reads as neon without post-processing.
+- **Pixel-grid rendering, period by default.** Two stacked canvases: a persistent **trail canvas** (segments are drawn once and accumulate — no per-frame full redraw) and a transparent **overlay canvas** redrawn each frame with just the turtle sprite. The trail canvas *is* the pixel grid: its backing store is the canvas area divided by the **pixel size** (adjustable 1–4, **default 3** — chunky, the period-correct look), upscaled with `image-rendering: pixelated`. Default line style is a flat 1-grid-pixel phosphor stroke, no glow — what turtle graphics actually looked like. Default pen color is white (Apple II LOGO convention).
+- **NEON mode (opt-in).** A toggle switches the segment renderer to the modern look: a wide low-alpha `shadowBlur` pass in the pen color plus a thin bright core. Off by default; it exists for people recording clips, not as the identity of the app.
+- **Pixel size / NEON changes re-render** by re-running the program pane instantly and silently (no animation, no plinks). Same mechanism handles window resize — no bitmap preservation needed; the program is the source of truth.
 - **Rainbow mode** advances the hue ~7° per segment (per FORWARD command, not per pixel), so a 36-segment star sweeps most of the wheel.
-- **Canvas resolution** matches the window's device-pixel ratio so lines stay crisp on retina displays. Logical drawing space is the window's canvas area; origin (HOME) at its center.
+- **Overlay canvas resolution** matches the window's device-pixel ratio so the turtle sprite stays crisp on retina displays. Logical drawing space is the window's canvas area; origin (HOME) at its center.
 - **Turtle sprite:** authored pixel art (~15×15 logical px grid drawn programmatically, scaled ×2), a small green turtle with shell, head, and feet, drawn onto the overlay rotated to the current heading. Idle blink: eyes toggle briefly every ~4 s while no program is running.
 
 ## 7. Sound spec
@@ -127,19 +130,17 @@ Deferred to v2, deliberately:
 
 ## 8. Visual spec
 
-- **Palette.** Canvas `#0a0a12` (near-black, faint blue). Neon pen defaults to `hsl(190 100% 60%)` cyan. Glow core near-white (`75%` lightness of the pen hue). UI chrome follows the TerminalOS window style; inside the content area, a chunky inset bezel around the canvas, monospace type everywhere (the OS mono stack), dim green-on-dark for the log, amber for the hint bar, red-pink for errors (still friendly in tone).
-- **Layout** (single window, default 720×560, min 520×420):
-  - Canvas (fills available space, top).
-  - Scrollback log: last ~4 lines of echoed commands/errors.
-  - Command line: `?` prompt + text input.
-  - Hint bar (one line).
-  - Controls strip: spell buttons `STAR SPIRAL FLOWER GALAXY`, then `SPEED 1×/4×/MAX`, `CLEAR`, mute.
-- **Spells** (exact v1 texts; SPIRAL and FLOWER deliberately demonstrate *nested* REPEAT):
-  - STAR — `COLOR YELLOW REPEAT 5 [ FORWARD 150 RIGHT 144 ]`
-  - SPIRAL — `RAINBOW REPEAT 60 [ REPEAT 4 [ FORWARD 100 RIGHT 90 ] RIGHT 6 ]`
-  - FLOWER — `RAINBOW REPEAT 12 [ REPEAT 6 [ FORWARD 60 RIGHT 60 ] RIGHT 30 ]`
-  - GALAXY — `RAINBOW REPEAT 300 [ FORWARD 230 RIGHT 151 ]`
-- **Input affordances:** ArrowUp/ArrowDown command history (session-scoped); Enter runs; input keeps focus after running; clicking anywhere in the window refocuses the input.
+- **Palette.** Canvas `#0a0a12` (near-black, faint blue). Pen defaults to white (period); named colors render flat at `hsl(h 100% 60%)`. UI chrome follows the TerminalOS window style; inside the content area, a chunky inset bezel around the canvas, monospace type everywhere (the OS mono stack), dim green-on-dark for the log and program pane, amber for the hint bar, red-pink for errors (still friendly in tone).
+- **Layout** (single window, default 860×560, min 620×420):
+  - Left column: canvas (fills available space), scrollback log (~3 lines of echoed commands/errors), command line (`?` prompt + text input), hint bar.
+  - Right column: **program pane** — header row (`PROGRAM · STOP · RUN ▶`), multi-line editable text area, footer hint (`EDIT FREELY · RUN REDRAWS FROM THE TOP`). ~300px wide; stacks below the canvas at narrow window sizes.
+  - Controls strip (full width, bottom): spell buttons `STAR SPIRAL FLOWER GALAXY`, `SPEED 1×/4×/MAX`, `PIXELS 1/2/3/4` (default 3), `NEON` toggle (default off), `CLEAR`, mute.
+- **Spells** (exact v1 sources; SPIRAL and FLOWER deliberately demonstrate *nested* REPEAT, formatted multi-line so the pane teaches indentation by example):
+  - STAR — `COLOR YELLOW` / `REPEAT 5 [ FORWARD 150 RIGHT 144 ]`
+  - SPIRAL — `RAINBOW` / `REPEAT 60 [` / `  REPEAT 4 [ FORWARD 100 RIGHT 90 ]` / `  RIGHT 6` / `]`
+  - FLOWER — `RAINBOW` / `REPEAT 12 [` / `  REPEAT 6 [ FORWARD 60 RIGHT 60 ]` / `  RIGHT 30` / `]`
+  - GALAXY — `RAINBOW` / `REPEAT 300 [ FORWARD 230 RIGHT 151 ]`
+- **Input affordances:** ArrowUp/ArrowDown command history at the prompt (session-scoped); Enter runs a line and appends it to the program pane; ⌘-Enter in the pane = RUN; input keeps focus after running; clicking empty window space refocuses the input (never steals focus from the pane).
 
 ## 9. TerminalOS integration spec
 
@@ -166,7 +167,7 @@ defineApp({
 			match: { kind: 'exact', id: 'turtle-garden' },
 			role: 'app',
 			title: () => 'Turtle Garden',
-			size: () => ({ w: 720, h: 560, minW: 520, minH: 420 }),
+			size: () => ({ w: 860, h: 560, minW: 620, minH: 420 }),
 			component: () => import('$lib/apps/turtle-garden/TurtleGardenWindow.svelte')
 		},
 		{
@@ -174,7 +175,7 @@ defineApp({
 			match: { kind: 'prefix', prefix: 'turtle-garden:', arg: 'fileId' },
 			role: 'app',
 			title: ({ args, fs }) => fs.peekNode(args.fileId)?.name ?? 'Turtle Garden',
-			size: () => ({ w: 720, h: 560, minW: 520, minH: 420 }),
+			size: () => ({ w: 860, h: 560, minW: 620, minH: 420 }),
 			component: () => import('$lib/apps/turtle-garden/TurtleGardenWindow.svelte'),
 			opens: { contentTypes: ['text/x-turtle-garden'] }
 		}
@@ -189,7 +190,7 @@ defineApp({
 		sections: [
 			{
 				h: 'WHAT IT IS',
-				body: 'A turtle that obeys typed commands and draws glowing lines. FORWARD 50 to start. REPEAT to go wild.'
+				body: 'A turtle that obeys typed commands and draws. FORWARD 50 to start. REPEAT to go wild. Your program builds itself beside the canvas — edit it and RUN.'
 			}
 		]
 	},
@@ -235,12 +236,12 @@ Verify the `ENT` category entry in `CATEGORIES` covers it (it exists already).
 
 ### Persistence
 
-**Recommendation: save drawings as replayable command-list files, not picture blobs.**
+**Recommendation: save drawings as replayable program files, not picture blobs.**
 
-- Format: the session's successfully-executed command list, one line per submitted command, UTF-8. First line `; TURTLE GARDEN v1` as a comment/format marker (`;` lines are skipped on replay).
+- Format: the program pane's text, verbatim, UTF-8. First line `; TURTLE GARDEN v1` as a comment/format marker (`;` lines are skipped on replay). Because the pane is the artifact, save/load is literally a text round-trip — reopening puts the program back in the pane and replays it.
 - Storage: `fs.createBlobFile(DOCUMENTS_ID, name, encodedBytes, { appId: 'turtle-garden', opensWith: 'turtle-garden', fileType: 'data', contentType: 'text/x-turtle-garden' })`. The blob path is required because inline-text bodies carry no `contentType`, and `contentType` is what the prefix window's `opens` claim routes on; `opensWith` makes routing explicit regardless.
 - Why command-list over picture blob:
-  1. It replays — reopening a drawing re-animates it, which *is* the product experience, and it invites further mutation (the code is the artifact).
+  1. It replays — reopening a drawing re-animates it, which *is* the product experience, and it invites further mutation (the pane is pre-loaded for editing).
   2. It's tiny (bytes vs. hundreds of KB of PNG in IndexedDB) — kind to the Terminal HD quota story.
   3. It's future-proof: v2 PNG export can always be derived from the commands; the reverse is impossible.
   4. Pedagogically right: a saved file a kid can open in TextEdit (v2: register the type) and read is a program they wrote.
@@ -263,17 +264,18 @@ Parser and executor live in a pure TS module with no Svelte/DOM imports so unit 
 
 ## 10. Acceptance criteria
 
-1. Fresh install from Computer Store → launch → typing `forward 50` (lowercase) draws a visible glowing line with a plink, within one command.
-2. All commands and aliases in §4 work; unknown/malformed input never executes anything and always produces a §4-style hint.
-3. `REPEAT 3 [ REPEAT 4 [ FD 30 RT 90 ] RT 120 ]` draws three rotated squares — nesting is correct.
-4. GALAXY spell animates without any frame taking >50 ms (no UI lockup); input stays responsive during drawing.
-5. ArrowUp recalls the last line verbatim, including a spell's full text after tapping its button.
-6. Speed control changes animation rate; MAX completes GALAXY in under ~2 s.
-7. Mute toggle silences plinks immediately and persists across relaunch.
-8. ⌘S saves a file to Documents; the file double-clicks open into a Turtle Garden window that replays the exact drawing.
-9. CLEAR (typed or button) wipes canvas, homes turtle, and a subsequent save contains only post-clear commands.
-10. No sound plays and no console error appears before the first user gesture.
-11. `pnpm check` and `pnpm test:unit` pass; no OS-code edits outside the two registration files (`manifests.ts`, `store-data.ts`).
+1. Fresh install from Computer Store → launch → typing `forward 50` (lowercase) draws a visible chunky phosphor line with a plink, and the line appears in the program pane.
+2. All commands and aliases in §4 work; unknown/malformed input never executes anything, never touches the program pane, and always produces a §4-style hint.
+3. `REPEAT 3 [ REPEAT 4 [ FD 30 RT 90 ] RT 120 ]` draws three rotated squares — nesting is correct, including when the REPEAT body spans multiple lines in the pane.
+4. GALAXY spell animates without any frame taking >50 ms (no UI lockup); input and pane stay responsive during drawing.
+5. Tapping a spell loads its full source into the program pane and runs it; editing a number in the pane and pressing RUN (or ⌘-Enter) clears, homes, and redraws the edited program from the top.
+6. ArrowUp at the prompt recalls the last typed line verbatim; STOP halts drawing without touching the pane.
+7. Speed control changes animation rate; MAX completes GALAXY in under ~2 s. Pixel size defaults to 3 (chunky); switching to 1/2/4 re-renders the same program instantly and silently, as does toggling NEON (default off) and resizing the window.
+8. Mute toggle silences plinks immediately and persists across relaunch.
+9. ⌘S saves the pane's text to Documents; the file double-clicks open into a Turtle Garden window with the program in the pane and the drawing replayed.
+10. CLEAR button wipes canvas, homes turtle, and empties the pane; typed `CLEAR` wipes/homes but stays in the listing, and RUN after it reproduces the canvas exactly.
+11. No sound plays and no console error appears before the first user gesture.
+12. `pnpm check` and `pnpm test:unit` pass; no OS-code edits outside the two registration files (`manifests.ts`, `store-data.ts`).
 
 ## 11. Test plan
 
@@ -287,11 +289,11 @@ Parser and executor live in a pure TS module with no Svelte/DOM imports so unit 
   - Runaway guard trips at the step cap.
   - Geometry: after `REPEAT 4 [ FD 100 RT 90 ]` the turtle is back at origin heading 0 (within float epsilon).
   - Replay round-trip: serializing a session and re-parsing yields an identical op stream.
-- **Manual QA script:** acceptance criteria 1–10 walked on desktop Chrome/Safari/Firefox; retina + non-retina; window resize mid-drawing (canvas must not lose the trail — either preserve via offscreen copy or accept documented clear-on-resize, decide during build and document in Help).
+- **Manual QA script:** acceptance criteria 1–11 walked on desktop Chrome/Safari/Firefox; retina + non-retina; window resize and pixel-size change mid-drawing (both re-render the program instantly — the in-flight animation is abandoned, which is documented behavior).
 
 ## 12. Risks & open questions
 
-- **Resize behavior.** Preserving the trail bitmap across window resizes needs an offscreen copy (cheap) — but re-centering HOME changes replay geometry. Proposal: HOME is fixed at the canvas center *at drawing start*; resizing pans, never rescales. Needs a build-time decision.
+- **Resize/re-render abandons animation.** Because resize and pixel-size changes re-run the program instantly, a resize mid-GALAXY skips to the finished drawing. Acceptable (the program pane makes re-running free), but verify it doesn't feel like a bug; a "resume animating from where you were" refinement is possible if it does.
 - **iconKind / store icon.** The manifest `iconKind` must match an existing PixelIcon glyph and the store card needs an icon; if no turtle-ish glyph exists, either reuse `doc` or add a sprite (adding one touches shared UI — check conformance constraints first).
 - **Save-menu wiring.** Menus are built at the manifest level; Save needs to reach the focused window's component (event/callback pattern — check how other apps with File menus do it before inventing one).
 - **Audio on iPad/touch devices.** The audience skews touch; the plink gesture-unlock must count taps on spell buttons as gestures (it does, but verify on iOS Safari).

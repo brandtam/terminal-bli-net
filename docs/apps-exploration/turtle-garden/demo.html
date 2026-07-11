@@ -51,6 +51,8 @@
     flex: 1 1 auto; display: flex; flex-direction: column;
     padding: 10px; gap: 8px; min-height: 0;
   }
+  .work { flex: 1 1 auto; display: flex; gap: 8px; min-height: 0; }
+  .left { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
   .canvas-wrap {
     flex: 1 1 auto; position: relative; min-height: 120px;
     border: 3px solid var(--bezel-hi);
@@ -60,10 +62,38 @@
     overflow: hidden;
   }
   .canvas-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #trail { image-rendering: pixelated; }
+
+  /* ---- program pane ---- */
+  .program-panel {
+    flex: 0 0 300px; display: flex; flex-direction: column; min-height: 0;
+    border: 3px solid var(--bezel-hi);
+    border-right-color: var(--bezel-lo); border-bottom-color: var(--bezel-lo);
+    background: var(--canvas-bg);
+  }
+  .prog-head {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+    padding: 5px 8px; background: var(--panel);
+    border-bottom: 2px solid var(--bezel-lo);
+  }
+  .prog-head .label { flex: 1 1 auto; }
+  .prog-head button { padding: 4px 10px; font-size: 11px; }
+  #runBtn { color: var(--cyan); font-weight: bold; }
+  #prog {
+    flex: 1 1 auto; min-height: 0;
+    background: transparent; border: 0; outline: 0; resize: none;
+    color: var(--green); font-family: var(--mono); font-size: 13px; line-height: 1.5;
+    padding: 8px 10px; caret-color: var(--green);
+    text-transform: uppercase; white-space: pre; overflow: auto;
+  }
+  .prog-foot {
+    flex: 0 0 auto; font-size: 10px; color: #6a6a8a; letter-spacing: 1px;
+    padding: 4px 8px; border-top: 2px solid var(--bezel-lo);
+  }
 
   /* ---- log ---- */
   #log {
-    flex: 0 0 auto; height: calc(1.35em * 4); overflow: hidden;
+    flex: 0 0 auto; height: calc(1.35em * 3); overflow: hidden;
     font-size: 13px; line-height: 1.35;
     padding: 2px 6px;
     display: flex; flex-direction: column; justify-content: flex-end;
@@ -112,6 +142,11 @@
   button.on { background: var(--bezel-hi); color: #fff; }
   .sep { width: 10px; }
   .label { font-size: 11px; color: #6a6a8a; letter-spacing: 1px; }
+
+  @media (max-width: 720px) {
+    .work { flex-direction: column; }
+    .program-panel { flex: 0 0 150px; }
+  }
 </style>
 </head>
 <body>
@@ -123,16 +158,29 @@
 </header>
 
 <main>
-  <div class="canvas-wrap" id="wrap">
-    <canvas id="trail"></canvas>
-    <canvas id="overlay"></canvas>
+  <div class="work">
+    <div class="left">
+      <div class="canvas-wrap" id="wrap">
+        <canvas id="trail"></canvas>
+        <canvas id="overlay"></canvas>
+      </div>
+      <div id="log"></div>
+      <div class="input-row">
+        <span class="prompt">?</span>
+        <input id="cmd" autocomplete="off" spellcheck="false" autofocus aria-label="turtle command">
+      </div>
+      <div id="hint"></div>
+    </div>
+    <div class="program-panel">
+      <div class="prog-head">
+        <span class="label">PROGRAM</span>
+        <button id="stopBtn" title="stop drawing">STOP</button>
+        <button id="runBtn" title="redraw from the top">RUN &#9654;</button>
+      </div>
+      <textarea id="prog" spellcheck="false" aria-label="turtle program"></textarea>
+      <div class="prog-foot">EDIT FREELY &middot; RUN REDRAWS FROM THE TOP</div>
+    </div>
   </div>
-  <div id="log"></div>
-  <div class="input-row">
-    <span class="prompt">?</span>
-    <input id="cmd" autocomplete="off" spellcheck="false" autofocus aria-label="turtle command">
-  </div>
-  <div id="hint"></div>
   <div class="controls">
     <span class="label">SPELLS</span>
     <button class="spell" data-spell="STAR">STAR</button>
@@ -145,6 +193,13 @@
     <button class="speed" data-speed="40">4&times;</button>
     <button class="speed" data-speed="max">MAX</button>
     <span class="sep"></span>
+    <span class="label">PIXELS</span>
+    <button class="px" data-px="1">1</button>
+    <button class="px" data-px="2">2</button>
+    <button class="px on" data-px="3">3</button>
+    <button class="px" data-px="4">4</button>
+    <span class="sep"></span>
+    <button id="neonBtn" title="modern glow rendering">NEON OFF</button>
     <button id="clearBtn">CLEAR</button>
     <button id="muteBtn" title="toggle sound">&#9834; ON</button>
   </div>
@@ -153,9 +208,12 @@
 <script>
 'use strict';
 /* =========================================================================
-   Turtle Garden — LOGO turtle graphics as a generative-art toy.
+   Turtle Garden — LOGO turtle graphics as a toy.
    Self-contained demo: tokenizer + recursive-descent parser, generator-based
    executor, budgeted rAF animator, WebAudio plinks. No external requests.
+   The program pane is the artifact: the prompt appends to it, spells load
+   into it, RUN redraws it from the top. Rendering is chunky-pixel by
+   default (period correct); NEON is the opt-in modern look.
    ========================================================================= */
 
 /* ---------------- language: tokenizer + parser ---------------- */
@@ -284,7 +342,7 @@ function* exec(nodes) {
 /* ---------------- sound: WebAudio plinks ---------------- */
 
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
-let AC = null, master = null, lastPlink = 0, muted = false;
+let AC = null, master = null, lastPlink = 0, muted = false, quiet = false;
 
 function ensureAudio() {
   if (!AC) {
@@ -299,7 +357,7 @@ function ensureAudio() {
 }
 
 function plink(heading) {
-  if (muted || !AC || AC.state !== 'running') return;
+  if (quiet || muted || !AC || AC.state !== 'running') return;
   const now = performance.now();
   if (now - lastPlink < 30) return; // rate limit: MAX speed must not buzz
   lastPlink = now;
@@ -367,71 +425,68 @@ const overlay = document.getElementById('overlay');
 const tctx = trail.getContext('2d');
 const octx = overlay.getContext('2d');
 
-const state = { x: 0, y: 0, heading: 0, pen: true, rainbow: false, hue: 190, white: false };
-let queue = [];    // array of op iterators, run in order
-let seg = null;    // current walking segment
-let speed = 10;    // px per frame; Infinity = MAX (budget-limited)
+const state = { x: 0, y: 0, heading: 0, pen: true, rainbow: false, hue: 190, white: true };
+let queue = [];      // array of op iterators, run in order
+let seg = null;      // current walking segment
+let speed = 10;      // px per frame; Infinity = MAX (budget-limited)
+let pixelSize = 3;   // chunky by default — the period-correct look
+let neon = false;    // opt-in modern glow rendering
 let cw = 0, ch = 0;
 
+function resetTurtle() {
+  state.x = cw / 2; state.y = ch / 2; state.heading = 0;
+  state.pen = true; state.rainbow = false; state.hue = 190; state.white = true;
+  seg = null;
+}
+
 function penColors() {
-  if (state.white) return ['hsl(0 0% 92%)', '#ffffff'];
+  if (state.white) return neon ? ['hsl(0 0% 92%)', '#ffffff'] : ['#e8e8f0', '#ffffff'];
   return [`hsl(${state.hue} 100% 60%)`, `hsl(${state.hue} 100% 85%)`];
 }
 
 function paintBackdrop() {
   tctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim() || '#0a0a12';
-  tctx.fillRect(0, 0, cw, ch);
-  tctx.fillStyle = 'rgba(255,255,255,0.045)'; // faint dot grid, very retro
-  for (let y = 10; y < ch; y += 22)
-    for (let x = 10; x < cw; x += 22)
-      tctx.fillRect(x, y, 1, 1);
+  tctx.fillRect(0, 0, trail.width, trail.height);
 }
 
 function sizeCanvases() {
   const dpr = window.devicePixelRatio || 1;
   const w = wrap.clientWidth, h = wrap.clientHeight;
-  // preserve the trail across resizes, keeping it centered
-  let saved = null, oldW = cw, oldH = ch;
-  if (cw > 0 && ch > 0) {
-    saved = document.createElement('canvas');
-    saved.width = trail.width; saved.height = trail.height;
-    saved.getContext('2d').drawImage(trail, 0, 0);
-  }
-  for (const c of [trail, overlay]) {
-    c.width = Math.round(w * dpr);
-    c.height = Math.round(h * dpr);
-  }
-  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  overlay.width = Math.round(w * dpr);
+  overlay.height = Math.round(h * dpr);
   octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // the trail canvas IS the pixel grid: low-res backing store, pixelated upscale
+  trail.width = Math.max(1, Math.floor(w / pixelSize));
+  trail.height = Math.max(1, Math.floor(h / pixelSize));
+  tctx.setTransform(1, 0, 0, 1, 0, 0);
   cw = w; ch = h;
   paintBackdrop();
-  if (saved) {
-    const dx = (w - oldW) / 2, dy = (h - oldH) / 2;
-    tctx.save();
-    tctx.setTransform(1, 0, 0, 1, 0, 0);
-    tctx.drawImage(saved, Math.round(dx * dpr), Math.round(dy * dpr));
-    tctx.restore();
-    state.x += dx; state.y += dy;
-  } else {
-    state.x = w / 2; state.y = h / 2;
-  }
+  state.x = w / 2; state.y = h / 2;
 }
 
 function drawSegment(x1, y1, x2, y2, main, core) {
+  const s = 1 / pixelSize;
   tctx.lineCap = 'round';
-  // wide glow pass
-  tctx.strokeStyle = main;
-  tctx.lineWidth = 3.5;
-  tctx.shadowColor = main;
-  tctx.shadowBlur = 14;
-  tctx.globalAlpha = 0.85;
-  tctx.beginPath(); tctx.moveTo(x1, y1); tctx.lineTo(x2, y2); tctx.stroke();
-  // bright core pass
-  tctx.shadowBlur = 0;
-  tctx.globalAlpha = 1;
-  tctx.strokeStyle = core;
-  tctx.lineWidth = 1.4;
-  tctx.beginPath(); tctx.moveTo(x1, y1); tctx.lineTo(x2, y2); tctx.stroke();
+  if (neon) {
+    // wide glow pass + bright core (the modern look, opt-in)
+    tctx.strokeStyle = main;
+    tctx.lineWidth = Math.max(1, 3.5 * s);
+    tctx.shadowColor = main;
+    tctx.shadowBlur = 14 * s;
+    tctx.globalAlpha = 0.85;
+    tctx.beginPath(); tctx.moveTo(x1 * s, y1 * s); tctx.lineTo(x2 * s, y2 * s); tctx.stroke();
+    tctx.shadowBlur = 0;
+    tctx.globalAlpha = 1;
+    tctx.strokeStyle = core;
+    tctx.lineWidth = Math.max(0.8, 1.4 * s);
+    tctx.beginPath(); tctx.moveTo(x1 * s, y1 * s); tctx.lineTo(x2 * s, y2 * s); tctx.stroke();
+  } else {
+    // period look: one flat chunky-pixel line, no glow
+    tctx.strokeStyle = main;
+    tctx.lineWidth = 1;
+    tctx.globalAlpha = 1;
+    tctx.beginPath(); tctx.moveTo(x1 * s, y1 * s); tctx.lineTo(x2 * s, y2 * s); tctx.stroke();
+  }
 }
 
 function applyOp(op) {
@@ -519,6 +574,64 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+/* ---------------- program pane: the artifact ---------------- */
+
+const prog = document.getElementById('prog');
+
+function appendToProgram(line) {
+  const cur = prog.value.replace(/\s+$/, '');
+  prog.value = (cur ? cur + '\n' : '') + line;
+  prog.scrollTop = prog.scrollHeight;
+}
+
+function parseProgramText(text) {
+  // whole-text parse: REPEAT bodies may span lines, all-or-nothing
+  const ast = parse(tokenize(text));
+  if (countSteps(ast) > STEP_CAP)
+    throw ParseError(`That's too many steps for one spell! Try a smaller REPEAT.`);
+  return ast;
+}
+
+function runProgram() {
+  queue = [];
+  resetTurtle();
+  paintBackdrop();
+  const text = prog.value;
+  if (!text.trim()) { echo('PROGRAM IS EMPTY. TYPE A COMMAND OR PRESS A SPELL.', 'sys'); return; }
+  let ast;
+  try {
+    ast = parseProgramText(text);
+  } catch (e) {
+    if (!e.friendly) throw e;
+    echo('  ' + e.message, 'err');
+    return;
+  }
+  echo('? RUN', 'cmd');
+  queue.push(exec(ast));
+}
+
+/* re-render instantly and silently — used when pixel size / neon / window change */
+function rerender() {
+  queue = [];
+  resetTurtle();
+  paintBackdrop();
+  const text = prog.value;
+  if (!text.trim()) return;
+  let ast;
+  try { ast = parseProgramText(text); } catch (e) { if (!e.friendly) throw e; return; }
+  quiet = true;
+  for (const op of exec(ast)) {
+    applyOp(op);
+    if (seg) {
+      const nx = state.x + seg.dx * seg.remaining, ny = state.y + seg.dy * seg.remaining;
+      if (seg.draw) drawSegment(state.x, state.y, nx, ny, seg.main, seg.core);
+      state.x = nx; state.y = ny;
+      seg = null;
+    }
+  }
+  quiet = false;
+}
+
 /* ---------------- UI: log, input, hints, spells, controls ---------------- */
 
 const logEl = document.getElementById('log');
@@ -545,15 +658,14 @@ function submit(raw) {
   histIdx = history.length;
   let ast;
   try {
-    ast = parse(tokenize(text));
-    if (countSteps(ast) > STEP_CAP)
-      throw ParseError(`That's too many steps for one spell! Try a smaller REPEAT.`);
+    ast = parseProgramText(text);
   } catch (e) {
     if (!e.friendly) throw e;
     echo('  ' + e.message, 'err'); // all-or-nothing: an erroring line runs zero commands
     return;
   }
-  queue.push(exec(ast));
+  appendToProgram(text.toUpperCase()); // the prompt writes the program
+  queue.push(exec(ast));               // and runs incrementally, no reset
 }
 
 /* hint bar: rotating tips when idle, prefix suggestions while typing */
@@ -564,7 +676,8 @@ const TIPS = [
   'TRY: RAINBOW',
   'TRY: COLOR PINK',
   'PRESS A SPELL BUTTON BELOW',
-  'UP ARROW BRINGS BACK YOUR LAST SPELL'
+  'EDIT THE PROGRAM PANE, THEN PRESS RUN',
+  'UP ARROW BRINGS BACK YOUR LAST LINE'
 ];
 const HELP = [
   ['FORWARD', 'FORWARD 50 · move ahead'],
@@ -615,31 +728,32 @@ input.addEventListener('keydown', (e) => {
   }
 });
 
-/* spells: the code types itself into the input — seeing the code is the point */
+/* spells: full source types itself into the program pane — then RUN.
+   The code is visible, editable, and yours now. */
 const SPELLS = {
-  STAR:   'COLOR YELLOW REPEAT 5 [ FORWARD 150 RIGHT 144 ]',
-  SPIRAL: 'RAINBOW REPEAT 60 [ REPEAT 4 [ FORWARD 100 RIGHT 90 ] RIGHT 6 ]',
-  FLOWER: 'RAINBOW REPEAT 12 [ REPEAT 6 [ FORWARD 60 RIGHT 60 ] RIGHT 30 ]',
-  GALAXY: 'RAINBOW REPEAT 300 [ FORWARD 230 RIGHT 151 ]'
+  STAR:   'COLOR YELLOW\nREPEAT 5 [ FORWARD 150 RIGHT 144 ]',
+  SPIRAL: 'RAINBOW\nREPEAT 60 [\n  REPEAT 4 [ FORWARD 100 RIGHT 90 ]\n  RIGHT 6\n]',
+  FLOWER: 'RAINBOW\nREPEAT 12 [\n  REPEAT 6 [ FORWARD 60 RIGHT 60 ]\n  RIGHT 30\n]',
+  GALAXY: 'RAINBOW\nREPEAT 300 [ FORWARD 230 RIGHT 151 ]'
 };
 let typing = false;
 
 function castSpell(text) {
   if (typing) return;
   typing = true;
-  input.value = '';
-  input.focus();
+  queue = [];
+  seg = null;
+  prog.value = '';
   let i = 0;
   const iv = setInterval(() => {
-    i++;
-    input.value = text.slice(0, i);
+    i += 2;
+    prog.value = text.slice(0, i);
+    prog.scrollTop = prog.scrollHeight;
     if (i >= text.length) {
       clearInterval(iv);
       setTimeout(() => {
         typing = false;
-        submit(input.value);
-        input.value = '';
-        refreshHint();
+        runProgram();
       }, 200);
     }
   }, 14);
@@ -647,6 +761,18 @@ function castSpell(text) {
 
 document.querySelectorAll('.spell').forEach(btn => {
   btn.addEventListener('click', () => castSpell(SPELLS[btn.dataset.spell]));
+});
+
+/* run / stop */
+document.getElementById('runBtn').addEventListener('click', () => { if (!typing) runProgram(); });
+document.getElementById('stopBtn').addEventListener('click', () => {
+  queue = [];
+  seg = null;
+  echo('STOPPED. THE PROGRAM IS STILL IN THE PANE — PRESS RUN TO REDRAW.', 'sys');
+});
+prog.addEventListener('keydown', (e) => {
+  if (typing) { e.preventDefault(); return; }
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runProgram(); }
 });
 
 /* speed */
@@ -658,12 +784,36 @@ document.querySelectorAll('.speed').forEach(btn => {
   });
 });
 
-/* CLEAR button = panic stop: flush the queue, wipe now (typed CLEAR queues normally) */
+/* pixel size: 1–4, default 3 (chunky, period correct). Re-renders instantly. */
+document.querySelectorAll('.px').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.px').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    pixelSize = parseInt(btn.dataset.px, 10);
+    sizeCanvases();
+    rerender();
+    input.focus();
+  });
+});
+
+/* neon: opt-in modern glow. Re-renders instantly. */
+const neonBtn = document.getElementById('neonBtn');
+neonBtn.addEventListener('click', () => {
+  neon = !neon;
+  neonBtn.textContent = neon ? 'NEON ON' : 'NEON OFF';
+  neonBtn.classList.toggle('on', neon);
+  rerender();
+  input.focus();
+});
+
+/* CLEAR button = fresh garden: stop, wipe canvas, empty the program pane */
 document.getElementById('clearBtn').addEventListener('click', () => {
   queue = [];
   seg = null;
-  echo('? CLEAR', 'cmd');
-  applyOp({ cmd: 'clear' });
+  prog.value = '';
+  resetTurtle();
+  paintBackdrop();
+  echo('? CLEAR — FRESH GARDEN', 'cmd');
   input.focus();
 });
 
@@ -681,15 +831,15 @@ const unlock = () => ensureAudio();
 document.addEventListener('pointerdown', unlock);
 document.addEventListener('keydown', unlock);
 document.addEventListener('pointerup', (e) => {
-  if (!e.target.closest('a, button, input') && !String(window.getSelection())) input.focus();
+  if (!e.target.closest('a, button, input, textarea') && !String(window.getSelection())) input.focus();
 });
 
-window.addEventListener('resize', sizeCanvases);
+window.addEventListener('resize', () => { sizeCanvases(); rerender(); });
 
 /* boot */
 sizeCanvases();
 echo('WELCOME TO TURTLE GARDEN. THE TURTLE OBEYS.', 'sys');
-echo('TYPE A COMMAND AND PRESS ENTER — OR PRESS A SPELL BUTTON.', 'sys');
+echo('TYPE A COMMAND — IT RUNS, AND IT JOINS YOUR PROGRAM ON THE RIGHT.', 'sys');
 requestAnimationFrame(frame);
 input.focus();
 </script>
