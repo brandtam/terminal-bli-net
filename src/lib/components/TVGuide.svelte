@@ -11,7 +11,7 @@
 		formatLiveClock
 	} from './tv-guide-utils';
 	import { getAppContext } from '$lib/os/os-context';
-	import { onMount, untrack } from 'svelte';
+	import { untrack } from 'svelte';
 
 	// Zero-prop window-host app (Slice 4). Everything the guide shows — the
 	// channel grid, the live clock, the marquee — derives off the live OS, so
@@ -106,33 +106,25 @@
 		}
 	});
 
-	const animState = { gridLoop: 0, paused: false };
+	// Auto-scroll loop. The effect owns the rAF: it stops entirely while
+	// paused or when the grid-loop tweak disables scrolling, restarts when
+	// either changes, and cancels on unmount.
 	$effect(() => {
-		animState.gridLoop = os.tweaks.tvGridLoop;
-	});
-	$effect(() => {
-		animState.paused = paused;
-	});
+		const el = scrollerEl;
+		const loop = os.tweaks.tvGridLoop;
+		if (!el || paused || loop <= 0) return;
 
-	onMount(() => {
 		let raf: number;
 		let last = performance.now();
 		let accum = 0;
 
 		const animate = (t: number) => {
-			const el = scrollerEl;
-			if (!el) {
-				raf = requestAnimationFrame(animate);
-				return;
-			}
-
 			const dt = (t - last) / 1000;
 			last = t;
 			const max = el.scrollWidth - el.clientWidth;
-			const loop = animState.gridLoop;
-			const speed = max > 0 && loop > 0 ? max / loop : 0;
+			const speed = max > 0 ? max / loop : 0;
 
-			if (!animState.paused && max > 0 && speed > 0) {
+			if (speed > 0) {
 				accum += speed * dt;
 				const whole = Math.floor(accum);
 				if (whole > 0) {

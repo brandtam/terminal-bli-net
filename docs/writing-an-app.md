@@ -166,6 +166,23 @@ windows: [
 
 When the user opens a file, `os.openDocument(file)` routes it LaunchServices-style: explicit `file.opensWith` → blob `contentType` → coarse `fileType` → raw id fallback. Your `opens` declaration is what claims the type. Inside the component, read `window.args.fileId` to know which file to load. See [ADR 0003](adr/0003-launchservices-document-routing.md) for the routing rules.
 
+## Look and feel
+
+Terminal has one visual language, and windows that ignore it stick out immediately. The tokens live in `src/lib/themes/brand.css` — read it before styling anything, and reference tokens instead of raw values.
+
+- **Color** — `--brand-color-ink` / `--brand-color-paper` / `--brand-color-paper-soft` for text and surfaces, plus the accent set (`--brand-color-orange`, `--brand-color-yellow`, …). Older components use the bridge aliases in `src/app.css` (`--ink`, `--paper`, `--accent`); both resolve to the same palette — pick one style and stay consistent within a file.
+- **Type** — `--brand-font-display` (Press Start 2P) for chrome labels and headers, `--brand-font-body` (VT323) for terminal-style body text, `--brand-font-ui` (Pixelify Sans) for buttons and general UI. Sizes come from the `--brand-text-*` scale.
+- **Spacing and radius** — the `--brand-space-*` scale (4px base). No rounded corners: `--brand-radius-none` is the only radius token, and it's `0`.
+- **Motion** — snap, don't glide. `--brand-easing-snap` is `linear`; blinking and marquees use stepped keyframes. State changes are instant.
+- **Icons** — on-screen icons are shared pixel sprites drawn by `PixelIcon`, chosen by the manifest's `iconKind` (`'hd'`, `'folder'`, `'tv'`, `'doc'`, `'trash'`, `'calc'`, `'floppy'`, `'stickies'`, `'guide'`). The conformance test rejects unknown kinds; if nothing fits, add a glyph to `PixelIcon.svelte`.
+
+Do / don't:
+
+- **Do** use `var(--brand-*)` tokens (or the legacy aliases) for every color, font, and gap.
+- **Don't** hardcode hex colors — they silently drift when the palette changes.
+- **Don't** add CSS `transition`s or eased animations; the look is instant and blocky.
+- **Don't** use full-color emoji as UI icons — the `icon` manifest field is list text, not what draws on screen.
+
 ## Test it
 
 ```bash
