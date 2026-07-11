@@ -57,6 +57,7 @@ export class OsApiClass implements OsApi {
 	private zCounter = 10;
 	private lastSlotIdx = -1;
 	private tickInterval?: ReturnType<typeof setInterval>;
+	private visibilityCleanup?: () => void;
 	private resizeCleanup?: () => void;
 	private keydownCleanup?: () => void;
 
@@ -115,19 +116,41 @@ export class OsApiClass implements OsApi {
 			this.openWindow(hash);
 		}
 
-		// Start clock
+		// Start clock. The 1s tick pauses while the tab is hidden and resyncs
+		// immediately on return, so the clock never shows a stale minute.
 		const initialNow = new SvelteDate();
 		this.lastSlotIdx = getSlotIndex(initialNow, this.timezone);
 		this.slotNow = initialNow;
 
-		this.tickInterval = setInterval(() => {
+		const tick = () => {
 			this.now = new SvelteDate();
 			const idx = getSlotIndex(this.now, this.timezone);
 			if (idx !== this.lastSlotIdx) {
 				this.lastSlotIdx = idx;
 				this.slotNow = this.now;
 			}
-		}, 1000);
+		};
+		const startTicking = () => {
+			if (this.tickInterval === undefined) this.tickInterval = setInterval(tick, 1000);
+		};
+		const stopTicking = () => {
+			if (this.tickInterval !== undefined) {
+				clearInterval(this.tickInterval);
+				this.tickInterval = undefined;
+			}
+		};
+		const handleVisibility = () => {
+			if (document.hidden) {
+				stopTicking();
+			} else {
+				tick();
+				startTicking();
+			}
+		};
+		if (!document.hidden) startTicking();
+		document.addEventListener('visibilitychange', handleVisibility);
+		this.visibilityCleanup = () =>
+			document.removeEventListener('visibilitychange', handleVisibility);
 
 		// Resize listener
 		const handleResize = () => {
@@ -168,6 +191,7 @@ export class OsApiClass implements OsApi {
 
 	destroy(): void {
 		if (this.tickInterval) clearInterval(this.tickInterval);
+		this.visibilityCleanup?.();
 		this.resizeCleanup?.();
 		this.keydownCleanup?.();
 	}
