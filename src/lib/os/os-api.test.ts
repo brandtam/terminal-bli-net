@@ -21,6 +21,7 @@ vi.mock('$lib/persistence', () => ({
 	saveConversations: vi.fn(),
 	isFirstVisit: () => false,
 	clearAllPreferences: vi.fn(),
+	onPersistenceQuotaExceeded: vi.fn(),
 	// Pulled in transitively via vcr-prefs (device-aware VCR window sizing).
 	appRead: (_app: string, _key: string, fallback: unknown) => fallback,
 	appWrite: vi.fn()
@@ -236,6 +237,16 @@ describe('alert lifecycle', () => {
 
 		expect(os.alertSpec!.title).toBe('Second');
 		expect(os.alertSpec!.id).not.toBe(firstId);
+	});
+
+	it('showDiskFullAlert raises the retro disk-full dialog with a Trash escape hatch', () => {
+		const { os } = createOs();
+		os.showDiskFullAlert();
+
+		expect(os.alertSpec).not.toBeNull();
+		expect(os.alertSpec!.title).toBe('Disk Full');
+		expect(os.alertSpec!.body).toContain('Empty the Trash');
+		expect(os.alertSpec!.buttons?.map((b) => b.label)).toEqual(['Open Trash', 'OK']);
 	});
 });
 
