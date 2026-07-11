@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Dialer — demo</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; }
+  body {
+    background:#0a0807;
+    color:#d8c9a3;
+    font-family:"SF Mono","Menlo","Consolas","Courier New",monospace;
+    display:flex; flex-direction:column; min-height:100vh;
+  }
+  /* ---------- top bar ---------- */
+  .topbar {
+    display:flex; align-items:center; gap:14px;
+    padding:8px 14px; background:#141009; border-bottom:1px solid #2c2213;
+    font-size:13px; flex-wrap:wrap;
+  }
+  .topbar .name { color:#ffb000; letter-spacing:2px; font-weight:bold; }
+  .topbar a { color:#9a8b66; text-decoration:none; }
+  .topbar a:hover { color:#ffd75e; }
+  .topbar .spacer { flex:1; }
+  .baud { display:flex; gap:2px; }
+  .baud button, .snd {
+    background:#1d1710; color:#9a8b66; border:1px solid #3a2e1a;
+    font:inherit; font-size:11px; padding:3px 8px; cursor:pointer;
+  }
+  .baud button.on { background:#3a2c0d; color:#ffd75e; border-color:#7a5c1a; }
+  .snd.on { color:#ffd75e; }
+
+  /* ---------- CRT ---------- */
+  .stage { flex:1; display:flex; align-items:center; justify-content:center; padding:18px; }
+  .bezel {
+    position:relative; width:min(860px,100%);
+    background:linear-gradient(160deg,#2b2620,#17130e 60%);
+    border-radius:22px; padding:26px 26px 20px;
+    box-shadow:0 24px 60px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .crt {
+    position:relative; background:#120c02; border-radius:10px;
+    box-shadow:inset 0 0 60px rgba(0,0,0,.85), inset 0 0 6px #000;
+    overflow:hidden; height:520px;
+  }
+  .crt::after { /* scanlines + vignette */
+    content:""; position:absolute; inset:0; pointer-events:none; border-radius:10px;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.45) 100%);
+  }
+  .crt::before { /* faint phosphor wash */
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse at 50% 40%, rgba(255,176,0,.05), transparent 70%);
+    animation:flick 4s infinite steps(2);
+  }
+  @keyframes flick { 0%,100%{opacity:.9} 50%{opacity:1} }
+
+  /* ---------- terminal ---------- */
+  #term {
+    position:absolute; inset:0; padding:18px 22px; overflow-y:auto;
+    color:#ffb000; font-size:14px; line-height:1.32;
+    text-shadow:0 0 6px rgba(255,176,0,.55), 0 0 1px rgba(255,176,0,.9);
+    white-space:pre-wrap; word-break:break-word;
+  }
+  #term .b   { color:#ffd75e; }
+  #term .dim { color:#9c6c08; text-shadow:0 0 4px rgba(255,176,0,.3); }
+  #term .inv { background:#ffb000; color:#1a1000; text-shadow:none; }
+  #cursor {
+    display:inline-block; width:.62em; height:1.05em; vertical-align:-0.15em;
+    background:#ffb000; box-shadow:0 0 8px rgba(255,176,0,.8);
+    animation:blink 1.06s steps(1) infinite;
+  }
+  @keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+
+  /* ---------- dial panel ---------- */
+  #dial {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    gap:38px; color:#ffb000; flex-wrap:wrap; padding:20px;
+    text-shadow:0 0 6px rgba(255,176,0,.45);
+  }
+  .phone { text-align:center; }
+  .phone h2 { font-size:13px; letter-spacing:4px; color:#9c6c08; margin-bottom:10px; }
+  #numdisp {
+    min-width:230px; padding:10px 8px; margin-bottom:14px;
+    border:1px solid #4a3608; background:#1a1204;
+    font-size:26px; letter-spacing:4px; color:#ffd75e; min-height:50px;
+  }
+  .pad { display:grid; grid-template-columns:repeat(3,64px); gap:8px; justify-content:center; }
+  .pad button {
+    height:48px; font:inherit; font-size:18px; color:#ffb000; cursor:pointer;
+    background:linear-gradient(180deg,#2a2010,#1a1206); border:1px solid #4a3608; border-radius:6px;
+    text-shadow:0 0 5px rgba(255,176,0,.5);
+  }
+  .pad button:active { background:#3d2e0d; }
+  .callrow { display:flex; gap:8px; margin-top:12px; }
+  .callrow button {
+    flex:1; height:42px; font:inherit; font-size:14px; letter-spacing:3px; cursor:pointer;
+    border-radius:6px; border:1px solid #4a3608;
+  }
+  #dialbtn { background:#3d2e0d; color:#ffd75e; font-weight:bold;
+    box-shadow:0 0 14px rgba(255,176,0,.25); }
+  #dialbtn:active { background:#57420f; }
+  #clrbtn { background:#1a1206; color:#9c6c08; }
+  .hint { margin-top:12px; font-size:11px; color:#7a5c1a; }
+
+  .pbook { width:250px; font-size:12px; }
+  .pbook h3 { font-size:12px; letter-spacing:3px; color:#9c6c08; border-bottom:1px solid #3a2c0d;
+    padding-bottom:6px; margin-bottom:8px; }
+  .pbook .entry { display:flex; justify-content:space-between; padding:4px 0; cursor:pointer; }
+  .pbook .entry:hover .num { color:#ffd75e; }
+  .pbook .entry .num { color:#ffb000; }
+  .pbook .entry.mys .num { color:#ffd75e; animation:blink 1.4s steps(1) infinite; }
+  .pbook .none { color:#5c4410; font-style:italic; }
+
+  /* ---------- sticky note ---------- */
+  #sticky {
+    position:absolute; top:-14px; right:-10px; width:168px; padding:14px 12px 18px;
+    background:#f2e389; color:#463c14; transform:rotate(4deg);
+    font-family:"Marker Felt","Comic Sans MS","Bradley Hand",cursive;
+    font-size:14px; line-height:1.35; box-shadow:3px 6px 14px rgba(0,0,0,.55);
+    text-shadow:none; z-index:5;
+  }
+  #sticky::before { content:""; position:absolute; top:-8px; left:50%; width:70px; height:16px;
+    transform:translateX(-50%) rotate(-2deg); background:rgba(255,255,255,.35); }
+
+  #status {
+    margin-top:10px; font-size:11px; letter-spacing:2px; color:#6e5310;
+    display:flex; justify-content:space-between;
+  }
+  #status .lit { color:#ffb000; text-shadow:0 0 6px rgba(255,176,0,.5); }
+  @media (max-width:700px){ .crt{height:600px} #sticky{right:2px} }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="name">☎ THE DIALER</span>
+  <a href="../index.html">&larr; back to apps</a>
+  <span class="spacer"></span>
+  <span style="color:#6e5310;font-size:11px">BAUD</span>
+  <div class="baud">
+    <button data-baud="300">300</button>
+    <button data-baud="2400" class="on">2400</button>
+    <button data-baud="9600">9600</button>
+  </div>
+  <button class="snd on" id="sndbtn" title="toggle sound">SND&nbsp;ON</button>
+</div>
+
+<div class="stage">
+  <div class="bezel">
+    <div id="sticky">RUSTY DISKETTE BBS<br><b>555&#8209;2323</b><br>ask for Captain Vector<br>&mdash; D.</div>
+    <div class="crt">
+      <div id="dial">
+        <div class="phone">
+          <h2>SMARTLINK 2400</h2>
+          <div id="numdisp">&nbsp;</div>
+          <div class="pad" id="pad"></div>
+          <div class="callrow">
+            <button id="dialbtn">DIAL</button>
+            <button id="clrbtn">CLR</button>
+          </div>
+          <div class="hint">type digits or click &middot; ENTER dials &middot; sound on</div>
+        </div>
+        <div class="pbook">
+          <h3>PHONEBOOK</h3>
+          <div id="pblist"></div>
+        </div>
+      </div>
+      <div id="term" style="display:none"></div>
+    </div>
+    <div id="status"><span id="stL">ON HOOK</span><span id="stR">READY</span></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   THE DIALER — demo. State machine:
+   dial -> connecting -> (rusty: handle -> main <-> board <-> post,
+                                 main <-> files <-> file, main -> goodbye)
+        -> connecting -> (lode: payoff -> Q -> dial)
+   Every session state has Q/ESC path back; connecting has ESC abort.
+   ===================================================================== */
+
+/* ---------------- audio ---------------- */
+let AC=null, master=null, line=null, sndOn=true, carrierSrc=null;
+function ac(){
+  if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain(); master.gain.value=sndOn?0.6:0; master.connect(AC.destination); }
+  if(AC.state==='suspended') AC.resume();
+  return AC;
+}
+function newLine(){ if(line){try{line.disconnect()}catch(e){}} line=ac().createGain(); line.gain.value=1; line.connect(master); return line; }
+function killLine(){
+  if(carrierSrc){ try{carrierSrc.stop()}catch(e){} carrierSrc=null; }
+  if(line){ try{line.gain.setTargetAtTime(0,ac().currentTime,0.03);}catch(e){} const l=line; setTimeout(()=>{try{l.disconnect()}catch(e){}},300); line=null; }
+}
+function tone(dest,freqs,t0,dur,g,type){
+  if(!sndOn||!dest) return;
+  freqs.forEach(f=>{
+    const o=AC.createOscillator(); o.type=type||'sine'; o.frequency.value=f;
+    const gn=AC.createGain();
+    gn.gain.setValueAtTime(0,t0);
+    gn.gain.linearRampToValueAtTime(g,t0+0.005);
+    gn.gain.setValueAtTime(g,Math.max(t0+0.006,t0+dur-0.01));
+    gn.gain.linearRampToValueAtTime(0,t0+dur);
+    o.connect(gn); gn.connect(dest); o.start(t0); o.stop(t0+dur+0.03);
+  });
+}
+let NB=null;
+function noiseBuf(){
+  if(NB) return NB;
+  const b=AC.createBuffer(1,AC.sampleRate,AC.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  return NB=b;
+}
+function noise(dest,t0,dur){ // returns gain node for envelopes
+  const s=AC.createBufferSource(); s.buffer=noiseBuf(); s.loop=true;
+  const g=AC.createGain(); g.gain.value=0;
+  s.connect(g); g.connect(dest); s.start(t0); if(dur) s.stop(t0+dur+0.1);
+  return {src:s,g};
+}
+const DTMF={'1':[697,1209],'2':[697,1336],'3':[697,1477],'4':[770,1209],'5':[770,1336],'6':[770,1477],
+            '7':[852,1209],'8':[852,1336],'9':[852,1477],'*':[941,1209],'0':[941,1336],'#':[941,1477]};
+function beepDigit(d){ if(!DTMF[d])return; ac(); tone(master,DTMF[d],AC.currentTime,0.08,0.10); }
+
+/* handshake: 4 phases, ~4.2s. returns duration. */
+function handshake(t0){
+  const L=line;
+  // A) 2100Hz answer tone w/ 15Hz wobble (0 - 0.7)
+  {
+    const o=AC.createOscillator(); o.frequency.value=2100;
+    const g=AC.createGain(); g.gain.setValueAtTime(0,t0);
+    for(let t=0;t<0.7;t+=1/15){ g.gain.setValueAtTime(t%(2/15)<1/15?0.16:0.09,t0+t); }
+    g.gain.setValueAtTime(0,t0+0.7);
+    o.connect(g); g.connect(L); o.start(t0); o.stop(t0+0.75);
+  }
+  // B) V.22 warble: 1200/2400 alternating every 35ms (0.7 - 1.6)
+  {
+    const o=AC.createOscillator(); o.frequency.setValueAtTime(1200,t0+0.7);
+    for(let t=0.7,i=0;t<1.6;t+=0.035,i++) o.frequency.setValueAtTime(i%2?1200:2400,t0+t);
+    const g=AC.createGain(); g.gain.setValueAtTime(0,t0);
+    g.gain.setValueAtTime(0.14,t0+0.7); g.gain.setValueAtTime(0,t0+1.6);
+    o.connect(g); g.connect(L); o.start(t0+0.7); o.stop(t0+1.65);
+    tone(L,[550],t0+0.7,0.9,0.05);
+  }
+  // C) training screech: bandpassed noise + gated 1650/1850 (1.6 - 3.0)
+  {
+    const n=noise(L,t0+1.6,1.5);
+    const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=0.8;
+    n.g.disconnect(); n.g.connect(bp); bp.connect(L);
+    n.g.gain.setValueAtTime(0.05,t0+1.6);
+    n.g.gain.linearRampToValueAtTime(0.30,t0+2.4);
+    n.g.gain.setValueAtTime(0.30,t0+3.0);
+    n.g.gain.linearRampToValueAtTime(0,t0+3.05);
+    for(let t=1.6;t<3.0;t+=0.125){ tone(L,[1650],t0+t,0.06,0.11); tone(L,[1850],t0+t+0.062,0.06,0.11); }
+  }
+  // D) carrier settle: lowpassed hiss decaying to a faint persistent bed (3.0 ->)
+  {
+    const n=noise(L,t0+3.0,0); carrierSrc=n.src; // runs until line killed
+    const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3000;
+    n.g.disconnect(); n.g.connect(lp); lp.connect(L);
+    n.g.gain.setValueAtTime(0.16,t0+3.0);
+    n.g.gain.exponentialRampToValueAtTime(0.015,t0+4.2);
+  }
+  return 4.2;
+}
+function ringback(t0,n){ for(let i=0;i<n;i++) tone(line,[440,480],t0+i*2.0,1.2,0.10); }
+function busyTone(t0,n){ for(let i=0;i<n;i++) tone(line,[480,620],t0+i*1.0,0.5,0.12); }
+function clickHang(){ if(!sndOn)return; ac(); const n=noise(master,AC.currentTime,0.06); n.g.gain.value=0.18; }
+
+/* ---------------- terminal typer ---------------- */
+const term=document.getElementById('term');
+let baud=2400, queue=[], curSpan=null, curCls=undefined, pump=null, lastT=0, carry=0;
+const cursor=document.createElement('span'); cursor.id='cursor';
+function cls2span(c){ const s=document.createElement('span'); if(c)s.className=c; term.insertBefore(s,cursor); return s; }
+function print(text,cls){ queue.push({text,cls,i:0}); startPump(); }
+function mark(fn){ queue.push({fn}); startPump(); }
+function startPump(){ if(pump)return; lastT=performance.now(); carry=0;
+  pump=setInterval(step,16); }
+function step(){
+  const now=performance.now(), dt=(now-lastT)/1000; lastT=now;
+  let budget=carry+(baud/10)*dt; carry=budget-Math.floor(budget); budget=Math.floor(budget);
+  if(budget<1) return;
+  emit(budget);
+}
+function emit(n){
+  while(n>0&&queue.length){
+    const q=queue[0];
+    if(q.fn){ queue.shift(); q.fn(); continue; }
+    if(!curSpan||curCls!==q.cls){ curSpan=cls2span(q.cls); curCls=q.cls; }
+    const take=Math.min(n,q.text.length-q.i);
+    curSpan.textContent+=q.text.substr(q.i,take);
+    q.i+=take; n-=take;
+    if(q.i>=q.text.length){ queue.shift(); curSpan=null; }
+  }
+  term.scrollTop=term.scrollHeight;
+  if(!queue.length&&pump){ clearInterval(pump); pump=null; }
+}
+function flush(){ emit(Infinity); }
+function busyTyping(){ return queue.length>0; }
+function clearTerm(){ flush(); term.textContent=''; term.appendChild(cursor); curSpan=null; }
+clearTerm();
+function echo(t,cls){ // instant, for input echo
+  const s=cls2span(cls); s.textContent=t; term.scrollTop=term.scrollHeight; return s;
+}
+
+/* ---------------- app state ---------------- */
+let mode='dial';          // dial | connecting | session
+let state='';             // handle|main|board|post|files|file|lode
+let dialed='', postIdx=0, fileIdx=0, handle='', inputSpan=null, inputBuf='';
+let callTimers=[];
+const found={'5552323':{name:'RUSTY DISKETTE',mys:false}};
+let seen0113=false;
+
+const dialPanel=document.getElementById('dial'), numdisp=document.getElementById('numdisp');
+const stL=document.getElementById('stL'), stR=document.getElementById('stR');
+function setStatus(l,r,lit){ stL.textContent=l; stR.textContent=r||''; stL.className=lit?'lit':''; }
+
+function fmtNum(d){ return d.length>3? d.slice(0,3)+'-'+d.slice(3):d; }
+function renderNum(){ numdisp.innerHTML=dialed?fmtNum(dialed):'&nbsp;'; }
+function renderPB(){
+  const el=document.getElementById('pblist'); el.innerHTML='';
+  const keys=Object.keys(found);
+  keys.forEach(k=>{
+    const e=found[k], d=document.createElement('div');
+    d.className='entry'+(e.mys?' mys':'');
+    d.innerHTML='<span>'+e.name+'</span><span class="num">'+fmtNum(k)+'</span>';
+    d.onclick=()=>{ if(mode!=='dial')return; ac(); dialed=k; renderNum(); };
+    el.appendChild(d);
+  });
+  if(keys.length===1){ const d=document.createElement('div'); d.className='none';
+    d.textContent='(numbers you see get logged here)'; el.appendChild(d); }
+}
+renderPB();
+
+function foundNumber(num,name,mys){
+  if(found[num])return;
+  found[num]={name,mys:!!mys}; renderPB();
+}
+
+/* keypad */
+const pad=document.getElementById('pad');
+'123456789*0#'.split('').forEach(d=>{
+  const b=document.createElement('button'); b.textContent=d;
+  b.onmousedown=e=>e.preventDefault(); // keep focus off buttons so Enter/Space stay on the app
+  b.onclick=()=>{ ac(); beepDigit(d); if(/\d/.test(d)&&dialed.length<7){ dialed+=d; renderNum(); } };
+  pad.appendChild(b);
+});
+document.querySelectorAll('button').forEach(b=>{ if(!b.onmousedown) b.onmousedown=e=>e.preventDefault(); });
+document.getElementById('clrbtn').onclick=()=>{ dialed=''; renderNum(); };
+document.getElementById('dialbtn').onclick=()=>startCall();
+
+/* baud + sound toggles */
+document.querySelectorAll('.baud button').forEach(b=>{
+  b.onclick=()=>{ document.querySelectorAll('.baud button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); baud=+b.dataset.baud; };
+});
+const sndbtn=document.getElementById('sndbtn');
+sndbtn.onclick=()=>{ sndOn=!sndOn; sndbtn.textContent=sndOn?'SND ON':'SND OFF';
+  sndbtn.classList.toggle('on',sndOn); if(master) master.gain.value=sndOn?0.6:0; };
+
+/* ---------------- call sequencing ---------------- */
+function later(ms,fn){ callTimers.push(setTimeout(fn,ms)); }
+function clearCall(){ callTimers.forEach(clearTimeout); callTimers=[]; }
+function showTerm(){ dialPanel.style.display='none'; term.style.display='block'; }
+function showDial(){ term.style.display='none'; dialPanel.style.display='flex';
+  mode='dial'; state=''; setStatus('ON HOOK','READY'); }
+
+function startCall(){
+  if(mode!=='dial'||dialed.length<7) return;
+  ac(); newLine();
+  const num=dialed; dialed=''; renderNum();
+  mode='connecting'; showTerm(); clearTerm();
+  setStatus('OFF HOOK','DIALING '+fmtNum(num),true);
+  print('ATDT'+num+'\n','dim');
+
+  const t0=AC.currentTime+0.05;
+  tone(line,[350,440],t0,0.45,0.07);                       // dial tone
+  for(let i=0;i<7;i++) tone(line,DTMF[num[i]],t0+0.5+i*0.14,0.09,0.11); // DTMF
+  const tRing=t0+0.5+7*0.14+0.2;
+  later(600,()=>print('DIALING '+fmtNum(num)+' ...\n','dim'));
+
+  if(num==='5552323'||num==='5550113'){
+    ringback(tRing,1);
+    later((tRing-t0)*1000,()=>print('RINGING ...\n','dim'));
+    const tHs=tRing+1.5;
+    later((tHs-t0)*1000-150,()=>print('CARRIER DETECTED\nNEGOTIATING ...\n','dim'));
+    later((tHs-t0)*1000,()=>{ if(mode==='connecting') handshake(AC.currentTime); });
+    const rate=num==='5550113'?'300':'2400';
+    later((tHs+3.6-t0)*1000,()=>print('\nCONNECT '+rate+'\n','b'));
+    later((tHs+4.4-t0)*1000,()=>{ if(mode!=='connecting')return;
+      mode='session';
+      if(num==='5552323') enterRusty(); else enterLode();
+    });
+  } else if(num==='5554477'){
+    busyTone(tRing,3);
+    later((tRing-t0)*1000,()=>print('BUSY ...\n','dim'));
+    later((tRing+3.2-t0)*1000,()=>{ print('\nLINE BUSY — THE FOUNDRY never has a free node.\nNO CARRIER\n','dim'); endCall(1200); });
+  } else if(num==='5558814'){
+    ringback(tRing,2);
+    later((tRing+3.0-t0)*1000,()=>{ print('\nVOICE — a man yells "HELLO?? HELLO??"\nYou hang up very quietly.\nNO CARRIER\n','dim'); endCall(1600); });
+  } else {
+    ringback(tRing,3);
+    later((tRing-t0)*1000,()=>print('RINGING ...\n','dim'));
+    later((tRing+5.5-t0)*1000,()=>{ print('\nNO ANSWER\nNO CARRIER\n','dim'); endCall(1200); });
+  }
+}
+function endCall(delay){
+  later(delay||0,()=>{ hangup(); });
+}
+function hangup(){
+  clearCall(); killLine(); clickHang(); showDial();
+}
+
+/* ---------------- content: THE RUSTY DISKETTE ---------------- */
+const BANNER=
+'      ┌─────────────┐\n'+
+'      │ ▄▄▄▄▄▄▄  ▪ │     █▀▀ THE RUSTY DISKETTE ▀▀█\n'+
+'      │ █▒▒▒▒▒█    │     616-555-2323 · EST. 1985\n'+
+'      │ ▀▀▀▀▀▀▀    │     NODE 1 OF 1 · 2400 BAUD MAX\n'+
+'      │  ┌─────┐   │     SYSOP: CAPTAIN VECTOR\n'+
+'      │  │RUSTY│   │\n'+
+'      └──┴─────┴───┘     "IF IT STILL READS, IT STILL LEADS"\n';
+
+const POSTS=[
+ {date:'10-24-87',from:'CAPT.VECTOR',subj:'READ THIS FIRST (RULES)',body:
+'Welcome aboard. This board lives in my garage on a 40 MEGABYTE hard\n'+
+'drive, which is more storage than you will ever need, so post freely.\n\n'+
+'Rules: be decent, no politics, and no Amiga vs ST wars (JOYST1CK.)\n'+
+'If the board is down I am either mowing the lawn or reseating RAM.\n\n'+
+'                                        -- CV\n'},
+ {date:'10-26-87',from:'JOYST1CK',subj:'AMIGA VS ST -- SETTLED FOREVER',body:
+'ok here me out. 4096 colors. FOUR THOUSAND. the ST has 512 and\n'+
+'MIDI ports, great, enjoy your accordion concert. debate over.\n\n'+
+'(dale dont delete this its EDUCATIONAL)\n'},
+ {date:'10-28-87',from:'PHRACTURE',subj:'late night boards??',body:
+'anyone collecting numbers for boards that answer after midnight?\n'+
+'the good stuff is never posted, you have to hunt it.\n\n'+
+'heard NO.CARRIER ran his autodialer over the whole 555 exchange\n'+
+'last weekend. post the log!! the people demand the log\n'},
+ {date:'10-29-87',from:'NO.CARRIER',subj:'wardial results, 555 exchange',body:
+'fine. ran the autodialer fri-sun, whole exchange. mostly VOICE\n'+
+'and BUSY. the interesting ones:\n\n'+
+'  555-2323 .. CARRIER 2400 .. (this place. hi dale)\n'+
+'  555-4477 .. CARRIER 2400 .. THE FOUNDRY (perma-busy, good luck)\n'+
+'  555-8814 .. VOICE (angry man. do not call)\n'+
+'  555-0199 .. FAX?? it screams at you\n'+
+'  555-0113 .. CARRIER 300 .. no banner. no login echo. it just\n'+
+'              listens. answers on the FIRST ring. every time.\n'+
+'              like it was waiting for the phone to ring.\n\n'+
+'anyone know what 0113 is? because i called it four times and\n'+
+'now i keep thinking about it\n',find:true},
+ {date:'10-30-87',from:'CAPT.VECTOR',subj:'re: wardial results',body:
+'Leave 0113 alone.\n\n'+
+'I mean it. Some doors are shut for a reason.\n\n'+
+'                                        -- CV\n'}
+];
+
+const FILES=[
+ {name:'MODEM101.TXT',size:'2,114',body:
+'SO YOU BOUGHT A MODEM (a guide)\n\n'+
+'1. The screeching is normal. The screeching is GOOD.\n'+
+'2. If mom picks up the phone mid-transfer, the transfer dies\n'+
+'   and part of you dies with it.\n'+
+'3. 2400 baud is 240 characters a second. Faster than you read.\n'+
+'   You will still want more. This is the disease.\n'},
+ {name:'ANSIDRAW.TXT',size:'4,882',body:
+'ANSI ART: block characters, 16 colors, and patience.\n'+
+'░▒▓█ -- learn these four and you can draw anything.\n'+
+'Practice on the welcome screen. Dale lets anyone submit banners,\n'+
+'which is why last month the board greeted callers with a duck.\n'},
+ {name:'FOUNDRY.TXT',size:'1,203',body:
+'██ THE FOUNDRY ██  616-555-4477  ██\n\n'+
+'DEMOS . SHOP TALK . OLD IRON . 24 HRS\n'+
+'SYSOP: SLAG\n\n'+
+'WE DO NOT SLEEP AND NEITHER DOES THE BOARD\n'+
+'(node is busy a lot. keep redialing. worth it.)\n'}
+];
+
+function prompt(p){ print('\n'+p,'b'); }
+
+function enterRusty(){
+  clearTerm(); setStatus('CONNECTED','RUSTY DISKETTE · '+baud+' BAUD',true);
+  print(BANNER,'b');
+  print('\nYou have reached THE RUSTY DISKETTE. All callers welcome.\n','');
+  if(handle){ print('\nWelcome back, '+handle+'.\n',''); mark(()=>{ state='main'; menuRusty(); }); }
+  else {
+    print('\nENTER YOUR HANDLE: ','b');
+    mark(()=>{ state='handle'; inputBuf=''; inputSpan=echo('','inv'); });
+  }
+}
+function menuRusty(){
+  print('\n┌── MAIN MENU ──────────────────┐\n','');
+  print('│  [M] MESSAGE BASE: THE GRAPEVINE  │\n','');
+  print('│  [F] FILE AREA                    │\n','');
+  print('│  [G] GOODBYE (LOG OFF)            │\n','');
+  print('└─────────────────────────────────┘\n','');
+  prompt('COMMAND: ');
+  mark(()=>{ state='main'; });
+}
+function showBoard(){
+  clearTerm();
+  print('▒▒ THE GRAPEVINE ▒▒  rumors, sightings, unfounded claims\n\n','b');
+  print(' #  DATE      FROM          SUBJECT\n','dim');
+  POSTS.forEach((p,i)=>{
+    print(' '+(i+1)+'  '+p.date+'  '+p.from.padEnd(12)+'  '+p.subj+'\n','');
+  });
+  prompt('READ # (1-'+POSTS.length+'), [Q]UIT TO MAIN: ');
+  mark(()=>{ state='board'; });
+}
+function showPost(i){
+  postIdx=i; const p=POSTS[i];
+  clearTerm();
+  print('MSG '+(i+1)+'/'+POSTS.length+' · '+p.date+' · FROM: ','dim');
+  print(p.from+'\n','b');
+  print('SUBJ: '+p.subj+'\n','b');
+  print('─'.repeat(56)+'\n','dim');
+  print(p.body,'');
+  if(p.find&&!seen0113){
+    print('\n','');
+    mark(()=>{ seen0113=true; foundNumber('5550113','UNKNOWN CARRIER',true); });
+    print('* 555-0113 logged to your phonebook *\n','dim');
+  }
+  prompt('[N]EXT, [Q]UIT TO BOARD: ');
+  mark(()=>{ state='post'; });
+}
+function showFiles(){
+  clearTerm();
+  print('▒▒ FILE AREA ▒▒  text files. all of them. it is 1987.\n\n','b');
+  print(' #  FILENAME       BYTES\n','dim');
+  FILES.forEach((f,i)=>{ print(' '+(i+1)+'  '+f.name.padEnd(14)+' '+f.size+'\n',''); });
+  prompt('VIEW # (1-'+FILES.length+'), [Q]UIT TO MAIN: ');
+  mark(()=>{ state='files'; });
+}
+function showFile(i){
+  fileIdx=i; clearTerm();
+  print('== '+FILES[i].name+' '+'='.repeat(Math.max(0,40-FILES[i].name.length))+'\n\n','dim');
+  print(FILES[i].body,'');
+  prompt('\n[Q] BACK TO FILES: ');
+  mark(()=>{ state='file'; });
+}
+function goodbye(){
+  clearTerm();
+  print('Thanks for calling THE RUSTY DISKETTE.\n','');
+  print('Come back soon. The drive is 40 MEGABYTES and mostly empty.\n\n','');
+  print('NO CARRIER\n','dim');
+  mark(()=>{ endCall(900); });
+}
+
+/* ---------------- content: PROJECT LODESTONE ---------------- */
+function enterLode(){
+  clearTerm(); setStatus('CONNECTED','555-0113 · NO ID · 300 BAUD',true);
+  state='lodewait';
+  print('\n','');
+  later(1400,()=>{
+    print('>ident\n','dim');
+    later(1200,()=>{
+      print('UNAUTHORIZED TERMINAL DETECTED\n','');
+      print('MAINTENANCE ACCOUNT "OPERATOR" ... ACCEPTED\n','');
+      print('LAST LOGIN: 83-01-14 06:12\n\n','dim');
+      later(900,()=>{
+        print('═'.repeat(52)+'\n','b');
+        print('   U.S. DEPARTMENT OF ENERGY · RESTRICTED SYSTEM\n','b');
+        print('     PROJECT LODESTONE · SEISMIC STATION WF-9\n','b');
+        print('═'.repeat(52)+'\n\n','b');
+        print(' STATION STATUS ........ NOMINAL\n','');
+        print(' DAYS UNATTENDED ....... 1,462\n','');
+        print(' TAPE STORAGE .......... 97% FULL\n','');
+        print(' ARRAY ................. LISTENING\n\n','');
+        print(' VISITORS.LOG\n','dim');
+        print('   CAPT.VECTOR ........ 85-11-02\n','dim');
+        print('   MAINFRAME.MARY ..... 86-03-17\n','dim');
+        print('   SLAG ............... 87-06-30\n','dim');
+        print('   '+((handle||'GUEST').padEnd(16,'.'))+' ... 87-10-31  ','');
+        print('<< YOU\n\n','inv');
+        later(1600,()=>{
+          print(' EVENT 0088 REGISTERED — SOURCE: INBOUND LINE (YOU)\n\n','b');
+          later(1400,()=>{
+            print(' It heard you dialing.\n','');
+            prompt('\n[Q] DISCONNECT ');
+            mark(()=>{ state='lode'; });
+          });
+        });
+      });
+    });
+  });
+}
+
+/* ---------------- keyboard ---------------- */
+document.addEventListener('keydown',e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const k=e.key;
+
+  if(mode==='dial'){
+    if(/^\d$/.test(k)){ ac(); beepDigit(k); if(dialed.length<7){dialed+=k;renderNum();} e.preventDefault(); }
+    else if(k==='Backspace'){ dialed=dialed.slice(0,-1); renderNum(); e.preventDefault(); }
+    else if(k==='Enter'){ startCall(); e.preventDefault(); }
+    return;
+  }
+  if(mode==='connecting'){
+    if(k==='Escape'){ print('\n+++ATH\nNO CARRIER\n','dim'); hangup(); }
+    e.preventDefault(); return;
+  }
+  // session --------------------------------------------------------
+  if(state==='handle'){ // text input, not skippable-swallowed
+    if(!inputSpan){ e.preventDefault(); return; }
+    if(k==='Enter'){
+      handle=(inputBuf.trim()||'GUEST').toUpperCase().slice(0,14);
+      inputSpan=null; state='wait';
+      print('\n\nGood to meet you, '+handle+'. Leave the light on.\n','');
+      mark(()=>{ menuRusty(); });
+    } else if(k==='Backspace'){ inputBuf=inputBuf.slice(0,-1); inputSpan.textContent=inputBuf; }
+    else if(k.length===1&&/[\w.\- ]/.test(k)&&inputBuf.length<14){ inputBuf+=k; inputSpan.textContent=inputBuf; }
+    e.preventDefault(); return;
+  }
+  if(busyTyping()){ flush(); e.preventDefault(); return; } // any key = skip
+  const K=k.toLowerCase();
+  switch(state){
+    case 'main':
+      if(K==='m') showBoard();
+      else if(K==='f') showFiles();
+      else if(K==='g'||k==='Escape') goodbye();
+      break;
+    case 'board':
+      if(/^[1-9]$/.test(K)&&+K<=POSTS.length) showPost(+K-1);
+      else if(K==='q'||k==='Escape'){ clearTerm(); print(BANNER,'b'); menuRusty(); }
+      break;
+    case 'post':
+      if(K==='n') showPost((postIdx+1)%POSTS.length);
+      else if(K==='q'||k==='Escape') showBoard();
+      break;
+    case 'files':
+      if(/^[1-9]$/.test(K)&&+K<=FILES.length) showFile(+K-1);
+      else if(K==='q'||k==='Escape'){ clearTerm(); print(BANNER,'b'); menuRusty(); }
+      break;
+    case 'file':
+      if(K==='q'||k==='Escape') showFiles();
+      break;
+    case 'lode':
+      if(K==='q'||k==='Escape'){
+        clearTerm(); print('CONNECTION CLOSED BY REMOTE HOST\nNO CARRIER\n','dim');
+        mark(()=>{ endCall(900); });
+      }
+      break;
+    case 'lodewait': break; // sequence is timer-driven; wait for prompt
+  }
+  e.preventDefault();
+});
+</script>
+</body>
+</html>

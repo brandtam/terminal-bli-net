@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turtle Garden</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #14141f;
+    --panel: #1d1d2b;
+    --bezel-hi: #3a3a52;
+    --bezel-lo: #08080e;
+    --canvas-bg: #0a0a12;
+    --ink: #c9c9e0;
+    --green: #7ee787;
+    --amber: #e3b341;
+    --pink: #ff7b9c;
+    --cyan: #58d6ff;
+    --mono: ui-monospace, Menlo, Monaco, "Cascadia Mono", "Courier New", monospace;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--mono);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---- top bar ---- */
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 12px;
+    background: var(--panel);
+    border-bottom: 3px solid var(--bezel-lo);
+    flex: 0 0 auto;
+  }
+  header img { image-rendering: pixelated; }
+  header .name { font-weight: bold; letter-spacing: 2px; color: var(--green); font-size: 14px; }
+  header .back {
+    margin-left: auto; color: var(--cyan); text-decoration: none;
+    font-size: 12px; letter-spacing: 1px; padding: 3px 8px;
+    border: 2px solid var(--bezel-hi);
+  }
+  header .back:hover { background: var(--bezel-hi); }
+
+  /* ---- main frame ---- */
+  main {
+    flex: 1 1 auto; display: flex; flex-direction: column;
+    padding: 10px; gap: 8px; min-height: 0;
+  }
+  .canvas-wrap {
+    flex: 1 1 auto; position: relative; min-height: 120px;
+    border: 3px solid var(--bezel-hi);
+    border-right-color: var(--bezel-lo); border-bottom-color: var(--bezel-lo);
+    box-shadow: inset 0 0 0 3px var(--bezel-lo), 0 0 0 1px #000;
+    background: var(--canvas-bg);
+    overflow: hidden;
+  }
+  .canvas-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* ---- log ---- */
+  #log {
+    flex: 0 0 auto; height: calc(1.35em * 4); overflow: hidden;
+    font-size: 13px; line-height: 1.35;
+    padding: 2px 6px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+  }
+  #log .cmd { color: var(--green); }
+  #log .err { color: var(--pink); }
+  #log .sys { color: #6a6a8a; }
+  #log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---- input ---- */
+  .input-row {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+    background: var(--canvas-bg);
+    border: 3px solid var(--bezel-lo);
+    box-shadow: inset 0 0 0 1px var(--bezel-hi);
+    padding: 8px 10px;
+  }
+  .prompt { color: var(--green); font-weight: bold; font-size: 16px; }
+  #cmd {
+    flex: 1; background: transparent; border: 0; outline: 0;
+    color: var(--green); font-family: var(--mono); font-size: 16px;
+    letter-spacing: 1px; caret-color: var(--green);
+    text-transform: uppercase;
+  }
+  #hint {
+    flex: 0 0 auto; font-size: 12px; color: var(--amber);
+    padding: 3px 8px; letter-spacing: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-height: 1.4em;
+  }
+
+  /* ---- controls ---- */
+  .controls {
+    flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    padding-top: 2px;
+  }
+  button {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 1px;
+    color: var(--ink); background: var(--panel);
+    border: 3px solid var(--bezel-hi);
+    border-right-color: var(--bezel-lo); border-bottom-color: var(--bezel-lo);
+    padding: 7px 12px; cursor: pointer;
+  }
+  button:active { border-color: var(--bezel-lo); border-right-color: var(--bezel-hi); border-bottom-color: var(--bezel-hi); transform: translate(1px,1px); }
+  button.spell { color: var(--cyan); font-weight: bold; }
+  button.on { background: var(--bezel-hi); color: #fff; }
+  .sep { width: 10px; }
+  .label { font-size: 11px; color: #6a6a8a; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<header>
+  <img id="logo" width="28" height="26" alt="">
+  <span class="name">TURTLE GARDEN</span>
+  <a class="back" href="../index.html">&larr; BACK</a>
+</header>
+
+<main>
+  <div class="canvas-wrap" id="wrap">
+    <canvas id="trail"></canvas>
+    <canvas id="overlay"></canvas>
+  </div>
+  <div id="log"></div>
+  <div class="input-row">
+    <span class="prompt">?</span>
+    <input id="cmd" autocomplete="off" spellcheck="false" autofocus aria-label="turtle command">
+  </div>
+  <div id="hint"></div>
+  <div class="controls">
+    <span class="label">SPELLS</span>
+    <button class="spell" data-spell="STAR">STAR</button>
+    <button class="spell" data-spell="SPIRAL">SPIRAL</button>
+    <button class="spell" data-spell="FLOWER">FLOWER</button>
+    <button class="spell" data-spell="GALAXY">GALAXY</button>
+    <span class="sep"></span>
+    <span class="label">SPEED</span>
+    <button class="speed on" data-speed="10">1&times;</button>
+    <button class="speed" data-speed="40">4&times;</button>
+    <button class="speed" data-speed="max">MAX</button>
+    <span class="sep"></span>
+    <button id="clearBtn">CLEAR</button>
+    <button id="muteBtn" title="toggle sound">&#9834; ON</button>
+  </div>
+</main>
+
+<script>
+'use strict';
+/* =========================================================================
+   Turtle Garden — LOGO turtle graphics as a generative-art toy.
+   Self-contained demo: tokenizer + recursive-descent parser, generator-based
+   executor, budgeted rAF animator, WebAudio plinks. No external requests.
+   ========================================================================= */
+
+/* ---------------- language: tokenizer + parser ---------------- */
+
+const COLOR_NAMES = {
+  RED: 0, ORANGE: 30, YELLOW: 52, GREEN: 120, CYAN: 185,
+  BLUE: 220, PURPLE: 275, PINK: 320, WHITE: 'white'
+};
+const CMD_NAMES = ['FORWARD','FD','BACK','BK','RIGHT','RT','LEFT','LT',
+  'PENUP','PU','PENDOWN','PD','COLOR','RAINBOW','REPEAT','CLEAR','CS','HOME'];
+const STEP_CAP = 100000;
+
+function tokenize(src) {
+  return src.replace(/([\[\]])/g, ' $1 ').trim().toUpperCase().split(/\s+/).filter(Boolean);
+}
+
+function editDist(a, b) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 2) return 99;
+  const d = Array.from({ length: m + 1 }, (_, i) => [i]);
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return d[m][n];
+}
+function nearest(word) {
+  let best = null, bd = 3;
+  for (const c of CMD_NAMES) {
+    const dd = editDist(word, c);
+    if (dd < bd) { bd = dd; best = c; }
+  }
+  return best;
+}
+
+function ParseError(msg) { const e = new Error(msg); e.friendly = true; return e; }
+
+// Recursive descent. Program := ( command | REPEAT n [ Program ] )*
+function parse(tokens) {
+  let pos = 0;
+  const peek = () => tokens[pos];
+  const next = () => tokens[pos++];
+
+  function needNumber(cmd, example) {
+    const t = peek();
+    const n = t !== undefined && /^-?\d*\.?\d+$/.test(t) ? parseFloat(t) : NaN;
+    if (isNaN(n)) throw ParseError(`${cmd} needs a number. TRY: ${example}`);
+    pos++;
+    return n;
+  }
+
+  function parseProgram(insideBrackets) {
+    const nodes = [];
+    while (pos < tokens.length) {
+      const t = peek();
+      if (t === ']') {
+        if (insideBrackets) return nodes;
+        throw ParseError(`There's a ] with no [ before it.`);
+      }
+      next();
+      switch (t) {
+        case 'FORWARD': case 'FD': nodes.push({ cmd: 'move', arg: needNumber('FORWARD', 'FORWARD 50') }); break;
+        case 'BACK':    case 'BK': nodes.push({ cmd: 'move', arg: -needNumber('BACK', 'BACK 50') }); break;
+        case 'RIGHT':   case 'RT': nodes.push({ cmd: 'turn', arg: needNumber('RIGHT', 'RIGHT 90') }); break;
+        case 'LEFT':    case 'LT': nodes.push({ cmd: 'turn', arg: -needNumber('LEFT', 'LEFT 90') }); break;
+        case 'PENUP':   case 'PU': nodes.push({ cmd: 'pen', arg: false }); break;
+        case 'PENDOWN': case 'PD': nodes.push({ cmd: 'pen', arg: true }); break;
+        case 'RAINBOW': nodes.push({ cmd: 'rainbow' }); break;
+        case 'CLEAR': case 'CS': nodes.push({ cmd: 'clear' }); break;
+        case 'HOME': nodes.push({ cmd: 'home' }); break;
+        case 'COLOR': {
+          const a = next();
+          if (a === undefined) throw ParseError(`COLOR needs a color. TRY: COLOR PINK`);
+          if (a in COLOR_NAMES) { nodes.push({ cmd: 'color', arg: COLOR_NAMES[a] }); break; }
+          if (/^-?\d*\.?\d+$/.test(a)) { nodes.push({ cmd: 'color', arg: ((parseFloat(a) % 360) + 360) % 360 }); break; }
+          throw ParseError(`I don't know the color "${a}". TRY: COLOR PINK — or a number 0–360.`);
+        }
+        case 'REPEAT': {
+          const t2 = peek();
+          const n = t2 !== undefined && /^\d+$/.test(t2) ? parseInt(t2, 10) : NaN;
+          if (isNaN(n) || n < 1) throw ParseError(`REPEAT needs a number. TRY: REPEAT 4 [ FORWARD 50 RIGHT 90 ]`);
+          pos++;
+          if (peek() !== '[') throw ParseError(`REPEAT needs [ brackets ] around the commands to repeat. TRY: REPEAT 4 [ FORWARD 50 RIGHT 90 ]`);
+          pos++;
+          const body = parseProgram(true);
+          if (peek() !== ']') throw ParseError(`A [ is missing its ]. Add ] at the end.`);
+          pos++;
+          nodes.push({ cmd: 'repeat', count: n, body });
+          break;
+        }
+        default: {
+          const guess = nearest(t);
+          throw ParseError(guess
+            ? `I don't know "${t}". Did you mean ${guess}?`
+            : `I don't know "${t}". TRY: FORWARD 50`);
+        }
+      }
+    }
+    if (insideBrackets) throw ParseError(`A [ is missing its ]. Add ] at the end.`);
+    return nodes;
+  }
+
+  return parseProgram(false);
+}
+
+function countSteps(nodes) {
+  let n = 0;
+  for (const node of nodes) {
+    n += node.cmd === 'repeat' ? node.count * countSteps(node.body) : 1;
+    if (n > STEP_CAP) return n;
+  }
+  return n;
+}
+
+// Generator executor: REPEAT unrolls lazily so animation can pause anywhere.
+function* exec(nodes) {
+  for (const node of nodes) {
+    if (node.cmd === 'repeat') {
+      for (let i = 0; i < node.count; i++) yield* exec(node.body);
+    } else {
+      yield node;
+    }
+  }
+}
+
+/* ---------------- sound: WebAudio plinks ---------------- */
+
+const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+let AC = null, master = null, lastPlink = 0, muted = false;
+
+function ensureAudio() {
+  if (!AC) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    AC = new Ctx();
+    master = AC.createGain();
+    master.gain.value = 0.5;
+    master.connect(AC.destination);
+  }
+  if (AC.state === 'suspended') AC.resume();
+}
+
+function plink(heading) {
+  if (muted || !AC || AC.state !== 'running') return;
+  const now = performance.now();
+  if (now - lastPlink < 30) return; // rate limit: MAX speed must not buzz
+  lastPlink = now;
+  const h = ((heading % 360) + 360) % 360;
+  const freq = 220 * Math.pow(2, PENTA[Math.round(h / 360 * 10)] / 12);
+  const t = AC.currentTime;
+  const osc = AC.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.value = freq;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.12, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+  osc.connect(g); g.connect(master);
+  osc.start(t); osc.stop(t + 0.2);
+}
+
+/* ---------------- turtle sprite (authored pixel art) ---------------- */
+
+const SPRITE_ROWS = [ // facing up; h=head f=feet s=shell S=shell pattern e=eye t=tail
+  '......hh......',
+  '.....heeh.....',
+  '.....hhhh.....',
+  '.f..ssssss..f.',
+  '.ff.ssssss.ff.',
+  '..fsssSSsssf..',
+  '...sSSssSSs...',
+  '...ssssssss...',
+  '...sSSssSSs...',
+  '..fsssSSsssf..',
+  '.ff.ssssss.ff.',
+  '.f..ssssss..f.',
+  '......tt......'
+];
+const SPRITE_COLORS = { h: '#8ff59a', e: '#0a0a12', s: '#3fb950', S: '#2b8a3e', f: '#8ff59a', t: '#5ad3a0' };
+const CELL = 2;
+
+function makeSprite(eyesClosed) {
+  const c = document.createElement('canvas');
+  c.width = SPRITE_ROWS[0].length * CELL;
+  c.height = SPRITE_ROWS.length * CELL;
+  const x = c.getContext('2d');
+  SPRITE_ROWS.forEach((row, ry) => {
+    for (let rx = 0; rx < row.length; rx++) {
+      let ch = row[rx];
+      if (ch === '.') continue;
+      if (eyesClosed && ch === 'e') ch = 'h';
+      x.fillStyle = SPRITE_COLORS[ch];
+      x.fillRect(rx * CELL, ry * CELL, CELL, CELL);
+    }
+  });
+  return c;
+}
+const spriteOpen = makeSprite(false);
+const spriteClosed = makeSprite(true);
+
+// header logo — an <img> with a data URI survives GPU canvas eviction
+document.getElementById('logo').src = spriteOpen.toDataURL();
+
+/* ---------------- canvas + animator ---------------- */
+
+const wrap = document.getElementById('wrap');
+const trail = document.getElementById('trail');
+const overlay = document.getElementById('overlay');
+const tctx = trail.getContext('2d');
+const octx = overlay.getContext('2d');
+
+const state = { x: 0, y: 0, heading: 0, pen: true, rainbow: false, hue: 190, white: false };
+let queue = [];    // array of op iterators, run in order
+let seg = null;    // current walking segment
+let speed = 10;    // px per frame; Infinity = MAX (budget-limited)
+let cw = 0, ch = 0;
+
+function penColors() {
+  if (state.white) return ['hsl(0 0% 92%)', '#ffffff'];
+  return [`hsl(${state.hue} 100% 60%)`, `hsl(${state.hue} 100% 85%)`];
+}
+
+function paintBackdrop() {
+  tctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim() || '#0a0a12';
+  tctx.fillRect(0, 0, cw, ch);
+  tctx.fillStyle = 'rgba(255,255,255,0.045)'; // faint dot grid, very retro
+  for (let y = 10; y < ch; y += 22)
+    for (let x = 10; x < cw; x += 22)
+      tctx.fillRect(x, y, 1, 1);
+}
+
+function sizeCanvases() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  // preserve the trail across resizes, keeping it centered
+  let saved = null, oldW = cw, oldH = ch;
+  if (cw > 0 && ch > 0) {
+    saved = document.createElement('canvas');
+    saved.width = trail.width; saved.height = trail.height;
+    saved.getContext('2d').drawImage(trail, 0, 0);
+  }
+  for (const c of [trail, overlay]) {
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+  }
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cw = w; ch = h;
+  paintBackdrop();
+  if (saved) {
+    const dx = (w - oldW) / 2, dy = (h - oldH) / 2;
+    tctx.save();
+    tctx.setTransform(1, 0, 0, 1, 0, 0);
+    tctx.drawImage(saved, Math.round(dx * dpr), Math.round(dy * dpr));
+    tctx.restore();
+    state.x += dx; state.y += dy;
+  } else {
+    state.x = w / 2; state.y = h / 2;
+  }
+}
+
+function drawSegment(x1, y1, x2, y2, main, core) {
+  tctx.lineCap = 'round';
+  // wide glow pass
+  tctx.strokeStyle = main;
+  tctx.lineWidth = 3.5;
+  tctx.shadowColor = main;
+  tctx.shadowBlur = 14;
+  tctx.globalAlpha = 0.85;
+  tctx.beginPath(); tctx.moveTo(x1, y1); tctx.lineTo(x2, y2); tctx.stroke();
+  // bright core pass
+  tctx.shadowBlur = 0;
+  tctx.globalAlpha = 1;
+  tctx.strokeStyle = core;
+  tctx.lineWidth = 1.4;
+  tctx.beginPath(); tctx.moveTo(x1, y1); tctx.lineTo(x2, y2); tctx.stroke();
+}
+
+function applyOp(op) {
+  switch (op.cmd) {
+    case 'move': {
+      const d = op.arg;
+      if (!d) return;
+      const rad = state.heading * Math.PI / 180;
+      const sign = d < 0 ? -1 : 1;
+      if (state.pen && state.rainbow) state.hue = (state.hue + 7) % 360;
+      const [main, core] = penColors();
+      seg = {
+        remaining: Math.abs(d),
+        dx: Math.sin(rad) * sign,
+        dy: -Math.cos(rad) * sign,
+        draw: state.pen, main, core
+      };
+      if (state.pen) plink(state.heading);
+      return;
+    }
+    case 'turn': state.heading = (state.heading + op.arg) % 360; return;
+    case 'pen': state.pen = op.arg; return;
+    case 'color':
+      state.rainbow = false;
+      if (op.arg === 'white') { state.white = true; } else { state.white = false; state.hue = op.arg; }
+      return;
+    case 'rainbow': state.rainbow = true; state.white = false; return;
+    case 'home': state.x = cw / 2; state.y = ch / 2; state.heading = 0; return;
+    case 'clear':
+      paintBackdrop();
+      state.x = cw / 2; state.y = ch / 2; state.heading = 0;
+      return;
+  }
+}
+
+function nextOp() {
+  while (queue.length) {
+    const r = queue[0].next();
+    if (r.done) { queue.shift(); continue; }
+    return r.value;
+  }
+  return null;
+}
+
+const running = () => queue.length > 0 || seg !== null;
+
+let blinkUntil = 0, nextBlink = performance.now() + 3000;
+
+function drawTurtle(now) {
+  octx.clearRect(0, 0, cw, ch);
+  if (!running()) {
+    if (now > nextBlink) { blinkUntil = now + 160; nextBlink = now + 2800 + Math.random() * 2500; }
+  }
+  const sprite = now < blinkUntil ? spriteClosed : spriteOpen;
+  octx.save();
+  octx.translate(state.x, state.y);
+  octx.rotate(state.heading * Math.PI / 180);
+  octx.shadowColor = '#3fb950';
+  octx.shadowBlur = 8;
+  octx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
+  octx.restore();
+}
+
+function frame(now) {
+  const deadline = performance.now() + 12; // never lock the UI
+  let px = speed; // pixels this frame (Infinity for MAX)
+  while (performance.now() < deadline) {
+    if (seg) {
+      const step = Math.min(seg.remaining, px);
+      if (step <= 0) break;
+      const nx = state.x + seg.dx * step, ny = state.y + seg.dy * step;
+      if (seg.draw) drawSegment(state.x, state.y, nx, ny, seg.main, seg.core);
+      state.x = nx; state.y = ny;
+      seg.remaining -= step;
+      if (px !== Infinity) px -= step;
+      if (seg.remaining <= 0.01) seg = null;
+      if (px <= 0) break;
+    } else {
+      const op = nextOp();
+      if (!op) break;
+      applyOp(op);
+    }
+  }
+  drawTurtle(now);
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- UI: log, input, hints, spells, controls ---------------- */
+
+const logEl = document.getElementById('log');
+const input = document.getElementById('cmd');
+const hintEl = document.getElementById('hint');
+
+function echo(text, cls) {
+  const div = document.createElement('div');
+  div.className = cls;
+  div.textContent = text;
+  logEl.appendChild(div);
+  while (logEl.children.length > 30) logEl.removeChild(logEl.firstChild);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+const history = [];
+let histIdx = 0;
+
+function submit(raw) {
+  const text = raw.trim();
+  if (!text) return;
+  echo('? ' + text.toUpperCase(), 'cmd');
+  history.push(text.toUpperCase());
+  histIdx = history.length;
+  let ast;
+  try {
+    ast = parse(tokenize(text));
+    if (countSteps(ast) > STEP_CAP)
+      throw ParseError(`That's too many steps for one spell! Try a smaller REPEAT.`);
+  } catch (e) {
+    if (!e.friendly) throw e;
+    echo('  ' + e.message, 'err'); // all-or-nothing: an erroring line runs zero commands
+    return;
+  }
+  queue.push(exec(ast));
+}
+
+/* hint bar: rotating tips when idle, prefix suggestions while typing */
+const TIPS = [
+  'TRY: FORWARD 50',
+  'TRY: RIGHT 90',
+  'TRY: REPEAT 8 [ FORWARD 60 RIGHT 45 ]',
+  'TRY: RAINBOW',
+  'TRY: COLOR PINK',
+  'PRESS A SPELL BUTTON BELOW',
+  'UP ARROW BRINGS BACK YOUR LAST SPELL'
+];
+const HELP = [
+  ['FORWARD', 'FORWARD 50 · move ahead'],
+  ['BACK', 'BACK 50 · move back'],
+  ['RIGHT', 'RIGHT 90 · turn right'],
+  ['LEFT', 'LEFT 90 · turn left'],
+  ['REPEAT', 'REPEAT 8 [ ... ] · do it again'],
+  ['RAINBOW', 'RAINBOW · rainbow pen'],
+  ['COLOR', 'COLOR PINK · set pen color'],
+  ['PENUP', 'PENUP · stop drawing'],
+  ['PENDOWN', 'PENDOWN · start drawing'],
+  ['CLEAR', 'CLEAR · wipe canvas'],
+  ['HOME', 'HOME · back to center']
+];
+let tipIdx = 0;
+function refreshHint() {
+  const val = input.value.toUpperCase();
+  if (!val.trim()) { hintEl.textContent = TIPS[tipIdx]; return; }
+  const words = val.trim().split(/\s+/);
+  const last = words[words.length - 1];
+  if (/^[A-Z]+$/.test(last)) {
+    const matches = HELP.filter(([name]) => name.startsWith(last) && name !== last).slice(0, 2);
+    if (matches.length) { hintEl.textContent = matches.map(m => m[1]).join('    '); return; }
+    const exact = HELP.find(([name]) => name === last);
+    if (exact) { hintEl.textContent = exact[1]; return; }
+  }
+  hintEl.textContent = '';
+}
+setInterval(() => { tipIdx = (tipIdx + 1) % TIPS.length; refreshHint(); }, 4000);
+input.addEventListener('input', refreshHint);
+refreshHint();
+
+input.addEventListener('keydown', (e) => {
+  if (typing) { e.preventDefault(); return; }
+  if (e.key === 'Enter') {
+    submit(input.value);
+    input.value = '';
+    refreshHint();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (histIdx > 0) { histIdx--; input.value = history[histIdx]; }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (histIdx < history.length) {
+      histIdx++;
+      input.value = histIdx === history.length ? '' : history[histIdx];
+    }
+  }
+});
+
+/* spells: the code types itself into the input — seeing the code is the point */
+const SPELLS = {
+  STAR:   'COLOR YELLOW REPEAT 5 [ FORWARD 150 RIGHT 144 ]',
+  SPIRAL: 'RAINBOW REPEAT 60 [ REPEAT 4 [ FORWARD 100 RIGHT 90 ] RIGHT 6 ]',
+  FLOWER: 'RAINBOW REPEAT 12 [ REPEAT 6 [ FORWARD 60 RIGHT 60 ] RIGHT 30 ]',
+  GALAXY: 'RAINBOW REPEAT 300 [ FORWARD 230 RIGHT 151 ]'
+};
+let typing = false;
+
+function castSpell(text) {
+  if (typing) return;
+  typing = true;
+  input.value = '';
+  input.focus();
+  let i = 0;
+  const iv = setInterval(() => {
+    i++;
+    input.value = text.slice(0, i);
+    if (i >= text.length) {
+      clearInterval(iv);
+      setTimeout(() => {
+        typing = false;
+        submit(input.value);
+        input.value = '';
+        refreshHint();
+      }, 200);
+    }
+  }, 14);
+}
+
+document.querySelectorAll('.spell').forEach(btn => {
+  btn.addEventListener('click', () => castSpell(SPELLS[btn.dataset.spell]));
+});
+
+/* speed */
+document.querySelectorAll('.speed').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    speed = btn.dataset.speed === 'max' ? Infinity : parseInt(btn.dataset.speed, 10);
+  });
+});
+
+/* CLEAR button = panic stop: flush the queue, wipe now (typed CLEAR queues normally) */
+document.getElementById('clearBtn').addEventListener('click', () => {
+  queue = [];
+  seg = null;
+  echo('? CLEAR', 'cmd');
+  applyOp({ cmd: 'clear' });
+  input.focus();
+});
+
+/* mute */
+const muteBtn = document.getElementById('muteBtn');
+muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  muteBtn.innerHTML = muted ? '&#9834; OFF' : '&#9834; ON';
+  muteBtn.classList.toggle('on', muted);
+  input.focus();
+});
+
+/* audio unlock on first gesture; keep focus on the input */
+const unlock = () => ensureAudio();
+document.addEventListener('pointerdown', unlock);
+document.addEventListener('keydown', unlock);
+document.addEventListener('pointerup', (e) => {
+  if (!e.target.closest('a, button, input') && !String(window.getSelection())) input.focus();
+});
+
+window.addEventListener('resize', sizeCanvases);
+
+/* boot */
+sizeCanvases();
+echo('WELCOME TO TURTLE GARDEN. THE TURTLE OBEYS.', 'sys');
+echo('TYPE A COMMAND AND PRESS ENTER — OR PRESS A SPELL BUTTON.', 'sys');
+requestAnimationFrame(frame);
+input.focus();
+</script>
+</body>
+</html>
