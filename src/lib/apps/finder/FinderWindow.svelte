@@ -12,7 +12,7 @@
 	import type { FsNode, FsFile, FsAlias } from '$lib/terminalos';
 	import { getAppContext } from '$lib/os/os-context';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
-	import { getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import { getAppIconKind, getAppIconSprite } from '$lib/terminalos/apps/app-install';
 	import { openFilesystemNode } from '$lib/os/filesystem-open';
 	import {
 		canDragFilesystemNode,
@@ -90,6 +90,18 @@
 		const file = node as FsFile;
 		if (file.appId) return getAppIconKind(file.appId);
 		return 'doc';
+	}
+
+	// App-supplied sprite (manifest iconSprite); wins over the kind in PixelIcon.
+	function iconSprite(node: FsNode): string[] | undefined {
+		if (node.kind === 'alias') {
+			const target = resolveNode(node);
+			return target ? iconSprite(target) : undefined;
+		}
+		if (node.kind === 'file' && (node as FsFile).appId) {
+			return getAppIconSprite((node as FsFile).appId!);
+		}
+		return undefined;
 	}
 
 	function iconAccent(node: FsNode): boolean {
@@ -352,7 +364,7 @@
 				ondrop={(e) => handleFolderDrop(e, node)}
 			>
 				<div class="finder-item-icon" class:alias={node.kind === 'alias'}>
-					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
+					<PixelIcon kind={iconKind(node)} sprite={iconSprite(node)} accent={iconAccent(node)} />
 				</div>
 				<div class="finder-item-label">{node.name}</div>
 			</button>

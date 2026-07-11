@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { InstalledApp } from '$lib/terminalos';
+	import { getAppIconKind, getAppIconSprite } from '$lib/terminalos/apps/app-install';
+	import PixelIcon from './PixelIcon.svelte';
 
 	let {
 		installedApps = [],
@@ -28,6 +30,8 @@
 		...installedApps.map((app) => ({
 			id: app.id,
 			icon: app.icon,
+			iconKind: getAppIconKind(app.id),
+			iconSprite: getAppIconSprite(app.id),
 			tip: app.name,
 			kind: 'app' as const
 		}))
@@ -79,7 +83,15 @@
 				onclick={() => (it.kind === 'app' ? onlaunchApp(it.id) : onopenWindow(it.id))}
 				title={it.tip}
 			>
-				<span class="dock-icon">{it.icon}</span>
+				{#if it.kind === 'app'}
+					<!-- Apps draw their pixel icon (kind or manifest sprite); the emoji
+					     `icon` string stays only as the text fallback for non-app items. -->
+					<span class="dock-icon dock-icon-pix">
+						<PixelIcon kind={it.iconKind} sprite={it.iconSprite} size={22} />
+					</span>
+				{:else}
+					<span class="dock-icon">{it.icon}</span>
+				{/if}
 				<span class="tooltip">{it.tip}</span>
 			</button>
 		{/each}
@@ -175,6 +187,11 @@
 	.dock-icon {
 		font-family: var(--brand-font-display, 'Press Start 2P', monospace);
 		font-size: 14px;
+	}
+	.dock-icon-pix {
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 	.tooltip {
 		position: absolute;
