@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import type { WindowState } from '$lib/types';
 	import type { OsApiClass } from '$lib/os/os-api.svelte';
 	import type { TerminalFS } from '$lib/terminalos';
 	import { setAppContext, type WindowHandle } from '$lib/os/os-context';
 	import { resolveWindow } from '$lib/os/window-host';
+	import { createAppStorage, createCleanupRegistry } from '$lib/os/app-services';
+	import { pageVisibility } from '$lib/os/page-visibility.svelte';
 
 	let {
 		win,
@@ -31,6 +34,12 @@
 		focus: () => os.focusWindow(win.id)
 	};
 
+	// OS-owned window lifecycle: the registry runs from *this host's* unmount,
+	// so a window close tears down whatever the app registered even if the
+	// component forgot its own onDestroy.
+	const cleanup = createCleanupRegistry();
+	onDestroy(() => cleanup.run());
+
 	setAppContext({
 		get os() {
 			return os;
@@ -39,17 +48,17 @@
 			return fs;
 		},
 		window: handle,
-		storage: {
-			get appId() {
-				return resolved?.appId ?? 'unknown';
-			},
-			get namespace() {
-				return `app:${resolved?.appId ?? 'unknown'}`;
-			},
-			status: 'reserved'
-		},
+		storage: createAppStorage(() => resolved?.appId ?? 'unknown'),
 		capabilities: {},
-		lifecycle: {},
+		lifecycle: {
+			onCleanup: cleanup.onCleanup,
+			get focused() {
+				return os.activeId === win.id;
+			},
+			get hidden() {
+				return pageVisibility.hidden;
+			}
+		},
 		get turnstileSiteKey() {
 			return turnstileSiteKey;
 		}

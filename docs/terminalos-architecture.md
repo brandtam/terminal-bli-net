@@ -63,12 +63,14 @@ Window ids are resolved by `matchWindow(id)`. The match result provides:
 
 `WindowHost.svelte` renders every app window through the same path. Window components receive no props. They read `getAppContext()` for:
 
-- `os`: the live OS API
+- `os`: the live OS API, including the shared synth at `os.audio`
 - `fs`: the live TerminalFS
 - `window`: this window's id, parsed args, close/focus actions
-- reserved storage/capability/lifecycle handles
+- `storage`: per-app key-value persistence, namespaced `terminal.app.<appId>.<key>` by convention (not a sandbox)
+- `lifecycle`: OS-owned `onCleanup(cb)` run on window close, plus reactive `focused`/`hidden`
+- `capabilities`: still a reserved seam for future sandboxing
 
-This makes the app host a deep module: the OS handles context and lifecycle shape once, and apps remain local.
+This makes the app host a deep module: the OS handles context and lifecycle shape once, and apps remain local. See [ADR 0006](adr/0006-app-context-services.md) for the audio, lifecycle, and storage contracts.
 
 ## Document Routing
 

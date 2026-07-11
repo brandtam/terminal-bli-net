@@ -17,14 +17,18 @@ export type WindowHandle = {
 };
 
 /**
- * Reserved for #29. The host provides this handle now so every app receives the
- * final AppContext shape, but it deliberately exposes no persistence methods
- * until the scoped storage design lands.
+ * Per-app key-value storage, namespaced `terminal.app.<appId>.<key>` in
+ * localStorage. Values round-trip through JSON, so store plain data. The
+ * namespace is a convention that keeps well-behaved apps out of each other's
+ * keys — it is NOT a sandbox and makes no security claim; any code on the page
+ * can read any key. Keep bulky bodies in the filesystem (`fs`), not here.
  */
 export type AppStorageHandle = {
 	readonly appId: string;
 	readonly namespace: string;
-	readonly status: 'reserved';
+	get<T>(key: string, fallback: T): T;
+	set<T>(key: string, value: T): void;
+	delete(key: string): void;
 };
 
 /**
@@ -36,12 +40,18 @@ export type AppCapabilities = {
 };
 
 /**
- * Typed documentation seam for #30, where the games SDK can design focus and
- * visibility hooks against a real requestAnimationFrame loop. Svelte lifecycle
- * remains the only active component lifecycle today.
+ * The OS-owned window lifecycle. `onCleanup` callbacks run when this window
+ * closes (WindowHost's unmount), so intervals, oscillators, and observers get
+ * torn down even if the component forgot its own `onDestroy`. `focused` and
+ * `hidden` are reactive — read them in a `$derived`/`$effect` to pause work
+ * when the window loses focus or the tab goes to the background.
  */
 export type AppLifecycle = {
-	readonly focusAware?: boolean;
+	onCleanup(cb: () => void): void;
+	/** True while this window is the active (frontmost) window. Reactive. */
+	readonly focused: boolean;
+	/** True while the browser tab is hidden (`document.hidden`). Reactive. */
+	readonly hidden: boolean;
 };
 
 /**
@@ -57,7 +67,7 @@ export type AppContext = {
 	window: WindowHandle;
 	storage: AppStorageHandle;
 	capabilities?: AppCapabilities;
-	lifecycle?: AppLifecycle;
+	lifecycle: AppLifecycle;
 	/**
 	 * Public Turnstile site key, read once from `$env/dynamic/public` at the app
 	 * edge and threaded here so leaf windows (the chat) need no env import.

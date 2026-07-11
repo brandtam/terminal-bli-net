@@ -25,6 +25,8 @@ import {
 	matchWindow
 } from '$lib/terminalos/apps/app-catalog';
 import { resolveOpenTarget } from './window-host';
+import { osAudio } from './audio.svelte';
+import { pageVisibility } from './page-visibility.svelte';
 import type { BodyGcReport, FsResult, TerminalFS, FsFile } from '$lib/terminalos';
 import { TRASH_ID } from '$lib/terminalos/filesystem/well-known-ids';
 
@@ -52,6 +54,11 @@ export class OsApiClass implements OsApi {
 	isMobile = $state(false);
 	mounted = $state(false);
 
+	// ── OS voice layer ────────────────────────────────────────────────────
+	// The shared synth (beep/blip/error/tone) — one AudioContext for the OS
+	// and every app, reached as `os.audio` off AppContext. See audio.svelte.ts.
+	readonly audio = osAudio;
+
 	// ── Private state ─────────────────────────────────────────────────────
 	private fs: TerminalFS;
 	private zCounter = 10;
@@ -70,6 +77,11 @@ export class OsApiClass implements OsApi {
 	// ── Initialization ────────────────────────────────────────────────────
 
 	async init(): Promise<void> {
+		// Arm the voice layer (gesture unlock + hidden-tab suspend) and the
+		// reactive visibility signal every window's lifecycle.hidden reads.
+		this.audio.init();
+		pageVisibility.start();
+
 		// Load persisted state
 		this.tweaks = loadTweaks();
 		this.timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -170,6 +182,8 @@ export class OsApiClass implements OsApi {
 		if (this.tickInterval) clearInterval(this.tickInterval);
 		this.resizeCleanup?.();
 		this.keydownCleanup?.();
+		this.audio.destroy();
+		pageVisibility.stop();
 	}
 
 	// ── Dock aliases ──────────────────────────────────────────────────────
@@ -331,6 +345,9 @@ export class OsApiClass implements OsApi {
 	// ── Alert system ──────────────────────────────────────────────────────
 
 	showAlert(spec: AlertSpec): void {
+		// The system alert voice. Progress alerts (backup et al.) stay silent —
+		// they announce work, not a problem. Muting is handled by the audio layer.
+		if (!spec.progress) this.audio.error();
 		this.alertSpec = { ...spec, id: Math.random() };
 	}
 

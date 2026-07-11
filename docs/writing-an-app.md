@@ -143,9 +143,27 @@ const { os, fs, window } = getAppContext();
 - **`os`** — the live OS API. Launch apps (`os.launchApp('computer-store')`), open documents, show alerts, read reactive state. Reading its `$state` fields here keeps your `$derived` values live.
 - **`fs`** — the live filesystem: folders, files, app data, blob bodies.
 - **`window`** — _this_ window's handle: `window.id`, `window.args` (the parsed match args), `window.close()`, `window.focus()`. Your component never builds a raw window id.
-- **`storage`** — reserved handle for scoped per-app storage (not active yet; exposes no methods today).
+- **`storage`** — per-app key-value persistence: `storage.get(key, fallback)`, `storage.set(key, value)`, `storage.delete(key)`. Keys live in localStorage under `terminal.app.<yourAppId>.<key>`, so apps never collide. Values round-trip through JSON — store plain data, and keep anything bulky in `fs` instead. The namespace is a convention, **not** a sandbox: any code on the page can read any key, so don't treat it as a security boundary.
+- **`lifecycle`** — the OS-owned window lifecycle:
+  - `lifecycle.onCleanup(cb)` — runs when your window closes, even if your component forgot its own `onDestroy`. Register intervals, oscillators, observers here and the OS tears them down.
+  - `lifecycle.focused` — reactive; true while your window is frontmost.
+  - `lifecycle.hidden` — reactive; true while the browser tab is hidden. Read either in a `$derived`/`$effect` to pause loops on blur.
 
-`capabilities` and `lifecycle` are typed documentation seams for future sandboxing and a games loop. They aren't enforced — don't treat them as a security guarantee.
+`capabilities` remains a typed documentation seam for future sandboxing. It isn't enforced — don't treat it as a security guarantee.
+
+### Sound: `os.audio`
+
+The OS owns one shared synth — no app should create its own `AudioContext`. Reach it off the context you already have:
+
+```ts
+const { os } = getAppContext();
+os.audio.beep(); // the system beep (square, 880 Hz)
+os.audio.blip(); // a short UI tick
+os.audio.error(); // the two-tone alert buzz
+os.audio.tone({ wave: 'pulse', freq: 220, dur: 90, gain: 0.7 }); // low-level voice
+```
+
+`tone` takes `wave: 'square' | 'pulse' | 'triangle' | 'noise'`, `freq` in Hz, `dur` in milliseconds, and `gain` 0–1. Everything is synthesized — there are no audio assets. You never need to guard a call: the layer drops tones silently when the user has muted sound, when the tab is hidden, or before the first user gesture (browser autoplay policy). Mute and volume are one persisted OS-level setting (`os.audio.setMuted(...)` / `os.audio.setVolume(...)`), so apps shouldn't ship their own mute toggles.
 
 ## Opening documents (the file → window path)
 

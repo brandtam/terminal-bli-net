@@ -23,7 +23,11 @@ vi.mock('$lib/persistence', () => ({
 	clearAllPreferences: vi.fn(),
 	// Pulled in transitively via vcr-prefs (device-aware VCR window sizing).
 	appRead: (_app: string, _key: string, fallback: unknown) => fallback,
-	appWrite: vi.fn()
+	appWrite: vi.fn(),
+	appDelete: vi.fn(),
+	// Pulled in transitively via the OS voice layer (audio.svelte.ts).
+	loadSoundPrefs: () => ({ muted: false, volume: 0.6 }),
+	saveSoundPrefs: vi.fn()
 }));
 
 import { OsApiClass } from './os-api.svelte';
