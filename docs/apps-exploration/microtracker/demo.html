@@ -122,12 +122,12 @@
   <div class="transport">
     <button class="bigbtn" id="playBtn">&#9654; PLAY DEMO SONG</button>
     <div class="bpm">
-      BPM <input type="range" id="bpmSlider" min="100" max="200" step="1" value="140">
+      BPM <input type="range" id="bpmSlider" min="60" max="240" step="1" value="140">
       <span class="val" id="bpmVal">140</span>
     </div>
     <button class="tbtn" id="demoBtn">LOAD DEMO</button>
     <button class="tbtn" id="clearBtn">CLEAR</button>
-    <span class="oct">OCTAVE <b>4</b> &middot; PATTERN 00 &middot; 64 ROWS</span>
+    <span class="oct">OCTAVE <b>4</b> &middot; PATTERN 00 &middot; <span id="rowsLabel">64 ROWS</span></span>
   </div>
 
   <div class="chead">
@@ -165,7 +165,8 @@
  *  times in the AudioContext clock domain (zero drift).
  * ============================================================ */
 
-const ROWS = 64, CHS = 4, ROW_H = 22;
+let ROWS = 64; // pattern length; local songs may resize via setRows()
+const CHS = 4, ROW_H = 22;
 const NOTE_NAMES = ['C-','C#','D-','D#','E-','F-','F#','G-','G#','A-','A#','B-'];
 
 /* note string 'A-4' / 'G#5' -> semitone index (C-0 = 0, A-4 = 57) */
@@ -392,12 +393,26 @@ function buildGrid() {
     html += '</div>';
   }
   grid.innerHTML = html;
+  cellEls.length = 0; rowEls.length = 0; curPlayEl = null;
   for (let c = 0; c < CHS; c++) cellEls.push(new Array(ROWS));
   grid.querySelectorAll('.row').forEach((el) => rowEls.push(el));
   grid.querySelectorAll('.cell').forEach((el) => {
     const r = +el.dataset.r, c = +el.dataset.c;
     cellEls[c][r] = { nt: el.children[0], vl: el.children[1], el };
   });
+}
+
+/* resize the pattern (and grid) — clears all cells */
+function setRows(n) {
+  if (playing) stop();
+  ROWS = n;
+  pattern = Array.from({ length: CHS }, () => new Array(ROWS).fill(null));
+  buildGrid();
+  updateAllCells();
+  document.getElementById('rowsLabel').textContent = ROWS + ' ROWS';
+  cursor = { row: 0, ch: 0 };
+  cellEls[0][0].el.classList.add('cur');
+  setView(0);
 }
 
 function updateCell(ch, row) {
@@ -531,6 +546,7 @@ playBtn.addEventListener('click', function () { this.blur(); playing ? stop() : 
 
 document.getElementById('demoBtn').addEventListener('click', function () {
   this.blur();
+  if (ROWS !== 64) setRows(64);
   loadDemoSong();
   updateAllCells();
   demoLoaded = true;
@@ -539,8 +555,7 @@ document.getElementById('demoBtn').addEventListener('click', function () {
 
 document.getElementById('clearBtn').addEventListener('click', function () {
   this.blur();
-  pattern = Array.from({ length: CHS }, () => new Array(ROWS).fill(null));
-  updateAllCells();
+  setRows(64);
   demoLoaded = false;
   if (!playing) playBtn.innerHTML = '&#9654; PLAY';
 });
@@ -565,11 +580,12 @@ requestAnimationFrame(frame);
  * Personal song data can live in a local-songs.js next to this file; that
  * file is gitignored, so it never lands in the repo or on a public host.
  * Format:
- *   window.LOCAL_SONGS = [{ name: 'MY SONG', bpm: 150, tracks: [t0,t1,t2,t3] }]
+ *   window.LOCAL_SONGS = [{ name: 'MY SONG', bpm: 150, rows: 64, tracks: [t0,t1,t2,t3] }]
  * where each track is [[row, 'E-5', vol], …] for channels
- * 0 pulse lead · 1 pulse arp · 2 triangle bass · 3 noise (C-2 kick, C-4 snare, C-6 hat). */
+ * 0 pulse lead · 1 pulse arp · 2 triangle bass · 3 noise (C-2 kick, C-4 snare, C-6 hat).
+ * rows (16..1024, default 64) resizes the pattern — full songs welcome. */
 function loadLocalSong(song) {
-  pattern = Array.from({ length: CHS }, () => new Array(ROWS).fill(null));
+  setRows(Math.max(16, Math.min(1024, song.rows || 64)));
   song.tracks.forEach((tr, c) => {
     if (c < CHS) (tr || []).forEach(([r, s, v]) => { if (r >= 0 && r < ROWS) put(c, r, s, v); });
   });
