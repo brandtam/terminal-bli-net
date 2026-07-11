@@ -21,3 +21,6 @@ bundle-stats.html
 
 # Agent scheduled-tasks runtime lock (not project state)
 scheduled_tasks.lock
+
+# Personal song data for the MicroTracker demo — private transcriptions, never ship
+docs/apps-exploration/microtracker/local-songs.js
