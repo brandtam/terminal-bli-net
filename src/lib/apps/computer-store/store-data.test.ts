@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
 	APPS,
 	APP_BY_ID,
@@ -8,6 +10,19 @@ import {
 	shelfLineup
 } from './store-data';
 import { APP_LIBRARY } from '$lib/terminalos/apps/app-library';
+import { MANIFESTS } from '$lib/terminalos/apps/manifests';
+
+/**
+ * The box-art glyphs the store's PixelIcon actually draws, read out of the
+ * component source so this can't drift from the real set. A store block naming
+ * an unknown boxIcon would render a blank splash panel.
+ */
+function knownBoxIcons(): Set<string> {
+	const src = readFileSync(fileURLToPath(new URL('./PixelIcon.svelte', import.meta.url)), 'utf8');
+	const names = [...src.matchAll(/name\s*===\s*'([^']+)'/g)].map((m) => m[1]);
+	expect(names.length).toBeGreaterThan(0);
+	return new Set(names);
+}
 
 describe('store catalog', () => {
 	it('has 12 apps', () => {
@@ -56,15 +71,33 @@ describe('store catalog', () => {
 		}
 	});
 
-	it('represents every sellable released app or explicitly omits it with a reason', () => {
-		const storeIds = new Set(APPS.map((app) => app.id));
+	it('requires a manifest store block (or an explicit omission) on every released non-system app', () => {
+		// The drift guard: the catalog derives from manifests, so a released store
+		// app with no `store` block silently vanishes from the shelves. Assert on
+		// the manifests directly — being sellable means declaring the listing.
 		const omissionIds = new Set(Object.keys(STORE_CATALOG_OMISSIONS));
-		const sellable = APP_LIBRARY.filter((app) => !app.isSystem && app.status === 'released');
+		const sellable = MANIFESTS.filter((m) => !m.isSystem && m.status === 'released');
 
-		for (const app of sellable) {
+		for (const m of sellable) {
 			expect(
-				storeIds.has(app.id) || omissionIds.has(app.id),
-				`${app.id} is released but missing from Computer Store data and omissions`
+				m.store !== undefined || omissionIds.has(m.id),
+				`${m.id} is released but has no manifest store block and no omission entry`
+			).toBe(true);
+		}
+	});
+
+	it('never puts a store block on a system app', () => {
+		for (const m of MANIFESTS.filter((x) => x.isSystem)) {
+			expect(m.store, `${m.id} is a system app and must not carry a store listing`).toBeUndefined();
+		}
+	});
+
+	it('names a real box-art glyph on every store block', () => {
+		const known = knownBoxIcons();
+		for (const app of APPS) {
+			expect(
+				known.has(app.icon),
+				`${app.id} boxIcon '${app.icon}' is not a store PixelIcon glyph`
 			).toBe(true);
 		}
 	});

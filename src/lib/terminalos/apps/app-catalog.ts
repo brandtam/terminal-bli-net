@@ -189,6 +189,15 @@ export function synthAppIconKind(appId: PersistedAppId): string {
 	return m?.iconKind ?? 'doc';
 }
 
+/**
+ * An app's self-supplied pixel sprite (manifest `iconSprite`), or undefined if
+ * it uses a shared PixelIcon kind. When present it wins over the kind, so an
+ * app can ship its own icon without a PixelIcon glyph branch.
+ */
+export function synthAppIconSprite(appId: PersistedAppId): string[] | undefined {
+	return MANIFESTS.find((x) => x.id === appId)?.iconSprite;
+}
+
 // ── App → about / prefs window id (os-api routing) ───────────────────────────
 
 /**

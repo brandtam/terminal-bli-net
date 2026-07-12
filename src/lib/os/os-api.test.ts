@@ -21,9 +21,14 @@ vi.mock('$lib/persistence', () => ({
 	saveConversations: vi.fn(),
 	isFirstVisit: () => false,
 	clearAllPreferences: vi.fn(),
+	onPersistenceQuotaExceeded: vi.fn(),
 	// Pulled in transitively via vcr-prefs (device-aware VCR window sizing).
 	appRead: (_app: string, _key: string, fallback: unknown) => fallback,
-	appWrite: vi.fn()
+	appWrite: vi.fn(),
+	appDelete: vi.fn(),
+	// Pulled in transitively via the OS voice layer (audio.svelte.ts).
+	loadSoundPrefs: () => ({ muted: false, volume: 0.6 }),
+	saveSoundPrefs: vi.fn()
 }));
 
 import { OsApiClass } from './os-api.svelte';
@@ -236,6 +241,16 @@ describe('alert lifecycle', () => {
 
 		expect(os.alertSpec!.title).toBe('Second');
 		expect(os.alertSpec!.id).not.toBe(firstId);
+	});
+
+	it('showDiskFullAlert raises the retro disk-full dialog with a Trash escape hatch', () => {
+		const { os } = createOs();
+		os.showDiskFullAlert();
+
+		expect(os.alertSpec).not.toBeNull();
+		expect(os.alertSpec!.title).toBe('Disk Full');
+		expect(os.alertSpec!.body).toContain('Empty the Trash');
+		expect(os.alertSpec!.buttons?.map((b) => b.label)).toEqual(['Open Trash', 'OK']);
 	});
 });
 

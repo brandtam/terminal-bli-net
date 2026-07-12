@@ -11,10 +11,6 @@
 
 <svelte:head>
 	<title>VCR Library — Media Search</title>
-	<link
-		href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Pixelify+Sans:wght@400;600&display=swap"
-		rel="stylesheet"
-	/>
 </svelte:head>
 
 {#if !dev}

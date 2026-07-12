@@ -14,8 +14,10 @@ import {
 	loadConversations,
 	saveConversations,
 	isFirstVisit,
-	clearAllPreferences
+	clearAllPreferences,
+	onPersistenceQuotaExceeded
 } from '$lib/persistence';
+import { estimateCapacity, shouldWarnCapacity } from './capacity';
 import { getAppLaunchStrategy } from '$lib/terminalos/apps/app-install';
 import { getAppDef } from '$lib/terminalos/apps/app-library';
 import type { TerminalAppDefinition } from '$lib/terminalos/apps/app-types';
@@ -25,6 +27,9 @@ import {
 	matchWindow
 } from '$lib/terminalos/apps/app-catalog';
 import { resolveOpenTarget } from './window-host';
+import { isViewportBlocked, readViewport } from './viewport-gate';
+import { osAudio } from './audio.svelte';
+import { pageVisibility } from './page-visibility.svelte';
 import type { BodyGcReport, FsResult, TerminalFS, FsFile } from '$lib/terminalos';
 import { TRASH_ID } from '$lib/terminalos/filesystem/well-known-ids';
 
@@ -52,13 +57,20 @@ export class OsApiClass implements OsApi {
 	isMobile = $state(false);
 	mounted = $state(false);
 
+	// ── OS voice layer ────────────────────────────────────────────────────
+	// The shared synth (beep/blip/error/tone) — one AudioContext for the OS
+	// and every app, reached as `os.audio` off AppContext. See audio.svelte.ts.
+	readonly audio = osAudio;
+
 	// ── Private state ─────────────────────────────────────────────────────
 	private fs: TerminalFS;
 	private zCounter = 10;
 	private lastSlotIdx = -1;
 	private tickInterval?: ReturnType<typeof setInterval>;
+	private visibilityCleanup?: () => void;
 	private resizeCleanup?: () => void;
 	private keydownCleanup?: () => void;
+	private fsWatchCleanup?: () => void;
 
 	// ── Dock alias map ────────────────────────────────────────────────────
 	private DOCK_ALIASES: Record<string, () => void> = {};
@@ -70,10 +82,26 @@ export class OsApiClass implements OsApi {
 	// ── Initialization ────────────────────────────────────────────────────
 
 	async init(): Promise<void> {
+		// Arm the voice layer (gesture unlock + hidden-tab suspend) and the
+		// reactive visibility signal every window's lifecycle.hidden reads.
+		this.audio.init();
+		pageVisibility.start();
+
+		// Disk-full surfacing. persistence.ts can't import the alert system
+		// (cycle), so it reports quota failures through this callback — already
+		// gated to once per session inside persistence. Blob-file creation is the
+		// choke point for large writes, so watch it for capacity checks; the boot
+		// check below catches a disk that filled up while the tab was closed.
+		onPersistenceQuotaExceeded(() => this.showDiskFullAlert());
+		this.fsWatchCleanup = this.fs.watch((e) => {
+			if (e.operation === 'create_file' && !e.remote) void this.warnIfNearCapacity();
+		});
+		void this.warnIfNearCapacity();
+
 		// Load persisted state
 		this.tweaks = loadTweaks();
 		this.timezone = loadTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-		this.isMobile = window.innerWidth < 720;
+		this.isMobile = isViewportBlocked(readViewport());
 
 		// Fetch guide data from API
 		try {
@@ -115,23 +143,48 @@ export class OsApiClass implements OsApi {
 			this.openWindow(hash);
 		}
 
-		// Start clock
+		// Start clock. The 1s tick pauses while the tab is hidden and resyncs
+		// immediately on return, so the clock never shows a stale minute.
 		const initialNow = new SvelteDate();
 		this.lastSlotIdx = getSlotIndex(initialNow, this.timezone);
 		this.slotNow = initialNow;
 
-		this.tickInterval = setInterval(() => {
+		const tick = () => {
 			this.now = new SvelteDate();
 			const idx = getSlotIndex(this.now, this.timezone);
 			if (idx !== this.lastSlotIdx) {
 				this.lastSlotIdx = idx;
 				this.slotNow = this.now;
 			}
-		}, 1000);
+		};
+		const startTicking = () => {
+			if (this.tickInterval === undefined) this.tickInterval = setInterval(tick, 1000);
+		};
+		const stopTicking = () => {
+			if (this.tickInterval !== undefined) {
+				clearInterval(this.tickInterval);
+				this.tickInterval = undefined;
+			}
+		};
+		const handleVisibility = () => {
+			if (document.hidden) {
+				stopTicking();
+			} else {
+				tick();
+				startTicking();
+			}
+		};
+		if (!document.hidden) startTicking();
+		document.addEventListener('visibilitychange', handleVisibility);
+		this.visibilityCleanup = () =>
+			document.removeEventListener('visibilitychange', handleVisibility);
 
-		// Resize listener
+		// Resize listener. Re-evaluate the wall only while it's up: the gate can
+		// lift mid-session (a desktop window widened past the minimum) but never
+		// drops — rotating a tablet or summoning the on-screen keyboard shrinks
+		// the viewport and must not replace a running desktop with the wall.
 		const handleResize = () => {
-			this.isMobile = window.innerWidth < 720;
+			if (this.isMobile) this.isMobile = isViewportBlocked(readViewport());
 		};
 		window.addEventListener('resize', handleResize);
 		this.resizeCleanup = () => window.removeEventListener('resize', handleResize);
@@ -168,8 +221,12 @@ export class OsApiClass implements OsApi {
 
 	destroy(): void {
 		if (this.tickInterval) clearInterval(this.tickInterval);
+		this.visibilityCleanup?.();
 		this.resizeCleanup?.();
 		this.keydownCleanup?.();
+		this.fsWatchCleanup?.();
+		this.audio.destroy();
+		pageVisibility.stop();
 	}
 
 	// ── Dock aliases ──────────────────────────────────────────────────────
@@ -331,6 +388,9 @@ export class OsApiClass implements OsApi {
 	// ── Alert system ──────────────────────────────────────────────────────
 
 	showAlert(spec: AlertSpec): void {
+		// The system alert voice. Progress alerts (backup et al.) stay silent —
+		// they announce work, not a problem. Muting is handled by the audio layer.
+		if (!spec.progress) this.audio.error();
 		this.alertSpec = { ...spec, id: Math.random() };
 	}
 
@@ -340,6 +400,33 @@ export class OsApiClass implements OsApi {
 
 	alert(spec: AlertSpec): void {
 		this.showAlert(spec);
+	}
+
+	// ── Disk-full surfacing ───────────────────────────────────────────────
+
+	showDiskFullAlert(): void {
+		this.showAlert({
+			title: 'Disk Full',
+			body: 'Terminal HD is full. Your latest changes could not be written to disk and will be lost when this session ends. Empty the Trash or delete old recordings to free up space.',
+			buttons: [
+				{ label: 'Open Trash', action: () => this.openFolder(TRASH_ID) },
+				{ label: 'OK', primary: true }
+			]
+		});
+	}
+
+	private async warnIfNearCapacity(): Promise<void> {
+		const estimate = await estimateCapacity();
+		if (!estimate || !shouldWarnCapacity(estimate)) return;
+		const pct = Math.round(estimate.ratio * 100);
+		this.showAlert({
+			title: 'Disk Almost Full',
+			body: `Terminal HD is about ${pct}% full (browser storage estimate). Empty the Trash or delete old recordings before the disk fills up. System Maintenance shows the full breakdown.`,
+			buttons: [
+				{ label: 'Open Maintenance', action: () => this.openSystemMaintenance() },
+				{ label: 'OK', primary: true }
+			]
+		});
 	}
 
 	// ── Tweaks ────────────────────────────────────────────────────────────

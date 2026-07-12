@@ -3,14 +3,17 @@
 	import type { FsFile } from '$lib/terminalos';
 	import { RECORDINGS_ID } from '$lib/terminalos';
 	import { getAppContext } from '$lib/os/os-context';
+	import { estimateCapacity, isNearCapacity } from '$lib/os/capacity';
 	import { recorderState } from './recorder-state.svelte';
 
 	// Zero-prop: fs comes from the host context. The global "● REC" menu-bar badge
 	// is driven by recorderState (read through this app's statusExtra), set on
 	// start/stop/cleanup below — no bindable prop threaded through Desktop.
-	const { fs } = getAppContext();
+	const { os, fs } = getAppContext();
 
-	const MAX_DURATION = 60;
+	// Keep in sync with the Camera aboutSpec copy in
+	// src/lib/terminalos/apps/manifests.ts ("record up to 30 seconds").
+	const MAX_DURATION = 30;
 
 	let stream = $state<MediaStream | null>(null);
 	let recorder = $state<MediaRecorder | null>(null);
@@ -21,7 +24,6 @@
 	let playingId = $state<string | null>(null);
 	let error = $state<string | null>(null);
 	let videoEl: HTMLVideoElement | undefined = $state(undefined);
-	let playbackEl: HTMLVideoElement | undefined = $state(undefined);
 	let chunks: Blob[] = [];
 	let timerInterval: ReturnType<typeof setInterval> | null = null;
 	// Object URLs leak unless revoked. Track the live one so we can free it
@@ -77,6 +79,35 @@
 		}
 	}
 
+	async function saveClip(blob: Blob) {
+		const bytes = await blob.arrayBuffer();
+		let clipNumber = recordings.length + 1;
+		let name = `Clip ${clipNumber} (${elapsed}s).webm`;
+		while (fs.exists(RECORDINGS_ID, name)) {
+			clipNumber++;
+			name = `Clip ${clipNumber} (${elapsed}s).webm`;
+		}
+		const result = await fs.createBlobFile(RECORDINGS_ID, name, bytes, {
+			// Recorder is the creator; the system Player is the handler that
+			// opens the clip — so it stays playable even if Recorder (a store
+			// app) is uninstalled. The Player itself lands in the next slice.
+			appId: 'recorder',
+			opensWith: 'player',
+			fileType: 'recording',
+			contentType: blob.type
+		});
+		if (result.ok) {
+			refreshRecordings();
+			// Reuse the blob we already have rather than reading back from disk.
+			setPlayback(URL.createObjectURL(blob), result.value.id, true);
+		} else if (result.error.code === 'duplicate_name') {
+			error = 'A recording with that name already exists.';
+		} else {
+			error = 'Storage full — delete old recordings to free space.';
+			os.showDiskFullAlert();
+		}
+	}
+
 	function startRecording() {
 		if (!stream) return;
 
@@ -98,32 +129,22 @@
 
 		recorder.onstop = async () => {
 			const blob = new Blob(chunks, { type: recorder?.mimeType || 'video/webm' });
-			const bytes = await blob.arrayBuffer();
-			let clipNumber = recordings.length + 1;
-			let name = `Clip ${clipNumber} (${elapsed}s).webm`;
-			while (fs.exists(RECORDINGS_ID, name)) {
-				clipNumber++;
-				name = `Clip ${clipNumber} (${elapsed}s).webm`;
+			// Capacity guard: if writing this clip would push the browser's storage
+			// estimate over the warning line, let the user decide before the bytes
+			// hit disk. An actual quota failure still lands in saveClip's error path.
+			const estimate = await estimateCapacity();
+			if (isNearCapacity(estimate, blob.size)) {
+				os.alert({
+					title: 'Disk Almost Full',
+					body: 'Saving this clip will nearly fill Terminal HD. Delete old recordings or empty the Trash to free up space, or save it anyway.',
+					buttons: [
+						{ label: 'Discard Clip' },
+						{ label: 'Save Anyway', primary: true, action: () => void saveClip(blob) }
+					]
+				});
+				return;
 			}
-			const result = await fs.createBlobFile(RECORDINGS_ID, name, bytes, {
-				// Recorder is the creator; the system Player is the handler that
-				// opens the clip — so it stays playable even if Recorder (a store
-				// app) is uninstalled. The Player itself lands in the next slice.
-				appId: 'recorder',
-				opensWith: 'player',
-				fileType: 'recording',
-				contentType: blob.type
-			});
-			if (result.ok) {
-				refreshRecordings();
-				// Reuse the blob we already have rather than reading back from disk.
-				setPlayback(URL.createObjectURL(blob), result.value.id, true);
-			} else {
-				error =
-					result.error.code === 'duplicate_name'
-						? 'A recording with that name already exists.'
-						: 'Storage full — delete old recordings to free space.';
-			}
+			await saveClip(blob);
 		};
 
 		recorder.start(100);
@@ -217,7 +238,7 @@
 
 	<div class="preview-area">
 		{#if playbackUrl && !isRecording}
-			<video bind:this={playbackEl} class="video-playback" src={playbackUrl} controls autoplay>
+			<video class="video-playback" src={playbackUrl} controls autoplay>
 				<track kind="captions" />
 			</video>
 		{:else}

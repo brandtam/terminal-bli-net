@@ -26,7 +26,7 @@
 	import BootScreen from './BootScreen.svelte';
 	import { seedDefaultStickies } from '$lib/apps/stickies/stickies-manager.svelte';
 	import DesktopContextMenu from './DesktopContextMenu.svelte';
-	import { getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import { getAppIconKind, getAppIconSprite } from '$lib/terminalos/apps/app-install';
 	import { matchWindow } from '$lib/terminalos/apps/app-catalog';
 	import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 	import { openFilesystemNode } from '$lib/os/filesystem-open';
@@ -95,6 +95,18 @@
 			return 'doc';
 		}
 		return 'doc';
+	}
+
+	// App-supplied sprite (manifest iconSprite); wins over the kind in PixelIcon.
+	function desktopIconSprite(node: FsNode): string[] | undefined {
+		if (node.kind === 'alias') {
+			const target = resolveAliasSync(node);
+			return target ? desktopIconSprite(target) : undefined;
+		}
+		if (node.kind === 'file' && (node as FsFile).appId) {
+			return getAppIconSprite((node as FsFile).appId!);
+		}
+		return undefined;
 	}
 
 	let deskCtxNode = $state<FsNode | null>(null);
@@ -380,12 +392,13 @@
 			<p class="mobile-tagline">Previously on screens…</p>
 			<div class="mobile-body">
 				<p>
-					Terminal is a retro desktop OS that lives in a browser tab. It's built for screens wide
+					Terminal is a retro desktop OS that lives in a browser tab. It's built for screens big
 					enough to drag windows around on.
 				</p>
 				<p>
-					Open this on a laptop or desktop to get the full experience — menu bar, draggable windows,
-					a TV Guide, and characters you can chat with.
+					Open this on a laptop, a desktop, or a tablet (landscape is the sweet spot) to get the
+					full experience — menu bar, draggable windows, a TV Guide, and characters you can chat
+					with.
 				</p>
 			</div>
 			<div class="mobile-footer">terminal.bli.net · one tab, one desktop</div>
@@ -459,7 +472,7 @@
 							ondragstart={(e) => handleDesktopDragStart(e, node)}
 							ondragend={clearDropTarget}
 						>
-							<PixelIcon kind={desktopIconKind(node)} />
+							<PixelIcon kind={desktopIconKind(node)} sprite={desktopIconSprite(node)} />
 						</DesktopIcon>
 					{/each}
 					<DesktopIcon
@@ -639,6 +652,10 @@
 		cursor: default;
 		user-select: none;
 		font-family: var(--brand-font-ui, 'Pixelify Sans', sans-serif);
+		/* Disable double-tap zoom OS-wide so double taps reach the desktop as
+		   dblclicks without the browser's disambiguation delay. Panning stays
+		   allowed, so scrolling inside window bodies still works. */
+		touch-action: manipulation;
 	}
 	.desktop.drop-active::after {
 		content: '';

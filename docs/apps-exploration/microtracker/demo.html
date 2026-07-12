@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MicroTracker — 4-channel chiptune tracker (demo)</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: #07080c;
+    color: #e8e6d0;
+    font: 13px/1.4 ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; cursor: pointer; }
+
+  .top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 16px; background: #131722; border-bottom: 1px solid #232a3a;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 2px; }
+  .logo .glyph {
+    width: 22px; height: 22px; display: grid; place-items: center;
+    background: #5ad7e0; color: #07080c; font-size: 14px;
+  }
+  .logo .sub { color: #6b7487; font-weight: 400; letter-spacing: 1px; font-size: 11px; }
+  .top a { color: #5ad7e0; text-decoration: none; letter-spacing: 1px; font-size: 12px; }
+  .top a:hover { text-decoration: underline; }
+
+  .wrap { max-width: 860px; margin: 20px auto 40px; padding: 0 14px; }
+
+  .transport {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    background: #131722; border: 1px solid #232a3a; padding: 12px 14px;
+  }
+  .bigbtn {
+    background: #124a2b; border: 1px solid #2ecc71; color: #b8f5cf;
+    padding: 12px 22px; font-weight: 700; letter-spacing: 2px; font-size: 14px;
+  }
+  .bigbtn:hover { background: #17603a; }
+  .bigbtn.playing { background: #55131a; border-color: #ff5d5d; color: #ffc9c9; }
+  .bigbtn.playing:hover { background: #6e1a23; }
+  .tbtn {
+    background: #1a2030; border: 1px solid #2c3650; color: #9aa5bd;
+    padding: 6px 12px; letter-spacing: 1px; font-size: 11px;
+  }
+  .tbtn:hover { border-color: #5ad7e0; color: #cfe9ec; }
+  .bpm { display: flex; align-items: center; gap: 8px; color: #9aa5bd; font-size: 11px; letter-spacing: 1px; }
+  .bpm input[type=range] { width: 110px; accent-color: #5ad7e0; }
+  .bpm .val { color: #ffb347; font-weight: 700; font-size: 13px; min-width: 3ch; }
+  .oct { color: #6b7487; font-size: 11px; letter-spacing: 1px; margin-left: auto; }
+  .oct b { color: #5ad7e0; }
+
+  .chead { display: flex; margin-top: 14px; }
+  .chead .rnh { width: 44px; }
+  .chead .ch {
+    flex: 1; position: relative; padding: 6px 34px 7px 10px; border: 1px solid #232a3a; border-bottom: none;
+    background: #131722; cursor: pointer; user-select: none; transition: opacity .15s;
+  }
+  .knob {
+    position: absolute; right: 6px; top: 50%; margin-top: -11px;
+    width: 22px; height: 22px; cursor: ns-resize; touch-action: none;
+  }
+  .knob circle { fill: #1a2030; stroke: #2c3650; }
+  .knob:hover circle { stroke: #5ad7e0; }
+  .knob line { stroke: #5ad7e0; stroke-width: 2; stroke-linecap: round; }
+  .chead .ch + .ch { border-left: none; }
+  .chead .ch .nm {
+    font-size: 11px; letter-spacing: 1px; color: #9aa5bd;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .chead .ch .nm b { color: #e8e6d0; }
+  .chead .ch.mut { opacity: .35; }
+  .chead .ch.mut .nm::after { content: " · MUTE"; color: #ff5d5d; }
+  .meter { height: 6px; background: #0b0d12; border: 1px solid #232a3a; margin-top: 5px; }
+  .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2ecc71 60%, #ffb347); }
+
+  .gridwrap {
+    position: relative; height: 352px; overflow: hidden;
+    background: #0b0d12; border: 1px solid #232a3a;
+  }
+  .gridwrap::after { /* faint scanlines */
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+  }
+  .playbar {
+    position: absolute; left: 0; right: 0; height: 22px; top: calc(50% - 11px);
+    background: rgba(90,167,255,.13);
+    border-top: 1px solid #3a5a8a; border-bottom: 1px solid #3a5a8a;
+    pointer-events: none; z-index: 2;
+  }
+  .grid { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
+  .row { display: flex; height: 22px; }
+  .row:nth-child(4n+1)  { background: #0e1118; }
+  .row:nth-child(16n+1) { background: #141a28; }
+  .row.play { background: #1c2c47; }
+  .row.play .nt, .row.play .rn, .row.play .vl, .row.play .fx, .row.play .fxp { color: #fff; }
+  .rn {
+    width: 44px; text-align: center; color: #5ad7e0; opacity: .65;
+    line-height: 22px; user-select: none;
+  }
+  .row:nth-child(4n+1) .rn { opacity: 1; }
+  .cell {
+    flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px;
+    border-left: 1px solid #1c2230; cursor: pointer;
+  }
+  .nt, .vl, .fx, .fxp { padding: 0 2px; }
+  .nt { color: #e8e6d0; letter-spacing: 1px; }
+  .vl { color: #ffb347; }
+  .fx, .fxp { color: #9a8cff; opacity: .85; }
+  .fxp { margin-left: -6px; } /* fx digit + param read as one 3-char group */
+  .nt.off, .vl.off, .fx.off, .fxp.off { color: #333a4a; opacity: 1; }
+  .cell.cur { background: #14161f; }
+  .cell.cur .cur-sub { outline: 1px solid #ffb347; outline-offset: -1px; background: #1e1a10; }
+
+  .legend {
+    margin-top: 12px; color: #6b7487; font-size: 11px; letter-spacing: .5px;
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+  }
+  .legend b { color: #9aa5bd; font-weight: 400; background: #1a2030; padding: 1px 6px; border: 1px solid #2c3650; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="logo">
+    <span class="glyph">&#9834;</span>
+    <span>MICROTRACKER</span>
+    <span class="sub">4-CH CHIPTUNE TRACKER &middot; TERMINALOS CONCEPT DEMO</span>
+  </div>
+  <a href="../index.html">&larr; BACK TO APPS</a>
+</div>
+
+<div class="wrap">
+  <div class="transport">
+    <button class="bigbtn" id="playBtn">&#9654; PLAY DEMO SONG</button>
+    <div class="bpm">
+      BPM <input type="range" id="bpmSlider" min="60" max="240" step="1" value="140">
+      <span class="val" id="bpmVal">140</span>
+    </div>
+    <button class="tbtn" id="demoBtn">LOAD DEMO</button>
+    <button class="tbtn" id="clearBtn">CLEAR</button>
+    <span class="oct">OCTAVE <b>4</b> &middot; PATTERN 00 &middot; <span id="rowsLabel">64 ROWS</span></span>
+  </div>
+
+  <div class="chead">
+    <div class="rnh"></div>
+    <div class="ch" data-ch="0"><div class="nm">01 &middot; <b>PULSE A</b> &middot; LEAD</div><div class="meter"><i></i></div><svg class="knob" viewBox="0 0 24 24"><title></title><circle cx="12" cy="12" r="9"/><line x1="12" y1="12" x2="12" y2="4.5"/></svg></div>
+    <div class="ch" data-ch="1"><div class="nm">02 &middot; <b>PULSE B</b> &middot; ARP</div><div class="meter"><i></i></div><svg class="knob" viewBox="0 0 24 24"><title></title><circle cx="12" cy="12" r="9"/><line x1="12" y1="12" x2="12" y2="4.5"/></svg></div>
+    <div class="ch" data-ch="2"><div class="nm">03 &middot; <b>TRIANGLE</b> &middot; BASS</div><div class="meter"><i></i></div><svg class="knob" viewBox="0 0 24 24"><title></title><circle cx="12" cy="12" r="9"/><line x1="12" y1="12" x2="12" y2="4.5"/></svg></div>
+    <div class="ch" data-ch="3"><div class="nm">04 &middot; <b>NOISE</b> &middot; DRUMS</div><div class="meter"><i></i></div><svg class="knob" viewBox="0 0 24 24"><title></title><circle cx="12" cy="12" r="9"/><line x1="12" y1="12" x2="12" y2="4.5"/></svg></div>
+  </div>
+
+  <div class="gridwrap" id="gridwrap">
+    <div class="playbar"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="legend">
+    <span><b>SPACE</b> play / stop</span>
+    <span><b>CLICK</b> select cell</span>
+    <span><b>ARROWS</b> move</span>
+    <span><b>Z&ndash;M</b> piano oct 4</span>
+    <span><b>Q&ndash;P</b> piano oct 5</span>
+    <span><b>DEL</b> clear cell</span>
+    <span><b>+ / &minus;</b> volume</span>
+    <span><b>0&ndash;F</b> hex in vol / fx / param</span>
+    <span><b>TAB</b> next channel</span>
+    <span>drums: <b>Z</b> kick <b>V</b> snare <b>J</b> hat</span>
+    <span>click channel name to mute</span>
+    <span>drag knob for channel level &middot; double-click resets</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================ *
+ *  MicroTracker demo — 4-channel WebAudio chiptune tracker.
+ *  Pure synthesis: 2x pulse (PeriodicWave), triangle, noise.
+ *  Lookahead scheduler: 25ms timer, 120ms horizon, all event
+ *  times in the AudioContext clock domain (zero drift).
+ * ============================================================ */
+
+let ROWS = 64; // pattern length; local songs may resize via setRows()
+const CHS = 4, ROW_H = 22;
+const NOTE_NAMES = ['C-','C#','D-','D#','E-','F-','F#','G-','G#','A-','A#','B-'];
+
+/* note string 'A-4' / 'G#5' -> semitone index (C-0 = 0, A-4 = 57) */
+function nn(s) {
+  const pc = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 }[s[0]] + (s[1] === '#' ? 1 : 0);
+  return (+s[2]) * 12 + pc;
+}
+const freqOf = (n) => 440 * Math.pow(2, (n - 57) / 12);
+function noteLabel(ch, n) {
+  if (ch === 3) return n < 36 ? 'KCK' : n < 60 ? 'SNR' : 'HAT';
+  return NOTE_NAMES[n % 12] + Math.floor(n / 12);
+}
+
+/* ---------------- pattern model ---------------- */
+/* pattern[ch][row] = null | { n, v, fx, fxp }
+   n   semitone index, or null (effect-only cell)
+   v   volume 0..15, or null (note plays at the channel's running volume)
+   fx  effect digit 0..15, fxp param 0..255 — fx 0 + fxp 0 means no effect.
+   Effects: 0xy arpeggio · 1xx slide up · 2xx slide down · Cxx set volume. */
+let pattern = Array.from({ length: CHS }, () => new Array(ROWS).fill(null));
+const muted = [false, false, false, false];
+
+function put(ch, row, note, vol, fx, fxp) {
+  pattern[ch][row] = { n: nn(note), v: vol ?? null, fx: fx || 0, fxp: fxp || 0 };
+}
+
+/* ---------------- the demo song ----------------
+ * "NIGHT DRIVE 87" — A minor, 140 BPM, 4 bars (Am / F / Dm / E). */
+function loadDemoSong() {
+  pattern = Array.from({ length: CHS }, () => new Array(ROWS).fill(null));
+
+  // CH1 pulse lead (vol 12)
+  [[0,'A-4'],[2,'C-5'],[4,'E-5'],[7,'D-5'],[8,'C-5'],[10,'D-5'],[12,'E-5'],
+   [16,'F-5'],[18,'E-5'],[20,'C-5'],[22,'A-4'],[24,'C-5'],[26,'D-5'],[28,'C-5'],[30,'A-4'],
+   [32,'D-5'],[34,'F-5'],[36,'A-5'],[39,'G-5'],[40,'F-5'],[42,'E-5'],[44,'D-5'],[46,'E-5'],
+   [48,'G#5'],[50,'E-5'],[52,'B-4'],[54,'E-5'],[56,'D-5'],[58,'C-5'],[60,'B-4'],[62,'G#4']
+  ].forEach(([r, s]) => put(0, r, s, 12));
+
+  // CH2 pulse arp, 8th-note chord cycle (vol 8)
+  const arp = [
+    ['A-3','C-4','E-4','C-4'], ['F-3','A-3','C-4','A-3'],
+    ['D-3','F-3','A-3','F-3'], ['E-3','G#3','B-3','G#3']
+  ];
+  for (let bar = 0; bar < 4; bar++)
+    for (let i = 0; i < 8; i++) {
+      const note = (bar === 3 && i === 7) ? 'D-4' : arp[bar][i % 4]; // last step leans home
+      put(1, bar * 16 + i * 2, note, 8);
+    }
+
+  // CH3 triangle bass, pumping octaves with walkdowns (vol 14)
+  [[0,'A-2'],[2,'A-3'],[4,'A-2'],[6,'A-3'],[8,'A-2'],[10,'A-3'],[12,'A-2'],[14,'G-2'],
+   [16,'F-2'],[18,'F-3'],[20,'F-2'],[22,'F-3'],[24,'F-2'],[26,'F-3'],[28,'F-2'],[30,'E-2'],
+   [32,'D-2'],[34,'D-3'],[36,'D-2'],[38,'D-3'],[40,'D-2'],[42,'D-3'],[44,'D-2'],[46,'D-3'],
+   [48,'E-2'],[50,'E-3'],[52,'E-2'],[54,'E-3'],[56,'E-2'],[58,'E-3'],[60,'E-2'],[62,'G#2']
+  ].forEach(([r, s]) => put(2, r, s, 14));
+
+  // CH4 noise drums: kick C-2, snare C-4, hat C-6
+  const K = 'C-2', S = 'C-4', H = 'C-6';
+  for (const bar of [0, 16, 32]) {
+    [[0,K,14],[2,H,6],[4,S,12],[6,H,6],[8,K,14],[10,H,6],[11,K,10],[12,S,12],[14,H,6]]
+      .forEach(([r, s, v]) => put(3, bar + r, s, v));
+  }
+  // bar 4: groove + snare roll into the loop
+  [[48,K,14],[50,H,6],[52,S,12],[54,H,6],[56,K,14],[58,H,6],
+   [60,S,8],[61,S,10],[62,S,12],[63,S,14]]
+    .forEach(([r, s, v]) => put(3, r, s, v));
+}
+
+/* ---------------- audio engine ---------------- */
+let ctx = null, voices = null, levelNodes = null;
+const chLevel = [1, 1, 1, 1]; // knob values; applied to levelNodes when audio exists
+let bpm = 140;
+const rowDur = () => 60 / (bpm * 4); // 4 rows per beat: each row is a 16th
+
+function makePulseWave(duty) {
+  const N = 32, re = new Float32Array(N), im = new Float32Array(N);
+  for (let i = 1; i < N; i++) im[i] = (2 / (i * Math.PI)) * Math.sin(Math.PI * i * duty);
+  return ctx.createPeriodicWave(re, im);
+}
+
+/* persistent oscillator voice; retriggered via envelopes, never rebuilt */
+function oscVoice(out, waveOrType, base, sustain, tau) {
+  const o = ctx.createOscillator();
+  if (typeof waveOrType === 'string') o.type = waveOrType;
+  else o.setPeriodicWave(waveOrType);
+  const g = ctx.createGain();
+  g.gain.value = 0;
+  o.connect(g); g.connect(out); o.start();
+  return {
+    g,
+    f: o.frequency, // exposed for the effect column: arp retunes, slide ramps
+    trigger(t, n, v) {
+      const a = (v / 15) * base;
+      o.frequency.setValueAtTime(freqOf(n), t);
+      // 5ms fade of whatever is still ringing, then attack — no step click
+      g.gain.cancelScheduledValues(t);
+      g.gain.setTargetAtTime(0, t, 0.0015);
+      g.gain.setValueAtTime(0, t + 0.005);
+      g.gain.linearRampToValueAtTime(a, t + 0.009);
+      g.gain.setTargetAtTime(a * sustain, t + 0.035, tau);
+    }
+  };
+}
+
+/* looping white-noise source; playbackRate + envelope shape kick/snare/hat */
+function noiseVoice(out, base) {
+  const len = ctx.sampleRate;
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  const g = ctx.createGain();
+  g.gain.value = 0;
+  src.connect(g); g.connect(out); src.start();
+  const r = src.playbackRate;
+  return {
+    g,
+    trigger(t, n, v) {
+      const a = (v / 15) * base;
+      g.gain.cancelScheduledValues(t);
+      r.cancelScheduledValues(t);
+      if (n < 36) {          // kick: dark noise with a fast pitch drop
+        r.setValueAtTime(0.8, t);
+        r.exponentialRampToValueAtTime(0.12, t + 0.06);
+        g.gain.setValueAtTime(Math.min(1, a * 1.4), t);
+        g.gain.setTargetAtTime(0, t + 0.005, 0.055);
+      } else if (n < 60) {   // snare
+        r.setValueAtTime(0.95, t);
+        g.gain.setValueAtTime(a, t);
+        g.gain.setTargetAtTime(0, t + 0.003, 0.07);
+      } else {               // hat
+        r.setValueAtTime(2.5, t);
+        g.gain.setValueAtTime(a * 0.8, t);
+        g.gain.setTargetAtTime(0, t + 0.002, 0.02);
+      }
+    }
+  };
+}
+
+function ensureAudio() {
+  if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const comp = ctx.createDynamicsCompressor();
+  const master = ctx.createGain();
+  master.gain.value = 0.85;
+  master.connect(comp); comp.connect(ctx.destination);
+  // one level stage per channel — the header knob turns this gain, live
+  levelNodes = chLevel.map((lv) => {
+    const g = ctx.createGain();
+    g.gain.value = lv;
+    g.connect(master);
+    return g;
+  });
+  voices = [
+    oscVoice(levelNodes[0], makePulseWave(0.5), 0.20, 0.45, 0.20), // lead: sustains to next note
+    oscVoice(levelNodes[1], makePulseWave(0.25), 0.12, 0, 0.06),   // arp: short stab
+    oscVoice(levelNodes[2], 'triangle', 0.34, 0, 0.13),            // bass: pluck
+    noiseVoice(levelNodes[3], 0.18)
+  ];
+}
+
+/* ---------------- lookahead scheduler ---------------- */
+const LOOKAHEAD = 0.12, TICK_MS = 25;
+let playing = false, playRow = 0, nextTime = 0, timer = null;
+let uiQ = []; // {t,row} playhead events + {t,ch,lv} trigger events, in schedule order
+
+/* per-channel playback state: last triggered note (arp on effect-only cells),
+   shadow of the oscillator frequency (slides chain across rows — the real
+   AudioParam can't be read at schedule time), and the running volume (Cxx) */
+const chState = [];
+function resetChState() {
+  for (let c = 0; c < CHS; c++) chState[c] = { lastN: null, freq: null, vol: CH_DEFAULT_VOL[c] };
+}
+
+function scheduleRow(row, t) {
+  const d = rowDur();
+  for (let c = 0; c < CHS; c++) {
+    if (muted[c]) continue;
+    const cell = pattern[c][row];
+    if (!cell) continue;
+    const st = chState[c], voice = voices[c];
+    const { fx, fxp } = cell;
+    if (fx === 0xC) st.vol = Math.round(Math.min(fxp, 0x3F) * 15 / 0x3F);
+    if (cell.n !== null) {
+      const v = cell.v !== null ? cell.v : st.vol; // the cell's own volume digit wins for its row
+      voice.trigger(t, cell.n, v);
+      st.lastN = cell.n;
+      st.freq = freqOf(cell.n);
+      uiQ.push({ t, ch: c, lv: v / 15 });
+    }
+    if (c === 3) continue; // noise: only Cxx applies, pitch effects are ignored
+    if (fx === 0 && fxp !== 0) {
+      // 0xy arpeggio: base, base+x, base+y at t, t+d/3, t+2d/3
+      const base = cell.n !== null ? cell.n : st.lastN;
+      if (base !== null) {
+        voice.f.setValueAtTime(freqOf(base), t);
+        voice.f.setValueAtTime(freqOf(base + (fxp >> 4)), t + d / 3);
+        voice.f.setValueAtTime(freqOf(base + (fxp & 15)), t + 2 * d / 3);
+        st.freq = freqOf(base + (fxp & 15));
+      }
+    } else if ((fx === 1 || fx === 2) && fxp !== 0 && st.freq !== null) {
+      // 1xx/2xx slide: xx sixteenths of a semitone over the row, chains across rows
+      const target = Math.max(16, Math.min(12000,
+        st.freq * Math.pow(2, (fx === 1 ? fxp : -fxp) / (16 * 12))));
+      voice.f.setValueAtTime(st.freq, t);
+      voice.f.exponentialRampToValueAtTime(target, t + d);
+      st.freq = target;
+    }
+  }
+  uiQ.push({ t, row });
+}
+
+function pump() {
+  // schedule every row that starts inside the horizon; times accumulate in
+  // the audio clock, so a late timer tick never causes drift.
+  while (nextTime < ctx.currentTime + LOOKAHEAD) {
+    scheduleRow(playRow, nextTime);
+    nextTime += rowDur();
+    playRow = (playRow + 1) % ROWS;
+  }
+}
+
+function play() {
+  ensureAudio();
+  playing = true;
+  playRow = 0;
+  nextTime = ctx.currentTime + 0.08;
+  resetChState();
+  uiQ.length = 0;
+  pump();
+  timer = setInterval(pump, TICK_MS);
+  playBtn.classList.add('playing');
+  playBtn.innerHTML = '&#9632; STOP';
+}
+
+function stop() {
+  playing = false;
+  if (timer) { clearInterval(timer); timer = null; }
+  if (ctx) {
+    const now = ctx.currentTime;
+    for (const v of voices) {
+      v.g.gain.cancelScheduledValues(now);
+      v.g.gain.setTargetAtTime(0, now, 0.03);
+      if (v.f) v.f.cancelScheduledValues(now); // drop pending arp retunes / slide ramps
+    }
+  }
+  uiQ.length = 0;
+  meters.fill(0);
+  setPlayRowEl(-1);
+  setView(cursor.row);
+  playBtn.classList.remove('playing');
+  playBtn.innerHTML = demoLoaded ? '&#9654; PLAY DEMO SONG' : '&#9654; PLAY';
+}
+
+/* ---------------- grid UI ---------------- */
+const grid = document.getElementById('grid');
+const gridwrap = document.getElementById('gridwrap');
+const playBtn = document.getElementById('playBtn');
+const meters = new Float32Array(CHS);
+const meterEls = [...document.querySelectorAll('.chead .meter i')];
+const headEls = [...document.querySelectorAll('.chead .ch')];
+const cellEls = [];  // [ch][row] -> {nt, vl, fx, fxp, el}
+const rowEls = [];
+const SUBS = 4;      // sub-columns: 0 note · 1 vol · 2 fx · 3 param
+let cursor = { row: 0, ch: 0, sub: 0 };
+let curPlayEl = null;
+let demoLoaded = true;
+
+function buildGrid() {
+  let html = '';
+  for (let r = 0; r < ROWS; r++) {
+    html += `<div class="row"><span class="rn">${r.toString(16).toUpperCase().padStart(2, '0')}</span>`;
+    for (let c = 0; c < CHS; c++)
+      html += `<span class="cell" data-r="${r}" data-c="${c}"><span class="nt off">&middot;&middot;&middot;</span><span class="vl off">&middot;</span><span class="fx off">&middot;</span><span class="fxp off">&middot;&middot;</span></span>`;
+    html += '</div>';
+  }
+  grid.innerHTML = html;
+  cellEls.length = 0; rowEls.length = 0; curPlayEl = null;
+  for (let c = 0; c < CHS; c++) cellEls.push(new Array(ROWS));
+  grid.querySelectorAll('.row').forEach((el) => rowEls.push(el));
+  grid.querySelectorAll('.cell').forEach((el) => {
+    const r = +el.dataset.r, c = +el.dataset.c;
+    cellEls[c][r] = { nt: el.children[0], vl: el.children[1], fx: el.children[2], fxp: el.children[3], el };
+  });
+}
+
+/* resize the pattern (and grid) — clears all cells */
+function setRows(n) {
+  if (playing) stop();
+  ROWS = n;
+  pattern = Array.from({ length: CHS }, () => new Array(ROWS).fill(null));
+  buildGrid();
+  updateAllCells();
+  document.getElementById('rowsLabel').textContent = ROWS + ' ROWS';
+  cursor = { row: 0, ch: 0, sub: 0 };
+  drawCursor(true);
+  setView(0);
+}
+
+function updateCell(ch, row) {
+  const cell = pattern[ch][row], e = cellEls[ch][row];
+  const hasN = !!cell && cell.n !== null;
+  const hasV = !!cell && cell.v !== null;
+  const hasFx = !!cell && (cell.fx !== 0 || cell.fxp !== 0);
+  if (hasN) e.nt.textContent = noteLabel(ch, cell.n);
+  else e.nt.innerHTML = '&middot;&middot;&middot;';
+  if (hasV) e.vl.textContent = cell.v.toString(16).toUpperCase();
+  else e.vl.innerHTML = '&middot;';
+  if (hasFx) {
+    e.fx.textContent = cell.fx.toString(16).toUpperCase();
+    e.fxp.textContent = cell.fxp.toString(16).toUpperCase().padStart(2, '0');
+  } else {
+    e.fx.innerHTML = '&middot;';
+    e.fxp.innerHTML = '&middot;&middot;';
+  }
+  e.nt.classList.toggle('off', !hasN);
+  e.vl.classList.toggle('off', !hasV);
+  e.fx.classList.toggle('off', !hasFx);
+  e.fxp.classList.toggle('off', !hasFx);
+}
+function updateAllCells() {
+  for (let c = 0; c < CHS; c++) for (let r = 0; r < ROWS; r++) updateCell(c, r);
+}
+
+function setView(row) {
+  const center = gridwrap.clientHeight / 2 - ROW_H / 2;
+  grid.style.transform = `translateY(${center - row * ROW_H}px)`;
+}
+
+function setPlayRowEl(row) {
+  if (curPlayEl) curPlayEl.classList.remove('play');
+  curPlayEl = row >= 0 ? rowEls[row] : null;
+  if (curPlayEl) curPlayEl.classList.add('play');
+}
+
+function drawCursor(on) {
+  const e = cellEls[cursor.ch][cursor.row];
+  e.el.classList.toggle('cur', on);
+  [e.nt, e.vl, e.fx, e.fxp][cursor.sub].classList.toggle('cur-sub', on);
+}
+
+function setCursor(row, ch, sub = cursor.sub) {
+  drawCursor(false);
+  cursor = {
+    row: (row + ROWS) % ROWS,
+    ch: Math.max(0, Math.min(CHS - 1, ch)),
+    sub: Math.max(0, Math.min(SUBS - 1, sub))
+  };
+  drawCursor(true);
+  if (!playing) setView(cursor.row);
+}
+
+/* rAF loop: drain due UI events, decay meters — display follows the audio clock */
+function frame() {
+  if (playing && ctx) {
+    const now = ctx.currentTime;
+    while (uiQ.length && uiQ[0].t <= now) {
+      const e = uiQ.shift();
+      if (e.row !== undefined) { setPlayRowEl(e.row); setView(e.row); }
+      else meters[e.ch] = Math.max(meters[e.ch], 0.3 + 0.7 * e.lv);
+    }
+  }
+  for (let c = 0; c < CHS; c++) {
+    meters[c] *= 0.90;
+    if (meters[c] < 0.01) meters[c] = 0;
+    meterEls[c].style.width = (meters[c] * 100).toFixed(1) + '%';
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- input ---------------- */
+/* FT2-style piano: Z-row = octave 4, Q-row = octave 5+ (semitone offsets from C-4) */
+const KEYMAP = {
+  z:0, s:1, x:2, d:3, c:4, v:5, g:6, b:7, h:8, n:9, j:10, m:11,
+  q:12, '2':13, w:14, '3':15, e:16, r:17, '5':18, t:19, '6':20, y:21, '7':22, u:23,
+  i:24, '9':25, o:26, '0':27, p:28
+};
+const BASE_NOTE = 48; // C-4
+const CH_DEFAULT_VOL = [12, 8, 14, 12];
+
+function placeNote(offset) {
+  const ch = cursor.ch;
+  let n, v;
+  if (ch === 3) { // noise: pitch class picks the drum; each drum keeps its own level
+    const pc = offset % 12;
+    if (pc < 5)      { n = nn('C-2'); v = 14; } // kick
+    else if (pc < 9) { n = nn('C-4'); v = 12; } // snare
+    else             { n = nn('C-6'); v = 6;  } // hat
+  } else {
+    n = BASE_NOTE + offset;
+    v = null; // vol column stays empty: the note plays at the running volume (Cxx)
+  }
+  const prev = pattern[ch][cursor.row]; // keep any effect already in the cell
+  pattern[ch][cursor.row] = { n, v, fx: prev ? prev.fx : 0, fxp: prev ? prev.fxp : 0 };
+  updateCell(ch, cursor.row);
+  demoLoaded = false;
+  ensureAudio(); // keydown is a user gesture: preview is allowed
+  const pv = v ?? CH_DEFAULT_VOL[ch];
+  voices[ch].trigger(ctx.currentTime + 0.01, n, pv);
+  meters[ch] = Math.max(meters[ch], 0.3 + 0.7 * pv / 15);
+  setCursor(cursor.row + 1, ch); // edit step 1
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); playing ? stop() : play(); return; }
+  if (e.key === 'Tab') { // jump a whole channel, landing on its note sub-column
+    e.preventDefault();
+    setCursor(cursor.row, (cursor.ch + (e.shiftKey ? CHS - 1 : 1)) % CHS, 0);
+    return;
+  }
+  switch (e.key) {
+    case 'ArrowUp':    e.preventDefault(); setCursor(cursor.row - 1, cursor.ch); return;
+    case 'ArrowDown':  e.preventDefault(); setCursor(cursor.row + 1, cursor.ch); return;
+    case 'ArrowLeft':
+      e.preventDefault();
+      if (cursor.sub > 0) setCursor(cursor.row, cursor.ch, cursor.sub - 1);
+      else if (cursor.ch > 0) setCursor(cursor.row, cursor.ch - 1, SUBS - 1);
+      return;
+    case 'ArrowRight':
+      e.preventDefault();
+      if (cursor.sub < SUBS - 1) setCursor(cursor.row, cursor.ch, cursor.sub + 1);
+      else if (cursor.ch < CHS - 1) setCursor(cursor.row, cursor.ch + 1, 0);
+      return;
+    case 'Delete': case 'Backspace':
+      e.preventDefault();
+      pattern[cursor.ch][cursor.row] = null;
+      updateCell(cursor.ch, cursor.row);
+      demoLoaded = false;
+      setCursor(cursor.row + 1, cursor.ch);
+      return;
+    case '+': case '=': case '-': case '_': {
+      const cell = pattern[cursor.ch][cursor.row];
+      if (cell) {
+        const d = (e.key === '+' || e.key === '=') ? 1 : -1;
+        cell.v = Math.max(0, Math.min(15, (cell.v ?? CH_DEFAULT_VOL[cursor.ch]) + d));
+        updateCell(cursor.ch, cursor.row);
+        demoLoaded = false;
+      }
+      return;
+    }
+  }
+  if (cursor.sub > 0) { // vol / fx / param sub-columns take hex digits
+    if (/^[0-9a-fA-F]$/.test(e.key)) {
+      e.preventDefault();
+      const d = parseInt(e.key, 16);
+      const cell = pattern[cursor.ch][cursor.row] ??
+        (pattern[cursor.ch][cursor.row] = { n: null, v: null, fx: 0, fxp: 0 });
+      if (cursor.sub === 1) cell.v = d;
+      else if (cursor.sub === 2) cell.fx = d;
+      else cell.fxp = ((cell.fxp << 4) | d) & 0xFF; // two digits shift in
+      updateCell(cursor.ch, cursor.row);
+      demoLoaded = false;
+    }
+    return; // piano keys only place notes from the note sub-column
+  }
+  const off = KEYMAP[e.key.toLowerCase()];
+  if (off !== undefined) { e.preventDefault(); placeNote(off); }
+});
+
+grid.addEventListener('mousedown', (e) => {
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const sub = ['nt', 'vl', 'fx', 'fxp'].findIndex((k) => e.target.classList.contains(k));
+  setCursor(+cell.dataset.r, +cell.dataset.c, sub >= 0 ? sub : 0);
+});
+
+gridwrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (!playing) setCursor(cursor.row + Math.sign(e.deltaY), cursor.ch);
+}, { passive: false });
+
+headEls.forEach((el) => el.addEventListener('click', () => {
+  const c = +el.dataset.ch;
+  muted[c] = !muted[c];
+  el.classList.toggle('mut', muted[c]);
+  if (muted[c] && ctx) { // silence the ringing envelope; a sustaining lead would ring forever
+    const now = ctx.currentTime;
+    voices[c].g.gain.cancelScheduledValues(now);
+    voices[c].g.gain.setTargetAtTime(0, now, 0.03);
+    meters[c] = 0;
+  }
+}));
+
+/* channel level knobs: drag up/down to turn, double-click resets to 100% */
+const LVL_MAX = 1.5;
+const knobEls = [...document.querySelectorAll('.chead .knob')];
+
+function drawKnob(c) {
+  const angle = -135 + (chLevel[c] / LVL_MAX) * 270;
+  knobEls[c].querySelector('line').setAttribute('transform', `rotate(${angle} 12 12)`);
+  knobEls[c].querySelector('title').textContent = `LEVEL ${Math.round(chLevel[c] * 100)}%`;
+}
+
+function setLevel(c, v) {
+  chLevel[c] = Math.max(0, Math.min(LVL_MAX, v));
+  if (levelNodes) levelNodes[c].gain.setTargetAtTime(chLevel[c], ctx.currentTime, 0.02);
+  drawKnob(c);
+}
+
+knobEls.forEach((k, c) => {
+  let startY = 0, startLv = 0;
+  k.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    k.setPointerCapture(e.pointerId);
+    startY = e.clientY; startLv = chLevel[c];
+  });
+  k.addEventListener('pointermove', (e) => {
+    if (!k.hasPointerCapture(e.pointerId)) return;
+    setLevel(c, startLv + (startY - e.clientY) * (LVL_MAX / 150)); // 150px of drag = full range
+  });
+  k.addEventListener('click', (e) => e.stopPropagation()); // the knob is not a mute click
+  k.addEventListener('dblclick', (e) => { e.stopPropagation(); setLevel(c, 1); });
+  drawKnob(c);
+});
+
+playBtn.addEventListener('click', function () { this.blur(); playing ? stop() : play(); });
+
+document.getElementById('demoBtn').addEventListener('click', function () {
+  this.blur();
+  if (ROWS !== 64) setRows(64);
+  loadDemoSong();
+  updateAllCells();
+  demoLoaded = true;
+  if (!playing) playBtn.innerHTML = '&#9654; PLAY DEMO SONG';
+});
+
+document.getElementById('clearBtn').addEventListener('click', function () {
+  this.blur();
+  setRows(64);
+  demoLoaded = false;
+  if (!playing) playBtn.innerHTML = '&#9654; PLAY';
+});
+
+const bpmSlider = document.getElementById('bpmSlider');
+bpmSlider.addEventListener('input', () => {
+  bpm = +bpmSlider.value; // applies on the next scheduled row — no reset, no glitch
+  document.getElementById('bpmVal').textContent = bpm;
+});
+
+window.addEventListener('resize', () => setView(playing && curPlayEl ? rowEls.indexOf(curPlayEl) : cursor.row));
+
+/* ---------------- boot ---------------- */
+loadDemoSong();
+buildGrid();
+updateAllCells();
+setCursor(0, 0);
+setView(0);
+requestAnimationFrame(frame);
+
+/* ---------------- local songs (optional, never shipped) ----------------
+ * Personal song data can live in a local-songs.js next to this file; that
+ * file is gitignored, so it never lands in the repo or on a public host.
+ * Format:
+ *   window.LOCAL_SONGS = [{ name: 'MY SONG', bpm: 150, rows: 64, tracks: [t0,t1,t2,t3] }]
+ * where each track is [[row, 'E-5', vol, fx?, fxParam?], …] for channels
+ * 0 pulse lead · 1 pulse arp · 2 triangle bass · 3 noise (C-2 kick, C-4 snare, C-6 hat).
+ * fx/fxParam are the optional effect column (0xy arp, 1xx/2xx slide, Cxx volume).
+ * rows (16..1024, default 64) resizes the pattern — full songs welcome. */
+function loadLocalSong(song) {
+  setRows(Math.max(16, Math.min(1024, song.rows || 64)));
+  song.tracks.forEach((tr, c) => {
+    if (c < CHS) (tr || []).forEach(([r, s, v, fx, fxp]) => { if (r >= 0 && r < ROWS) put(c, r, s, v, fx, fxp); });
+  });
+  if (song.bpm) {
+    bpm = Math.max(+bpmSlider.min, Math.min(+bpmSlider.max, song.bpm));
+    bpmSlider.value = bpm;
+    document.getElementById('bpmVal').textContent = bpm;
+  }
+  updateAllCells();
+  setCursor(0, 0);
+  demoLoaded = false;
+  if (!playing) playBtn.innerHTML = '&#9654; PLAY';
+}
+(function () {
+  const s = document.createElement('script');
+  s.src = 'local-songs.js';
+  s.onload = () => {
+    if (!Array.isArray(window.LOCAL_SONGS)) return;
+    const clearBtn = document.getElementById('clearBtn');
+    for (const song of window.LOCAL_SONGS) {
+      const b = document.createElement('button');
+      b.className = 'tbtn';
+      b.textContent = song.name;
+      b.addEventListener('click', () => { b.blur(); loadLocalSong(song); });
+      clearBtn.parentNode.insertBefore(b, clearBtn);
+    }
+  };
+  s.onerror = () => s.remove(); // no local songs file — nothing to do
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

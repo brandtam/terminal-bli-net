@@ -12,7 +12,7 @@
 	import type { FsNode, FsFile, FsAlias } from '$lib/terminalos';
 	import { getAppContext } from '$lib/os/os-context';
 	import PixelIcon from '$lib/components/PixelIcon.svelte';
-	import { getAppIconKind } from '$lib/terminalos/apps/app-install';
+	import { getAppIconKind, getAppIconSprite } from '$lib/terminalos/apps/app-install';
 	import { openFilesystemNode } from '$lib/os/filesystem-open';
 	import {
 		canDragFilesystemNode,
@@ -23,6 +23,7 @@
 		writeFilesystemDragNode,
 		type FilesystemDropTarget
 	} from '$lib/os/filesystem-drag';
+	import { longPress, isTouchLikePointer, type PressPoint } from '$lib/os/touch';
 
 	// Zero-prop: os/fs come from the host context. The starting folder is an
 	// explicit static arg on the matched window (finder → ROOT_ID, trash → TRASH_ID)
@@ -91,6 +92,18 @@
 		return 'doc';
 	}
 
+	// App-supplied sprite (manifest iconSprite); wins over the kind in PixelIcon.
+	function iconSprite(node: FsNode): string[] | undefined {
+		if (node.kind === 'alias') {
+			const target = resolveNode(node);
+			return target ? iconSprite(target) : undefined;
+		}
+		if (node.kind === 'file' && (node as FsFile).appId) {
+			return getAppIconSprite((node as FsFile).appId!);
+		}
+		return undefined;
+	}
+
 	function iconAccent(node: FsNode): boolean {
 		if (node.kind === 'file') {
 			if (node.name.toLowerCase() === 'pricing.txt') return true;
@@ -100,6 +113,28 @@
 
 	function handleSelect(id: string) {
 		selectedId = id;
+	}
+
+	// Touch can't rely on dblclick, so items open classic-Mac style there:
+	// first tap selects, second tap opens. pointerdown always precedes the
+	// click it produces, so its pointerType tells the click handler apart.
+	let lastPointerType = '';
+
+	function handleItemClick(node: FsNode) {
+		if (isTouchLikePointer(lastPointerType) && selectedId === node.id) {
+			handleOpen(node);
+			return;
+		}
+		handleSelect(node.id);
+	}
+
+	function handleItemLongPress(p: PressPoint, node: FsNode) {
+		// iOS Safari never fires contextmenu for touch; synthesize it.
+		selectedId = node.id;
+		handleContextMenu(
+			new MouseEvent('contextmenu', { clientX: p.clientX, clientY: p.clientY }),
+			node
+		);
 	}
 
 	function handleOpen(node: FsNode) {
@@ -317,9 +352,11 @@
 				class:selected={selectedId === node.id}
 				class:drop-target={folderDropId === node.id}
 				draggable={canDragFilesystemNode(node)}
-				onclick={() => handleSelect(node.id)}
+				onpointerdown={(e) => (lastPointerType = e.pointerType)}
+				onclick={() => handleItemClick(node)}
 				ondblclick={() => handleOpen(node)}
 				oncontextmenu={(e) => handleContextMenu(e, node)}
+				use:longPress={(p) => handleItemLongPress(p, node)}
 				ondragstart={(e) => handleDragStart(e, node)}
 				ondragend={clearDropTarget}
 				ondragover={(e) => handleFolderDragOver(e, node)}
@@ -327,7 +364,7 @@
 				ondrop={(e) => handleFolderDrop(e, node)}
 			>
 				<div class="finder-item-icon" class:alias={node.kind === 'alias'}>
-					<PixelIcon kind={iconKind(node)} accent={iconAccent(node)} />
+					<PixelIcon kind={iconKind(node)} sprite={iconSprite(node)} accent={iconAccent(node)} />
 				</div>
 				<div class="finder-item-label">{node.name}</div>
 			</button>
@@ -450,6 +487,10 @@
 		font: inherit;
 		color: inherit;
 		text-align: center;
+		/* Long-press opens our context menu — keep the platform's text-selection
+		   callout out of the way. */
+		-webkit-touch-callout: none;
+		user-select: none;
 	}
 
 	.finder-item[draggable='true'] {

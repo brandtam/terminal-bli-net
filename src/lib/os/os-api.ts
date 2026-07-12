@@ -114,6 +114,8 @@ export interface OsApi {
 
 	alert: (spec: AlertSpec) => void;
 	showAlert: (spec: AlertSpec) => void;
+	/** The retro "disk full" dialog — one shared voice for every quota failure. */
+	showDiskFullAlert: () => void;
 	dismissAlert: () => void;
 	startNewConversation: () => void;
 

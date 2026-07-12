@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { AppDef, AppMenuItem, OsApi } from '$lib/os/os-api';
+	import { isTouchLikePointer } from '$lib/os/touch';
+	import { osAudio } from '$lib/os/audio.svelte';
 
 	let {
 		app,
@@ -22,6 +24,16 @@
 
 	let openMenu = $state<string | null>(null);
 	let tzOpen = $state(false);
+
+	// A touch tap fires a synthetic mouseenter right before its click. With a
+	// menu open, that would hover-switch openMenu to the tapped menu and the
+	// click would then toggle it straight back closed — so hover-switching is
+	// a mouse-only behavior. pointerdown precedes the synthetic mouseenter.
+	let lastPointerType = '';
+
+	function hoverSwitch(label: string) {
+		if (openMenu && !isTouchLikePointer(lastPointerType)) openMenu = label;
+	}
 
 	const TZ_OPTIONS = [
 		{ tz: 'local', label: 'Local (auto)' },
@@ -142,6 +154,8 @@
 	function handleMenuItemClick(item: AppMenuItem) {
 		if (item.type === 'separator') return;
 		openMenu = null;
+		// A tiny UI tick on every menu pick — the OS voice layer drops it when muted.
+		osAudio.blip();
 		if (item.type === 'check') {
 			item.toggle(os);
 			return;
@@ -162,14 +176,14 @@
 	});
 </script>
 
-<div class="menubar" role="menubar" tabindex="-1" onmouseleave={() => (openMenu = null)}>
-	<div
-		class="menu-wrapper"
-		role="none"
-		onmouseenter={() => {
-			if (openMenu) openMenu = '__os';
-		}}
-	>
+<div
+	class="menubar"
+	role="menubar"
+	tabindex="-1"
+	onmouseleave={() => (openMenu = null)}
+	onpointerdown={(e) => (lastPointerType = e.pointerType)}
+>
+	<div class="menu-wrapper" role="none" onmouseenter={() => hoverSwitch('__os')}>
 		<button
 			class="apple menu-item"
 			class:open={openMenu === '__os'}
@@ -203,13 +217,7 @@
 
 	<!-- App-defined menus from the registry -->
 	{#each appMenus as menu (menu.label)}
-		<div
-			class="menu-wrapper"
-			role="none"
-			onmouseenter={() => {
-				if (openMenu) openMenu = menu.label;
-			}}
-		>
+		<div class="menu-wrapper" role="none" onmouseenter={() => hoverSwitch(menu.label)}>
 			<button
 				class="menu-item"
 				class:open={openMenu === menu.label}

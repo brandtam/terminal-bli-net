@@ -53,6 +53,43 @@ export type AppLaunchHandler = (
 
 export type AppLaunchMetadata = { kind: 'custom'; handler: AppLaunchHandler } | { kind: 'none' };
 
+// ── Store listing ────────────────────────────────────────────────────────────
+
+/** The Computer Store's aisles. Display metadata lives in the store's category table. */
+export type StoreCategoryId = 'games' | 'business' | 'ent';
+
+export type StoreSticker = 'STAFF_PICK' | 'SALE' | 'NEW';
+
+/**
+ * How an app presents itself in the Computer Store. Lives on the manifest so
+ * the store catalog is a pure derivation over MANIFESTS — an app is added to
+ * the store by writing this block, never by editing a second hand-kept list.
+ * The box title is the manifest `name` uppercased (box art is always caps).
+ */
+export type StoreListing = {
+	/** Which aisle shelves the box. Category display metadata is the store's. */
+	category: StoreCategoryId;
+	/** Publisher line on the box art (e.g. 'ELORG-ISH'). */
+	publisher: string;
+	/** One-liner on the box front. */
+	tagline: string;
+	/** Box-art glyph name (the computer-store PixelIcon set). */
+	boxIcon: string;
+	sticker?: StoreSticker;
+	/** Back-of-box copy. */
+	back: string;
+	/** "Inside the box" bullet list. */
+	inside: string[];
+	/** System requirements line. */
+	reqs: string;
+	/**
+	 * Optional sort key within the aisle (lower first, default 0; ties keep
+	 * manifest order). Only for when shelf placement must differ from manifest
+	 * order — most apps omit it.
+	 */
+	shelfOrder?: number;
+};
+
 /**
  * One window an app owns. Every entry is uniform — a fixed window, a minted
  * instance, a prefs dialog and an about dialog differ only in `match`/`role`,
@@ -102,6 +139,13 @@ export type TerminalAppManifest = {
 	// ── Icon sprite (from getAppIconKind) ───────────────────────────────────
 	/** Reference to a shared PixelIcon sprite (e.g. 'tv', 'hd', 'floppy', 'doc'). */
 	iconKind: string;
+	/**
+	 * Optional app-supplied pixel sprite: rows of palette characters (one char =
+	 * one pixel, `.`/space = transparent — see SPRITE_PALETTE in
+	 * $lib/components/pixel-sprite). When present it wins over `iconKind`, so an
+	 * app can ship its own icon without adding a glyph to the shared PixelIcon.
+	 */
+	iconSprite?: string[];
 
 	// ── Windows ─────────────────────────────────────────────────────────────
 	/**
@@ -116,6 +160,13 @@ export type TerminalAppManifest = {
 	 * through that window by default; prefix-only apps declare custom behavior here.
 	 */
 	launch?: AppLaunchMetadata;
+
+	/**
+	 * The app's Computer Store listing. Required for store apps (isSystem: false,
+	 * status other than 'deprecated') — a drift test enforces it — and absent on
+	 * system apps. The store derives its whole catalog from these blocks.
+	 */
+	store?: StoreListing;
 
 	// ── Menus / about content / status (from APPS) ──────────────────────────
 	menus: (os: OsApi) => AppMenuSpec[];

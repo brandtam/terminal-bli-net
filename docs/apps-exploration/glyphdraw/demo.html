@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GlyphDraw — ANSI art studio (demo)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; }
+  body {
+    background:#000; color:#AAAAAA;
+    font-family: ui-monospace, Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    font-size:12px; display:flex; flex-direction:column; min-height:100vh;
+  }
+  a { color:#FFFF55; text-decoration:none; }
+  a:hover { background:#FFFF55; color:#000; }
+
+  /* top bar — DOS blue */
+  .topbar {
+    background:#0000AA; color:#FFF; padding:6px 12px;
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+  }
+  .topbar .logo { font-weight:bold; letter-spacing:1px; color:#FFF; text-shadow:0 0 6px #5555FF; }
+  .topbar .tag { color:#55FFFF; }
+  .topbar .back { margin-left:auto; }
+
+  .wrap { flex:1; display:flex; gap:12px; padding:12px; align-items:flex-start; flex-wrap:wrap; justify-content:center; }
+
+  /* tool rail */
+  .rail { width:196px; background:#0a0a0a; border:1px solid #333; padding:8px; }
+  .rail h3 { font-size:10px; color:#555; letter-spacing:2px; margin:10px 0 4px; }
+  .rail h3:first-child { margin-top:0; }
+  .rail h3.on { color:#FFFF55; }
+  .rail h3.on::after { content:" ◄ TAB"; color:#555; letter-spacing:0; }
+  .bank { display:grid; grid-template-columns:repeat(5,1fr); gap:3px; }
+  .bank button {
+    height:28px; font:16px inherit; font-family:inherit; background:#1a1a1a; color:#AAAAAA;
+    border:1px solid #333; cursor:pointer; line-height:1;
+  }
+  .bank button:hover { border-color:#AAAAAA; color:#FFF; }
+  .bank button.sel { background:#AAAAAA; color:#000; border-color:#FFF; }
+  .swatches { display:grid; grid-template-columns:repeat(8,1fr); gap:3px; }
+  .swatches button { height:16px; border:1px solid #222; cursor:pointer; }
+  .swatches button.sel { outline:2px solid #FFF; outline-offset:-1px; }
+  .brushbox { display:flex; gap:8px; align-items:center; margin-top:2px; }
+  #brushPrev {
+    width:34px; height:44px; display:flex; align-items:center; justify-content:center;
+    font-size:26px; border:1px solid #333;
+  }
+  .brushmeta { color:#555; line-height:1.5; }
+  .brushmeta b { color:#AAAAAA; font-weight:normal; }
+
+  /* stage */
+  .stage { display:flex; flex-direction:column; gap:8px; max-width:864px; flex:1; min-width:300px; }
+  .controls { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .controls button, .controls select {
+    font-family:inherit; font-size:12px; background:#1a1a1a; color:#AAAAAA;
+    border:1px solid #444; padding:5px 10px; cursor:pointer;
+  }
+  .controls button:hover { color:#FFF; border-color:#AAAAAA; }
+  #btnTx { background:#AA0000; color:#FFF; border-color:#FF5555; font-weight:bold; }
+  #btnTx:hover { background:#FF5555; color:#000; }
+  .controls label { color:#555; cursor:pointer; user-select:none; display:flex; gap:4px; align-items:center; }
+  .controls .spacer { flex:1; }
+
+  .screen { position:relative; border:2px solid #333; background:#000; line-height:0;
+    box-shadow:0 0 24px rgba(0,60,120,.35) inset, 0 0 18px rgba(0,0,0,.8); }
+  #cv { width:100%; height:auto; image-rendering:pixelated; cursor:crosshair; display:block; }
+  .screen.scan::after {
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 3px);
+  }
+
+  /* status bar — TheDraw cyan */
+  .status {
+    background:#00AAAA; color:#000; padding:4px 10px;
+    display:flex; gap:14px; flex-wrap:wrap; align-items:baseline;
+  }
+  .status b { font-weight:bold; }
+  .status .msg { color:#0000AA; font-weight:bold; }
+  .status .keys { margin-left:auto; color:#005555; }
+  .status .keys b { color:#000; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="logo">▓▒░ GLYPHDRAW ░▒▓</span>
+    <span class="tag">ANSI ART STUDIO · EST. 1986 · CONCEPT DEMO</span>
+    <a class="back" href="../index.html">← APPS INDEX</a>
+  </div>
+
+  <div class="wrap">
+    <div class="rail" id="rail">
+      <h3>BRUSH</h3>
+      <div class="brushbox">
+        <div id="brushPrev">█</div>
+        <div class="brushmeta">CHAR <b id="bmCh">█</b><br>FG <b id="bmFg">14</b> · BG <b id="bmBg">0</b><br><span id="bmBank">BLOCKS</span></div>
+      </div>
+      <div id="banks"></div>
+      <h3>FOREGROUND <span style="color:#333">[ ]</span></h3>
+      <div class="swatches" id="fgRow"></div>
+      <h3>BACKGROUND <span style="color:#333">{ }</span></h3>
+      <div class="swatches" id="bgRow"></div>
+    </div>
+
+    <div class="stage">
+      <div class="controls">
+        <button id="btnTx">▶ TRANSMIT</button>
+        <select id="baud" title="baud rate">
+          <option value="300">300 BAUD</option>
+          <option value="1200">1200 BAUD</option>
+          <option value="2400" selected>2400 BAUD</option>
+          <option value="9600">9600 BAUD</option>
+        </select>
+        <span class="spacer"></span>
+        <button id="btnClear">CLEAR</button>
+        <button id="btnSample">SAMPLE</button>
+        <button id="btnPng">PNG ↓</button>
+        <label><input type="checkbox" id="sndChk" checked>SOUND</label>
+        <label><input type="checkbox" id="gridChk">GRID</label>
+        <label><input type="checkbox" id="scanChk" checked>SCANLINES</label>
+      </div>
+      <div class="screen scan" id="screen"><canvas id="cv" width="720" height="400"></canvas></div>
+    </div>
+  </div>
+
+  <div class="status">
+    <span>POS <b id="stPos">02,02</b></span>
+    <span>CHAR <b id="stCh">█</b></span>
+    <span>MODE <b id="stMode">DRAW</b></span>
+    <span class="msg" id="stMsg"></span>
+    <span class="keys"><b>ANY KEY</b>=brush · <b>F1-F10</b> char · <b>TAB</b> set · <b>[ ]</b> fg <b>{ }</b> bg · <b>ARROWS+SPACE</b> stamp · <b>R-DRAG</b> erase · <b>ALT-CLICK</b> pick · <b>⌘Z</b> undo · <b>ESC</b> abort</span>
+  </div>
+
+<script>
+'use strict';
+// ── grid model ─────────────────────────────────────────────────────────────
+const COLS=60, ROWS=20, CW=12, CH=20, N=COLS*ROWS;
+const PAL=['#000000','#0000AA','#00AA00','#00AAAA','#AA0000','#AA00AA','#AA5500','#AAAAAA',
+           '#555555','#5555FF','#55FF55','#55FFFF','#FF5555','#FF55FF','#FFFF55','#FFFFFF'];
+let ch=new Array(N).fill(' '), fg=new Array(N).fill(7), bg=new Array(N).fill(0);
+
+const BANKS=[
+  { name:'BLOCKS', chars:['█','▓','▒','░','▀','▄','▌','▐','■','·'] },
+  { name:'SINGLE', chars:['─','│','┌','┐','└','┘','├','┤','┼','┴'] },
+  { name:'DOUBLE', chars:['═','║','╔','╗','╚','╝','╠','╣','╬','╦'] },
+  { name:'MISC',   chars:['○','●','♥','♦','♣','♠','☺','★','↑','~'] }
+];
+let bankIdx=0, brushCh='█', brushFg=14, brushBg=0;
+let cursorX=2, cursorY=2, blinkOn=true;
+let playing=false;
+
+// ── canvas rendering ────────────────────────────────────────────────────────
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const FONT='16px ui-monospace, Menlo, Consolas, "DejaVu Sans Mono", monospace';
+const BAYER=[[0,2],[3,1]];
+const gridChk=document.getElementById('gridChk');
+
+function dither(g,px,py,level){
+  for(let iy=0;iy<10;iy++) for(let ix=0;ix<6;ix++)
+    if(BAYER[iy&1][ix&1]<level) g.fillRect(px+ix*2,py+iy*2,2,2);
+}
+function drawCell(g,i,withGrid){
+  const x=i%COLS, y=(i/COLS)|0, px=x*CW, py=y*CH;
+  g.fillStyle=PAL[bg[i]]; g.fillRect(px,py,CW,CH);
+  const c=ch[i];
+  if(c!==' '){
+    g.fillStyle=PAL[fg[i]];
+    switch(c){
+      case '█': g.fillRect(px,py,CW,CH); break;
+      case '▀': g.fillRect(px,py,CW,CH/2); break;
+      case '▄': g.fillRect(px,py+CH/2,CW,CH/2); break;
+      case '▌': g.fillRect(px,py,CW/2,CH); break;
+      case '▐': g.fillRect(px+CW/2,py,CW/2,CH); break;
+      case '■': g.fillRect(px+2,py+4,CW-4,CH-8); break;
+      case '░': dither(g,px,py,1); break;
+      case '▒': dither(g,px,py,2); break;
+      case '▓': dither(g,px,py,3); break;
+      default:
+        g.font=FONT; g.textAlign='center'; g.textBaseline='middle';
+        g.fillText(c,px+CW/2,py+CH/2+1);
+    }
+  }
+  if(withGrid){ g.strokeStyle='rgba(255,255,255,.07)'; g.strokeRect(px+.5,py+.5,CW-1,CH-1); }
+}
+function renderAll(g,withGrid){
+  g=g||ctx; withGrid=(withGrid===undefined)?gridChk.checked:withGrid;
+  for(let i=0;i<N;i++) drawCell(g,i,withGrid);
+}
+function drawCursorCell(){
+  if(playing) return;
+  const i=cursorY*COLS+cursorX;
+  drawCell(ctx,i,gridChk.checked);
+  if(blinkOn){
+    ctx.strokeStyle='#FFFFFF'; ctx.lineWidth=2;
+    ctx.strokeRect(cursorX*CW+1,cursorY*CH+1,CW-2,CH-2);
+  }
+}
+setInterval(()=>{ blinkOn=!blinkOn; drawCursorCell(); },400);
+
+// ── sample artwork (composed, not stored) ───────────────────────────────────
+function P(x,y,c,f,b){ if(x<0||x>=COLS||y<0||y>=ROWS) return; const i=y*COLS+x; ch[i]=c; fg[i]=f; bg[i]=b; }
+function T(x,y,s,f,b){ for(let k=0;k<s.length;k++) P(x+k,y,s[k],f,b); }
+function clearGrid(){ ch.fill(' '); fg.fill(7); bg.fill(0); }
+function loadSample(){
+  clearGrid();
+  [[3,1,'·'],[9,0,'+'],[15,2,'·'],[22,1,'·'],[28,0,'+'],[34,2,'·'],[40,1,'·'],[47,2,'+'],[52,1,'·'],[57,0,'·'],[6,3,'·'],[19,3,'+']]
+    .forEach(function(s,k){ P(s[0],s[1],s[2], k%2?8:7, 0); });
+  for(let x=0;x<COLS;x++){ P(x,4,'░',5,0); P(x,5,'▒',5,0); P(x,6,'░',4,0); }
+  T(44,2,'▄▄▄▄',14,0); T(43,3,'██████',14,0); T(43,4,'██████',14,0); T(44,5,'▀▀▀▀',14,0);
+  P(42,3,'░',6,0); P(49,3,'░',6,0); P(42,4,'░',6,0); P(49,4,'░',6,0);
+  const peaks=[{cx:12,top:6,hw:12},{cx:30,top:8,hw:16}];
+  for(let x=0;x<COLS;x++){
+    let ym=99;
+    for(const p of peaks){ const yy=p.top+Math.round(Math.abs(x-p.cx)*(12-p.top)/p.hw); if(yy<ym) ym=yy; }
+    if(ym<12){ P(x,ym,'▄',8,0); for(let y=ym+1;y<12;y++) P(x,y,'█',8,0); }
+  }
+  P(12,6,'▄',15,0); P(11,7,'█',7,0); P(12,7,'█',15,0); P(13,7,'█',7,0);
+  for(let y=12;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    if((x+y)%7===0) P(x,y,'~',3,0);
+    else if((x*3+y)%11===0) P(x,y,'-',11,0);
+  }
+  for(let y=12;y<17;y++){
+    if(y%2===0){ P(45,y,'▒',6,0); P(46,y,'▒',14,0); }
+    else { P(44,y,'░',6,0); P(45,y,'▒',14,0); P(46,y,'░',6,0); }
+  }
+  for(let y=13;y<19;y++) for(let x=4;x<30;x++) P(x,y,' ',15,1);   // box fill
+  P(4,13,'╔',11,1); P(29,13,'╗',11,1); P(4,18,'╚',11,1); P(29,18,'╝',11,1);
+  for(let x=5;x<29;x++){ P(x,13,'═',11,1); P(x,18,'═',11,1); }
+  for(let y=14;y<18;y++){ P(4,y,'║',11,1); P(29,y,'║',11,1); }
+  T(8,15,'G L Y P H D R A W',15,1);
+  T(7,16,'· ansi art studio ·',3,1);
+  T(37,18,'·· 2400 BAUD ··',8,0);
+}
+
+// ── undo ────────────────────────────────────────────────────────────────────
+const undoStack=[];
+function pushUndo(){
+  undoStack.push({c:ch.slice(),f:fg.slice(),b:bg.slice()});
+  if(undoStack.length>60) undoStack.shift();
+}
+function undo(){
+  if(playing||!undoStack.length) return;
+  const s=undoStack.pop(); ch=s.c; fg=s.f; bg=s.b;
+  renderAll(); flash('UNDO');
+}
+
+// ── painting ────────────────────────────────────────────────────────────────
+function paintCell(x,y,erase){
+  const i=y*COLS+x;
+  if(erase){ ch[i]=' '; fg[i]=7; bg[i]=0; }
+  else { ch[i]=brushCh; fg[i]=brushFg; bg[i]=brushBg; }
+  drawCell(ctx,i,gridChk.checked);
+}
+let mouseBtn=0, lastX=0, lastY=0;
+function cellAt(e,clamp){
+  const r=cv.getBoundingClientRect();
+  let x=Math.floor((e.clientX-r.left)/r.width*COLS);
+  let y=Math.floor((e.clientY-r.top)/r.height*ROWS);
+  if(clamp){ x=Math.max(0,Math.min(COLS-1,x)); y=Math.max(0,Math.min(ROWS-1,y)); return [x,y]; }
+  if(x<0||x>=COLS||y<0||y>=ROWS) return null;
+  return [x,y];
+}
+cv.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+cv.addEventListener('mousedown',function(e){
+  if(playing) return;
+  e.preventDefault();
+  const c=cellAt(e,false); if(!c) return;
+  if(e.altKey){
+    const i=c[1]*COLS+c[0];
+    if(ch[i]!==' ') brushCh=ch[i];
+    brushFg=fg[i]; brushBg=bg[i]; syncUI(); flash('PICKED'); return;
+  }
+  pushUndo();
+  mouseBtn=(e.button===2)?2:1;
+  lastX=c[0]; lastY=c[1];
+  paintCell(c[0],c[1],mouseBtn===2);
+});
+window.addEventListener('mousemove',function(e){
+  const c=cellAt(e,mouseBtn>0);
+  if(c) setPos(c[0],c[1]);
+  if(!mouseBtn||playing||!c) return;
+  const dx=c[0]-lastX, dy=c[1]-lastY, steps=Math.max(Math.abs(dx),Math.abs(dy));
+  for(let t=1;t<=steps;t++)
+    paintCell(Math.round(lastX+dx*t/steps),Math.round(lastY+dy*t/steps),mouseBtn===2);
+  lastX=c[0]; lastY=c[1];
+});
+window.addEventListener('mouseup',function(){ mouseBtn=0; });
+
+// ── keyboard ────────────────────────────────────────────────────────────────
+function moveCursor(dx,dy){
+  const i=cursorY*COLS+cursorX;
+  drawCell(ctx,i,gridChk.checked);              // erase old cursor
+  cursorX=Math.max(0,Math.min(COLS-1,cursorX+dx));
+  cursorY=Math.max(0,Math.min(ROWS-1,cursorY+dy));
+  blinkOn=true; drawCursorCell(); setPos(cursorX,cursorY);
+}
+window.addEventListener('keydown',function(e){
+  const tag=(e.target&&e.target.tagName||'').toLowerCase();
+  if(tag==='select'||tag==='input') return;
+  if(e.metaKey||e.ctrlKey){
+    if(e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); }
+    return;
+  }
+  if(e.key==='Escape'){ if(playing) abortTransmit(false); return; }
+  if(playing) return;
+  if(e.key==='Tab'){ e.preventDefault(); setBank((bankIdx+1)%BANKS.length); return; }
+  const fm=/^F([1-9]|10)$/.exec(e.key);
+  if(fm){ e.preventDefault(); setBrushChar(BANKS[bankIdx].chars[+fm[1]-1]); return; }
+  switch(e.key){
+    case 'ArrowLeft':  e.preventDefault(); moveCursor(-1,0); return;
+    case 'ArrowRight': e.preventDefault(); moveCursor(1,0);  return;
+    case 'ArrowUp':    e.preventDefault(); moveCursor(0,-1); return;
+    case 'ArrowDown':  e.preventDefault(); moveCursor(0,1);  return;
+    case ' ':
+      e.preventDefault(); pushUndo();
+      paintCell(cursorX,cursorY,false); moveCursor(1,0); return;
+    case 'Backspace':
+      e.preventDefault(); pushUndo();
+      moveCursor(-1,0); paintCell(cursorX,cursorY,true); drawCursorCell(); return;
+    case 'Delete':
+      e.preventDefault(); pushUndo();
+      paintCell(cursorX,cursorY,true); drawCursorCell(); return;
+    case '[': cycle('fg',-1); return;
+    case ']': cycle('fg',1);  return;
+    case '{': cycle('bg',-1); return;
+    case '}': cycle('bg',1);  return;
+  }
+  if(e.key.length===1) setBrushChar(e.key);
+});
+function cycle(which,d){
+  if(which==='fg') brushFg=(brushFg+d+16)%16; else brushBg=(brushBg+d+16)%16;
+  syncUI();
+}
+
+// ── tool rail UI ────────────────────────────────────────────────────────────
+const banksEl=document.getElementById('banks');
+BANKS.forEach(function(bank,bi){
+  const h=document.createElement('h3'); h.textContent=bank.name; h.id='bh'+bi;
+  const grid=document.createElement('div'); grid.className='bank';
+  bank.chars.forEach(function(c){
+    const b=document.createElement('button');
+    b.textContent=c; b.title=bank.name+' — F'+(bank.chars.indexOf(c)+1);
+    b.addEventListener('click',function(){ setBank(bi); setBrushChar(c); this.blur(); });
+    grid.appendChild(b);
+  });
+  banksEl.appendChild(h); banksEl.appendChild(grid);
+});
+function makeSwatches(rowEl,which){
+  for(let i=0;i<16;i++){
+    const b=document.createElement('button');
+    b.style.background=PAL[i]; b.title=which.toUpperCase()+' '+i;
+    b.addEventListener('click',function(){
+      if(which==='fg') brushFg=i; else brushBg=i;
+      syncUI(); this.blur();
+    });
+    rowEl.appendChild(b);
+  }
+}
+makeSwatches(document.getElementById('fgRow'),'fg');
+makeSwatches(document.getElementById('bgRow'),'bg');
+
+function setBank(bi){ bankIdx=bi; syncUI(); }
+function setBrushChar(c){ brushCh=c; syncUI(); }
+function syncUI(){
+  const prev=document.getElementById('brushPrev');
+  prev.textContent=brushCh; prev.style.color=PAL[brushFg]; prev.style.background=PAL[brushBg];
+  document.getElementById('bmCh').textContent=brushCh;
+  document.getElementById('bmFg').textContent=brushFg;
+  document.getElementById('bmBg').textContent=brushBg;
+  document.getElementById('bmBank').textContent=BANKS[bankIdx].name;
+  document.getElementById('stCh').textContent=brushCh;
+  BANKS.forEach(function(bank,bi){
+    document.getElementById('bh'+bi).className=(bi===bankIdx)?'on':'';
+    const btns=banksEl.querySelectorAll('.bank')[bi].children;
+    for(let k=0;k<btns.length;k++)
+      btns[k].className=(bi===bankIdx&&bank.chars[k]===brushCh)?'sel':'';
+  });
+  const fgBtns=document.getElementById('fgRow').children;
+  const bgBtns=document.getElementById('bgRow').children;
+  for(let i=0;i<16;i++){
+    fgBtns[i].className=(i===brushFg)?'sel':'';
+    bgBtns[i].className=(i===brushBg)?'sel':'';
+  }
+}
+function setPos(x,y){
+  document.getElementById('stPos').textContent=
+    String(x).padStart(2,'0')+','+String(y).padStart(2,'0');
+}
+let flashTimer=0;
+function flash(msg){
+  const el=document.getElementById('stMsg');
+  el.textContent=msg;
+  clearTimeout(flashTimer);
+  flashTimer=setTimeout(function(){ el.textContent=''; },2200);
+}
+
+// ── modem audio (WebAudio, gesture-gated, no assets) ────────────────────────
+const sndChk=document.getElementById('sndChk');
+let AC=null, master=null, snd=null, warbleTimer=0;
+function ensureAudio(){
+  if(AC) return;
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  master=AC.createGain();
+  master.gain.value=sndChk.checked?0.12:0;
+  master.connect(AC.destination);
+}
+sndChk.addEventListener('change',function(){ if(master) master.gain.value=this.checked?0.12:0; this.blur(); });
+function startModem(){
+  if(!sndChk.checked) return;
+  ensureAudio(); AC.resume();
+  const t=AC.currentTime;
+  // hiss: looped noise through a bandpass
+  const buf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  const hiss=AC.createBufferSource(); hiss.buffer=buf; hiss.loop=true;
+  const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1700; bp.Q.value=0.7;
+  const hissGain=AC.createGain(); hissGain.gain.value=0.18;
+  hiss.connect(bp); bp.connect(hissGain); hissGain.connect(master); hiss.start();
+  // warble: square osc hopping Bell 212A tones; opens with a 2100Hz answer tone
+  const osc=AC.createOscillator(); osc.type='square';
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600;
+  const oGain=AC.createGain();
+  osc.connect(lp); lp.connect(oGain); oGain.connect(master);
+  osc.frequency.setValueAtTime(2100,t);
+  oGain.gain.setValueAtTime(0,t);
+  oGain.gain.linearRampToValueAtTime(0.09,t+0.02);
+  osc.frequency.setValueAtTime(1270,t+0.25);
+  osc.start(t);
+  const tones=[1070,1270,2025,2225];
+  warbleTimer=setInterval(function(){
+    if(!AC) return;
+    osc.frequency.setValueAtTime(tones[Math.random()*4|0],AC.currentTime);
+    oGain.gain.setTargetAtTime(0.05+Math.random()*0.05,AC.currentTime,0.01);
+  },45);
+  snd={hiss:hiss,hissGain:hissGain,osc:osc,oGain:oGain};
+}
+function stopModem(done){
+  clearInterval(warbleTimer);
+  if(snd&&AC){
+    const t=AC.currentTime;
+    snd.oGain.gain.setTargetAtTime(0,t,0.03);
+    snd.hissGain.gain.setTargetAtTime(0,t,0.05);
+    snd.osc.stop(t+0.2); snd.hiss.stop(t+0.25);
+    snd=null;
+    if(done&&sndChk.checked){ beep(1046,0.05,0.07); beep(1568,0.16,0.12); }
+  }
+}
+function beep(freq,dt,dur){
+  ensureAudio();
+  const t=AC.currentTime+dt;
+  const o=AC.createOscillator(); o.type='square'; o.frequency.value=freq;
+  const g=AC.createGain();
+  g.gain.setValueAtTime(0.08,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.connect(g); g.connect(master);
+  o.start(t); o.stop(t+dur+0.02);
+}
+
+// ── transmission playback ───────────────────────────────────────────────────
+const btnTx=document.getElementById('btnTx');
+const baudSel=document.getElementById('baud');
+let revealList=[], revealed=0, playRAF=0, playStart=0;
+function startTransmit(){
+  if(playing){ abortTransmit(true); return; }
+  revealList=[];
+  for(let i=0;i<N;i++) if(!(ch[i]===' '&&bg[i]===0)) revealList.push(i);
+  if(!revealList.length){ flash('NOTHING TO TRANSMIT — PAINT SOMETHING'); return; }
+  playing=true; revealed=0;
+  btnTx.textContent='■ ABORT';
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,cv.width,cv.height);
+  startModem();
+  flash('CARRIER DETECTED…');
+  playStart=performance.now();
+  playRAF=requestAnimationFrame(step);
+}
+function step(now){
+  const cps=(+baudSel.value)/10;
+  const target=Math.max(0,Math.min(revealList.length,
+    Math.floor((now-playStart-600)/1000*cps)));
+  while(revealed<target){ drawCell(ctx,revealList[revealed],false); revealed++; }
+  if(revealed<revealList.length){
+    const i=revealList[revealed];
+    ctx.fillStyle='#FFFFFF';
+    ctx.fillRect((i%COLS)*CW,((i/COLS)|0)*CH,CW,CH);
+    playRAF=requestAnimationFrame(step);
+  } else {
+    playing=false;
+    stopModem(true);
+    btnTx.textContent='▶ TRANSMIT';
+    renderAll();
+    flash('TRANSMISSION COMPLETE · '+baudSel.value+' BAUD');
+  }
+}
+function abortTransmit(){
+  cancelAnimationFrame(playRAF);
+  playing=false;
+  stopModem(false);
+  btnTx.textContent='▶ TRANSMIT';
+  renderAll();
+  flash('NO CARRIER');
+}
+btnTx.addEventListener('click',function(){ startTransmit(); this.blur(); });
+
+// ── controls ────────────────────────────────────────────────────────────────
+document.getElementById('btnClear').addEventListener('click',function(){
+  if(playing) return;
+  pushUndo(); clearGrid(); renderAll(); flash('CLEARED — ⌘Z TO UNDO'); this.blur();
+});
+document.getElementById('btnSample').addEventListener('click',function(){
+  if(playing) return;
+  pushUndo(); loadSample(); renderAll(); flash('SAMPLE LOADED'); this.blur();
+});
+document.getElementById('btnPng').addEventListener('click',function(){
+  const c1=document.createElement('canvas'); c1.width=cv.width; c1.height=cv.height;
+  renderAll(c1.getContext('2d'),false);
+  const c2=document.createElement('canvas'); c2.width=cv.width*2; c2.height=cv.height*2;
+  const g2=c2.getContext('2d'); g2.imageSmoothingEnabled=false;
+  g2.drawImage(c1,0,0,c2.width,c2.height);
+  const a=document.createElement('a');
+  a.download='glyphdraw.png'; a.href=c2.toDataURL('image/png'); a.click();
+  flash('PNG SAVED'); this.blur();
+});
+gridChk.addEventListener('change',function(){ if(!playing) renderAll(); this.blur(); });
+document.getElementById('scanChk').addEventListener('change',function(){
+  document.getElementById('screen').classList.toggle('scan',this.checked); this.blur();
+});
+
+// ── boot ────────────────────────────────────────────────────────────────────
+loadSample();
+renderAll();
+syncUI();
+setPos(cursorX,cursorY);
+</script>
+</body>
+</html>

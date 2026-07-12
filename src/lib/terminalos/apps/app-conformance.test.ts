@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { MANIFESTS } from './manifests';
 import { matchWindow, synthAboutWindowId } from './app-catalog';
 import type { WindowSpec } from './app-manifest';
+import { SPRITE_PALETTE, SPRITE_TRANSPARENT } from '$lib/components/pixel-sprite';
 import { vcrPrefs } from '$lib/apps/vcr/vcr-prefs.svelte';
 import type { AppContext, AppStorageHandle, WindowHandle } from '$lib/os/os-context';
 
@@ -53,14 +54,40 @@ describe('manifest conformance', () => {
 		expectTypeOf<AppContext>().toHaveProperty('lifecycle');
 	});
 
-	describe.each(windowed.map((m) => [m.id, m] as const))('%s', (_id, manifest) => {
-		it('resolves an icon to a real PixelIcon kind', () => {
+	// The icon set is OPEN: an app either names a shared PixelIcon glyph OR ships
+	// its own `iconSprite` (which wins). This catches iconKind typos without
+	// closing the set, and covers EVERY manifest — window-less apps (the games)
+	// still draw icons on the desktop, in Finder, the Dock, and My Shelf.
+	describe.each(MANIFESTS.map((m) => [m.id, m] as const))('%s icon', (_id, manifest) => {
+		it('resolves a pixel icon: a known kind or a valid sprite', () => {
 			expect(manifest.icon).toBeTruthy();
 			expect(manifest.iconKind).toBeTruthy();
-			// iconKind must name a glyph PixelIcon can draw, or every icon renders blank.
-			expect(knownPixelIconKinds().has(manifest.iconKind)).toBe(true);
+			if (manifest.iconSprite) {
+				// A sprite must be a rectangular grid of palette / transparent chars,
+				// or PixelIcon would draw a ragged or partially blank icon.
+				const rows = manifest.iconSprite;
+				expect(rows.length).toBeGreaterThan(0);
+				for (const row of rows) {
+					expect(row.length, `row '${row}' width`).toBe(rows[0].length);
+					for (const ch of row) {
+						expect(
+							ch in SPRITE_PALETTE || SPRITE_TRANSPARENT.has(ch),
+							`sprite char '${ch}' must be in SPRITE_PALETTE or transparent`
+						).toBe(true);
+					}
+				}
+			} else {
+				// No sprite → iconKind must name a glyph PixelIcon can draw. (Unknown
+				// kinds render the generic fallback, but a manifest shipping one is a typo.)
+				expect(
+					knownPixelIconKinds().has(manifest.iconKind),
+					`iconKind '${manifest.iconKind}' is not a PixelIcon glyph and no iconSprite is supplied`
+				).toBe(true);
+			}
 		});
+	});
 
+	describe.each(windowed.map((m) => [m.id, m] as const))('%s', (_id, manifest) => {
 		it('resolves an about target', () => {
 			// synthAboutWindowId is what openAbout() routes through — either the app's
 			// own about:<id> or the shared system About ('about').

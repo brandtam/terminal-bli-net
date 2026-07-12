@@ -5,7 +5,8 @@ import {
 	synthWindowAppMap,
 	synthWindowAppId,
 	synthAppWindowId,
-	synthAppIconKind
+	synthAppIconKind,
+	synthAppIconSprite
 } from './app-catalog';
 
 /**
@@ -178,5 +179,18 @@ describe('synthAppIconKind', () => {
 		expect(synthAppIconKind('unknown-app')).toBe('doc');
 		expect(synthAppIconKind('textedit')).toBe('doc');
 		expect(synthAppIconKind('chatrbot')).toBe('doc');
+	});
+});
+
+describe('synthAppIconSprite', () => {
+	it('returns the manifest-supplied sprite for apps that ship one', () => {
+		const sprite = synthAppIconSprite('tetra');
+		expect(sprite).toBeDefined();
+		expect(sprite!.length).toBeGreaterThan(0);
+	});
+
+	it('returns undefined for shared-kind apps and unknown ids', () => {
+		expect(synthAppIconSprite('finder')).toBeUndefined();
+		expect(synthAppIconSprite('unknown-app')).toBeUndefined();
 	});
 });

@@ -160,7 +160,7 @@
 	class="window {active ? '' : 'inactive'} {className}"
 	class:chromeless
 	style="left: {x}px; top: {y}px; width: {width}px; height: {height}px; z-index: {z};"
-	onmousedown={() => onfocus(id)}
+	onpointerdown={() => onfocus(id)}
 	role="dialog"
 	aria-label={title}
 	tabindex="-1"
@@ -297,6 +297,10 @@
 		cursor: grab;
 		position: relative;
 		flex-shrink: 0;
+		/* A touch drag must feed pointermove, not become a browser pan (which
+		   would end the drag with pointercancel). Same for both grow boxes and
+		   any chromeless drag handle below. */
+		touch-action: none;
 	}
 
 	.window.inactive .window-titlebar {
@@ -400,6 +404,7 @@
 		color: var(--chrome-window-border-color, var(--ink));
 		padding: 1px;
 		z-index: 2;
+		touch-action: none;
 	}
 
 	.window-growbox:hover {
@@ -420,6 +425,14 @@
 		padding: 1px;
 		margin: -1px -2px -1px 0;
 		flex-shrink: 0;
+		touch-action: none;
+	}
+
+	/* Chromeless windows drag from elements marked [data-drag-handle] (see
+	   onTitlePointerDown); those handles need the same pan opt-out as the
+	   titlebar, wherever the app renders them. */
+	:global([data-drag-handle]) {
+		touch-action: none;
 	}
 
 	.window-growbox-ne:hover {

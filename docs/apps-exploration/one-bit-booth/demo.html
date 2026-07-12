@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1-Bit Booth — demo</title>
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	html { background: #8a8776; }
+	body {
+		font-family: "Courier New", Courier, monospace;
+		background: #8a8776;
+		background-image: repeating-conic-gradient(#84816f 0% 25%, #8f8c7b 0% 50%);
+		background-size: 4px 4px;
+		color: #1a1a1a;
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	/* top bar */
+	.topbar {
+		width: 100%;
+		background: #1a1a1a;
+		color: #d6d3c7;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 6px 12px;
+		font-size: 12px;
+		letter-spacing: 1px;
+	}
+	.topbar b { color: #fff; white-space: nowrap; }
+	.topbar a { color: #9bbc0f; text-decoration: none; white-space: nowrap; }
+	.topbar a:hover { text-decoration: underline; }
+	.topbar .note { opacity: 0.75; margin-left: auto; text-align: right; }
+
+	/* mac window */
+	.mac {
+		margin: 22px 10px 40px;
+		width: 700px;
+		max-width: calc(100vw - 20px);
+		background: #d6d3c7;
+		border: 1px solid #000;
+		box-shadow: 2px 2px 0 #000, inset 1px 1px 0 #fff;
+	}
+	.titlebar {
+		position: relative;
+		height: 22px;
+		border-bottom: 1px solid #000;
+		background:
+			repeating-linear-gradient(#d6d3c7 0 2px, #8f8c7b 2px 3px);
+		background-clip: content-box;
+		padding: 3px 6px;
+		display: flex;
+		align-items: center;
+	}
+	.titlebar .box {
+		width: 12px; height: 12px;
+		background: #d6d3c7;
+		border: 1px solid #000;
+		box-shadow: inset 1px 1px 0 #fff;
+	}
+	.titlebar .name {
+		position: absolute; left: 50%; transform: translateX(-50%);
+		background: #d6d3c7;
+		padding: 0 10px;
+		font-weight: bold;
+		font-size: 13px;
+		letter-spacing: 2px;
+		white-space: nowrap;
+	}
+	.inner { padding: 14px; }
+
+	/* viewport */
+	.viewwell {
+		background: #101010;
+		border: 2px solid #000;
+		box-shadow: inset 2px 2px 0 #000, 1px 1px 0 #fff;
+		padding: 10px;
+		position: relative;
+	}
+	.crt {
+		position: relative;
+		margin: 0 auto;
+		max-width: 640px;
+		background: #000;
+		border-radius: 6px;
+		overflow: hidden;
+	}
+	canvas#view {
+		display: block;
+		width: 100%;
+		image-rendering: pixelated;
+		image-rendering: crisp-edges;
+	}
+	.crt::after {
+		content: "";
+		position: absolute; inset: 0;
+		pointer-events: none;
+		background:
+			repeating-linear-gradient(rgba(0,0,0,0.14) 0 1px, transparent 1px 3px),
+			radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.35) 100%);
+		border-radius: 6px;
+	}
+	.flash {
+		position: absolute; inset: 0;
+		background: #fff;
+		opacity: 0;
+		pointer-events: none;
+		z-index: 3;
+	}
+	.flash.on { opacity: 1; }
+	.flash.fade { opacity: 0; transition: opacity 0.35s ease-out; }
+
+	.startwrap {
+		position: absolute; inset: 0;
+		display: flex; flex-direction: column;
+		align-items: center; justify-content: center;
+		gap: 10px;
+		z-index: 2;
+		background: rgba(0,0,0,0.45);
+		text-align: center;
+		padding: 12px;
+	}
+	.startwrap p {
+		color: #d6d3c7; font-size: 11px; max-width: 420px; line-height: 1.5;
+		text-shadow: 1px 1px 0 #000;
+	}
+	.startwrap.hidden { display: none; }
+
+	/* buttons */
+	button {
+		font-family: inherit;
+		font-size: 12px;
+		font-weight: bold;
+		letter-spacing: 1px;
+		background: #d6d3c7;
+		border: 1px solid #000;
+		box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #8f8c7b, 2px 2px 0 #000;
+		padding: 6px 12px;
+		cursor: pointer;
+		color: #1a1a1a;
+	}
+	button:active { transform: translate(2px, 2px); box-shadow: inset 1px 1px 0 #8f8c7b; }
+	button.sel {
+		background: #1a1a1a; color: #e8e8e0;
+		box-shadow: inset 1px 1px 0 #444, 2px 2px 0 #000;
+	}
+	button.big { font-size: 14px; padding: 10px 22px; }
+
+	.statusrow {
+		display: flex; align-items: center; gap: 8px;
+		font-size: 11px; letter-spacing: 2px;
+		padding: 8px 2px 2px;
+	}
+	.led {
+		width: 8px; height: 8px; border-radius: 50%;
+		background: #555; border: 1px solid #000;
+	}
+	.led.live { background: #e33; box-shadow: 0 0 6px #e33; }
+	.led.test { background: #f9bd2b; }
+	.statusrow .fps { margin-left: auto; opacity: 0.55; letter-spacing: 1px; }
+
+	.panel {
+		display: flex; flex-wrap: wrap; gap: 8px;
+		align-items: center;
+		margin-top: 12px;
+	}
+	.panel .grp {
+		display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+		border: 1px solid #8f8c7b;
+		box-shadow: inset 1px 1px 0 #fff;
+		padding: 8px;
+	}
+	.panel .lbl { font-size: 10px; letter-spacing: 1px; opacity: 0.7; margin-right: 2px; }
+
+	.sliders { display: flex; flex-direction: column; gap: 4px; font-size: 10px; }
+	.sliders label { display: flex; align-items: center; gap: 6px; letter-spacing: 1px; }
+	input[type=range] { width: 90px; accent-color: #1a1a1a; }
+
+	/* shutter */
+	.shutterrow {
+		display: flex; align-items: center; justify-content: center;
+		gap: 18px; margin-top: 16px;
+	}
+	#shutter {
+		width: 78px; height: 78px;
+		border-radius: 50%;
+		border: 3px solid #000;
+		background: radial-gradient(circle at 35% 30%, #f66 0 18%, #c22 60%, #801010 100%);
+		box-shadow: 0 4px 0 #000, inset 0 2px 0 rgba(255,255,255,0.5);
+		color: #fff;
+		text-shadow: 1px 1px 0 #600;
+		font-size: 11px;
+	}
+	#shutter:active { transform: translateY(4px); box-shadow: 0 0 0 #000; }
+	.hint { font-size: 10px; letter-spacing: 1px; opacity: 0.6; max-width: 150px; }
+
+	/* strip */
+	.striplabel { font-size: 10px; letter-spacing: 2px; margin: 18px 0 6px; opacity: 0.7; }
+	#strip {
+		display: flex; gap: 10px;
+		overflow-x: auto;
+		padding: 10px;
+		background: #3a382f;
+		border: 2px solid #000;
+		box-shadow: inset 2px 2px 0 #000;
+		min-height: 96px;
+	}
+	#strip .empty { color: #8f8c7b; font-size: 11px; letter-spacing: 1px; align-self: center; margin: 0 auto; }
+	#strip img {
+		width: 100px; height: 75px;
+		image-rendering: pixelated;
+		border: 4px solid #fff;
+		outline: 1px solid #000;
+		box-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+		cursor: pointer;
+		flex: 0 0 auto;
+	}
+	#strip img:nth-child(odd) { transform: rotate(1deg); }
+	#strip img:nth-child(even) { transform: rotate(-1deg); }
+	#strip img:hover { transform: scale(1.05); }
+
+	.footer { font-size: 10px; letter-spacing: 1px; opacity: 0.6; margin-top: 10px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+	<b>▚ 1-BIT BOOTH</b>
+	<a href="../index.html">&larr; all app demos</a>
+	<span class="note">all processing happens on your computer — no frame ever leaves this page</span>
+</div>
+
+<div class="mac">
+	<div class="titlebar"><span class="box"></span><span class="name">1-Bit Booth.app</span></div>
+	<div class="inner">
+
+		<div class="viewwell">
+			<div class="crt">
+				<canvas id="view" width="160" height="120"></canvas>
+				<div class="flash" id="flash"></div>
+				<div class="startwrap" id="startwrap">
+					<button class="big" id="startbtn">START CAMERA</button>
+					<p>1-Bit Booth needs your camera for the live preview. Video never leaves this
+					computer — every frame is dithered right here in your browser and thrown away
+					unless you press the shutter. No camera? The test pattern works too.</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="statusrow">
+			<span class="led test" id="led"></span>
+			<span id="status">STANDBY &middot; TEST PATTERN</span>
+			<span class="fps" id="fps"></span>
+		</div>
+
+		<div class="panel">
+			<div class="grp">
+				<span class="lbl">FILM</span>
+				<button class="mode sel" data-mode="onebit">1-BIT</button>
+				<button class="mode" data-mode="paper">PAPER</button>
+				<button class="mode" data-mode="green">GREEN</button>
+				<button class="mode" data-mode="amber">AMBER</button>
+				<button class="mode" data-mode="plasma">PLASMA</button>
+				<button class="mode" data-mode="gameboy">GAME BOY</button>
+				<button class="mode" data-mode="cga">CGA</button>
+				<button class="mode" data-mode="c64">C64</button>
+			</div>
+			<div class="grp">
+				<span class="lbl">SIGNAL</span>
+				<button id="agc" class="sel">AGC</button>
+				<button id="invert">INVERT</button>
+			</div>
+			<div class="grp">
+				<span class="lbl">STAMPS</span>
+				<button class="stamp" data-stamp="shades">SHADES</button>
+				<button class="stamp" data-stamp="crown">CROWN</button>
+				<button class="stamp" data-stamp="rad">RAD!</button>
+			</div>
+			<div class="grp sliders">
+				<label>BRT <input type="range" id="brt" min="-100" max="100" value="0"></label>
+				<label>CON <input type="range" id="con" min="50" max="200" value="100"></label>
+			</div>
+		</div>
+
+		<div class="shutterrow">
+			<span class="hint">SPACE also fires the shutter</span>
+			<button id="shutter">SNAP</button>
+			<span class="hint">photos drop into the strip below</span>
+		</div>
+
+		<div class="striplabel">PHOTO STRIP &middot; CLICK A PHOTO TO DOWNLOAD THE PNG</div>
+		<div id="strip"><span class="empty">no photos yet — press SNAP</span></div>
+
+		<div class="footer">ordered dither: Bayer 4&times;4 &middot; 8 film stocks &middot; AGC auto-exposure &middot; buffer 160&times;120 &middot; output 640&times;480 PNG</div>
+	</div>
+</div>
+
+<script>
+'use strict';
+/* ============================== constants ============================== */
+var W = 160, H = 120, OUT_SCALE = 4, STRIP_MAX = 8;
+
+var BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
+function hex(s) { return [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)]; }
+/* every palette is a dark -> light luma ramp; the kernel indexes it by quantized luminance */
+var MODES = {
+	onebit:  { pal: ['#0a0a0a', '#e8e8e0'].map(hex) },                          // classic Mac 1-bit
+	paper:   { pal: ['#33302a', '#f4f0e4'].map(hex) },                          // dot-matrix printout
+	green:   { pal: ['#001500', '#0a4f0a', '#15a115', '#33ff33'].map(hex) },    // green phosphor (IBM 5151)
+	amber:   { pal: ['#140a00', '#663c00', '#c27800', '#ffb000'].map(hex) },    // amber phosphor
+	plasma:  { pal: ['#140200', '#5c1400', '#b33000', '#ff5f1f'].map(hex) },    // gas-plasma portable
+	gameboy: { pal: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'].map(hex) },    // DMG LCD
+	cga:     { pal: ['#000000', '#ff55ff', '#55ffff', '#ffffff'].map(hex) },    // CGA palette 1, high intensity
+	c64:     { pal: ['#0f0b33', '#40318d', '#7869c4', '#cbd6ff'].map(hex) }     // Commodore blue
+};
+
+/* ============================== dither kernel ============================== */
+/* Bayer 4x4 ordered dither, luminance-based, N palette levels.
+   50% gray in 1-bit mode -> exactly 8/16 white per tile; endpoints solid.
+   AGC (auto gain control): stretch the 2%..98% luma percentiles to full range,
+   smoothed across frames so exposure glides instead of flickering. */
+var LUMA = new Uint8ClampedArray(W * H);
+var HIST = new Uint32Array(256);
+var agcLo = 0, agcHi = 255;
+
+function ditherFrame(data, pal, brightness, contrast, agc) {
+	var n = pal.length, px = W * H, p, i, l, v;
+	HIST.fill(0);
+	for (p = 0, i = 0; p < px; p++, i += 4) {
+		l = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) | 0;
+		LUMA[p] = l;
+		HIST[l]++;
+	}
+	if (agc) {
+		var cut = px * 0.02, acc = 0, lo = 0, hi = 255;
+		for (v = 0; v < 256; v++) { acc += HIST[v]; if (acc >= cut) { lo = v; break; } }
+		acc = 0;
+		for (v = 255; v >= 0; v--) { acc += HIST[v]; if (acc >= cut) { hi = v; break; } }
+		if (hi - lo < 32) { var mid = (hi + lo) / 2; lo = mid - 16; hi = mid + 16; } // near-flat scene: don't amplify noise
+		agcLo += (lo - agcLo) * 0.15;
+		agcHi += (hi - agcHi) * 0.15;
+	} else { agcLo = 0; agcHi = 255; }
+	var span = (agcHi - agcLo) || 1;
+
+	p = 0; i = 0;
+	for (var y = 0; y < H; y++) {
+		var row = (y & 3) * 4;
+		for (var x = 0; x < W; x++, p++, i += 4) {
+			l = (LUMA[p] - agcLo) * 255 / span;
+			l = (l - 128) * contrast + 128 + brightness;
+			if (l < 0) l = 0; else if (l > 255) l = 255;
+			var t = (BAYER[row + (x & 3)] + 0.5) / 16;
+			v = l / 255 * (n - 1);
+			var base = Math.floor(v);
+			var idx = base + ((v - base) > t ? 1 : 0);
+			if (idx > n - 1) idx = n - 1;
+			var c = pal[idx];
+			data[i] = c[0]; data[i + 1] = c[1]; data[i + 2] = c[2]; data[i + 3] = 255;
+		}
+	}
+}
+
+/* ============================== stamps ============================== */
+/* grids: '#' = dark palette end, 'o' = light palette end, '.' = transparent */
+var SHADES_GRID = [
+	'################################',
+	'..###########...###########.....',
+	'..#oo########...#oo########.....',
+	'..##########....##########......',
+	'...########......########.......',
+	'....######........######........',
+	'.....####..........####.........'
+];
+var CROWN_GRID = [
+	'#.......#.......#',
+	'#.......#.......#',
+	'##.....###.....##',
+	'#o#...#o#o#...#o#',
+	'#oo#.#oo#oo#.#oo#',
+	'#ooo#ooooooo#ooo#',
+	'#ooooooooooooooo#',
+	'#################',
+	'#o#o#o#o#o#o#o#o#',
+	'#################'
+];
+
+function drawGrid(ctx, grid, gx, gy, scale, dark, light) {
+	for (var r = 0; r < grid.length; r++) {
+		var line = grid[r];
+		for (var c = 0; c < line.length; c++) {
+			var ch = line[c];
+			if (ch === '.') continue;
+			ctx.fillStyle = ch === '#' ? dark : light;
+			ctx.fillRect(gx + c * scale, gy + r * scale, scale, scale);
+		}
+	}
+}
+
+/* 3x5 mini font for the RAD! bubble */
+var FONT = {
+	R: ['##.', '#.#', '##.', '#.#', '#.#'],
+	A: ['.#.', '#.#', '###', '#.#', '#.#'],
+	D: ['##.', '#.#', '#.#', '#.#', '##.'],
+	'!': ['#..', '#..', '#..', '...', '#..']
+};
+function drawText(ctx, str, tx, ty, scale, color) {
+	ctx.fillStyle = color;
+	for (var k = 0; k < str.length; k++) {
+		var g = FONT[str[k]];
+		if (!g) continue;
+		for (var r = 0; r < 5; r++)
+			for (var c = 0; c < 3; c++)
+				if (g[r][c] === '#') ctx.fillRect(tx + (k * 4 + c) * scale, ty + r * scale, scale, scale);
+	}
+}
+function drawRadBubble(ctx, dark, light) {
+	var bx = 110, by = 6, bw = 42, bh = 18;
+	ctx.fillStyle = dark;  ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2); // border
+	ctx.fillStyle = light; ctx.fillRect(bx, by, bw, bh);
+	// tail
+	ctx.fillStyle = dark;  ctx.fillRect(bx + 2, by + bh, 7, 6);
+	ctx.fillStyle = light; ctx.fillRect(bx + 3, by + bh, 5, 4);
+	drawText(ctx, 'RAD!', bx + 5, by + 4, 2, dark);
+}
+
+var stampsOn = { shades: false, crown: false, rad: false };
+function rgb(c) { return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
+function drawStamps(ctx, pal) {
+	var dark = rgb(pal[0]), light = rgb(pal[pal.length - 1]);
+	if (stampsOn.shades) drawGrid(ctx, SHADES_GRID, 48, 44, 2, dark, light);
+	if (stampsOn.crown)  drawGrid(ctx, CROWN_GRID, 63, 2, 2, dark, light);
+	if (stampsOn.rad)    drawRadBubble(ctx, dark, light);
+}
+
+/* ============================== test pattern ============================== */
+var smiley = { x: 40, y: 40, vx: 0.9, vy: 0.7 };
+function drawTestScene(ctx, tms) {
+	// backdrop sweep
+	var g = ctx.createLinearGradient(0, 0, W, H * 0.6);
+	g.addColorStop(0, '#111'); g.addColorStop(1, '#bbb');
+	ctx.fillStyle = g;
+	ctx.fillRect(0, 0, W, H);
+	// drifting diagonal sheen so the dither visibly animates
+	var p = (tms / 40) % (W * 2);
+	var g2 = ctx.createLinearGradient(p - W, 0, p, H);
+	g2.addColorStop(0, 'rgba(255,255,255,0)');
+	g2.addColorStop(0.5, 'rgba(255,255,255,0.45)');
+	g2.addColorStop(1, 'rgba(255,255,255,0)');
+	ctx.fillStyle = g2;
+	ctx.fillRect(0, 0, W, H);
+	// 16-step calibration bars along the bottom (eyeball check of the ramp)
+	for (var i2 = 0; i2 < 16; i2++) {
+		var v = Math.round(i2 * 255 / 15);
+		ctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
+		ctx.fillRect(i2 * 10, H - 16, 10, 16);
+	}
+	// bouncing smiley
+	smiley.x += smiley.vx; smiley.y += smiley.vy;
+	if (smiley.x < 16 || smiley.x > W - 16) smiley.vx *= -1;
+	if (smiley.y < 16 || smiley.y > H - 34) smiley.vy *= -1;
+	ctx.fillStyle = '#e8e8e0';
+	ctx.beginPath(); ctx.arc(smiley.x, smiley.y, 14, 0, 6.284); ctx.fill();
+	ctx.fillStyle = '#111';
+	ctx.fillRect(smiley.x - 7, smiley.y - 6, 3, 5);
+	ctx.fillRect(smiley.x + 4, smiley.y - 6, 3, 5);
+	ctx.fillRect(smiley.x - 7, smiley.y + 5, 14, 2);
+	ctx.fillRect(smiley.x - 9, smiley.y + 3, 3, 2);
+	ctx.fillRect(smiley.x + 6, smiley.y + 3, 3, 2);
+}
+
+/* ============================== elements & state ============================== */
+var view = document.getElementById('view');
+var ctx = view.getContext('2d', { willReadFrequently: true });
+var strip = document.getElementById('strip');
+var led = document.getElementById('led');
+var statusEl = document.getElementById('status');
+var fpsEl = document.getElementById('fps');
+var flash = document.getElementById('flash');
+var startwrap = document.getElementById('startwrap');
+var brtEl = document.getElementById('brt');
+var conEl = document.getElementById('con');
+
+var mode = 'onebit';
+var agcOn = true, invertOn = false;
+var video = null, live = false;
+var shotCount = 0;
+
+function activePal() {
+	var pal = MODES[mode].pal;
+	return invertOn ? pal.slice().reverse() : pal;
+}
+
+/* ============================== main loop ============================== */
+var frames = 0, lastFpsT = performance.now();
+function tick(tms) {
+	if (live && video && video.readyState >= 2 && video.videoWidth > 0) {
+		var vw = video.videoWidth, vh = video.videoHeight;
+		var s = Math.max(W / vw, H / vh);
+		var dw = vw * s, dh = vh * s;
+		ctx.save();
+		ctx.translate(W, 0); ctx.scale(-1, 1); // selfie mirror
+		ctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh);
+		ctx.restore();
+	} else {
+		drawTestScene(ctx, tms);
+	}
+	var img = ctx.getImageData(0, 0, W, H);
+	var pal = activePal();
+	ditherFrame(img.data, pal, +brtEl.value, +conEl.value / 100, agcOn);
+	ctx.putImageData(img, 0, 0);
+	drawStamps(ctx, pal);
+
+	frames++;
+	var now = performance.now();
+	if (now - lastFpsT >= 1000) {
+		fpsEl.textContent = frames + ' FPS';
+		frames = 0; lastFpsT = now;
+	}
+	requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+/* ============================== camera ============================== */
+function setStatus(kind, text) {
+	led.className = 'led ' + kind;
+	statusEl.innerHTML = text;
+}
+document.getElementById('startbtn').addEventListener('click', function () {
+	blip(440);
+	if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+		startwrap.classList.add('hidden');
+		setStatus('test', 'NO CAMERA API (needs https or localhost) &middot; TEST PATTERN');
+		return;
+	}
+	navigator.mediaDevices.getUserMedia({
+		video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+		audio: false
+	}).then(function (stream) {
+		video = document.createElement('video');
+		video.setAttribute('playsinline', '');
+		video.muted = true;
+		video.srcObject = stream;
+		video.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none';
+		document.body.appendChild(video);
+		return video.play().then(function () {
+			live = true;
+			startwrap.classList.add('hidden');
+			setStatus('live', 'LIVE');
+		});
+	}).catch(function (err) {
+		startwrap.classList.add('hidden');
+		buzz();
+		var why = err && err.name === 'NotAllowedError' ? 'CAMERA DENIED' :
+			err && err.name === 'NotReadableError' ? 'CAMERA BUSY' : 'NO CAMERA';
+		setStatus('test', why + ' &middot; TEST PATTERN');
+	});
+});
+
+/* ============================== audio ============================== */
+var ac = null;
+function audio() {
+	if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+	if (ac.state === 'suspended') ac.resume();
+	return ac;
+}
+function blip(freq) {
+	try {
+		var a = audio(), t = a.currentTime;
+		var o = a.createOscillator(), g = a.createGain();
+		o.type = 'square'; o.frequency.value = freq || 880;
+		g.gain.setValueAtTime(0.12, t);
+		g.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+		o.connect(g); g.connect(a.destination);
+		o.start(t); o.stop(t + 0.04);
+	} catch (e) { /* audio unavailable */ }
+}
+function buzz() {
+	try {
+		var a = audio(), t = a.currentTime;
+		var o = a.createOscillator(), g = a.createGain();
+		o.type = 'square'; o.frequency.value = 110;
+		g.gain.setValueAtTime(0.15, t);
+		g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+		o.connect(g); g.connect(a.destination);
+		o.start(t); o.stop(t + 0.19);
+	} catch (e) { /* audio unavailable */ }
+}
+function clunk() {
+	try {
+		var a = audio(), t = a.currentTime;
+		// layer 1: low thump
+		var o = a.createOscillator(), g = a.createGain();
+		o.type = 'square';
+		o.frequency.setValueAtTime(180, t);
+		o.frequency.exponentialRampToValueAtTime(50, t + 0.09);
+		g.gain.setValueAtTime(0.5, t);
+		g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+		o.connect(g); g.connect(a.destination);
+		o.start(t); o.stop(t + 0.13);
+		// layer 2: mechanical click (bandpassed noise burst)
+		var len = Math.floor(a.sampleRate * 0.05);
+		var buf = a.createBuffer(1, len, a.sampleRate);
+		var d = buf.getChannelData(0);
+		for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+		var src = a.createBufferSource(); src.buffer = buf;
+		var bp = a.createBiquadFilter(); bp.type = 'bandpass';
+		bp.frequency.value = 2200; bp.Q.value = 1;
+		var ng = a.createGain();
+		ng.gain.setValueAtTime(0.35, t);
+		ng.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+		src.connect(bp); bp.connect(ng); ng.connect(a.destination);
+		src.start(t); src.stop(t + 0.05);
+	} catch (e) { /* audio unavailable */ }
+}
+
+/* ============================== shutter & strip ============================== */
+var capCanvas = document.createElement('canvas');
+capCanvas.width = W * OUT_SCALE; capCanvas.height = H * OUT_SCALE;
+var capCtx = capCanvas.getContext('2d');
+capCtx.imageSmoothingEnabled = false;
+
+function snap() {
+	clunk();
+	flash.classList.remove('fade');
+	flash.classList.add('on');
+	// force reflow so the fade transition restarts
+	void flash.offsetWidth;
+	flash.classList.remove('on');
+	flash.classList.add('fade');
+
+	capCtx.drawImage(view, 0, 0, capCanvas.width, capCanvas.height);
+	var url = capCanvas.toDataURL('image/png');
+	shotCount++;
+
+	var empty = strip.querySelector('.empty');
+	if (empty) empty.remove();
+
+	var img = document.createElement('img');
+	img.src = url;
+	img.alt = '1-Bit Booth photo ' + shotCount;
+	img.title = 'Click to download PNG';
+	img.dataset.n = String(shotCount);
+	img.addEventListener('click', function () {
+		blip(660);
+		var a = document.createElement('a');
+		a.href = img.src;
+		a.download = 'onebit-booth-' + String(img.dataset.n).padStart(3, '0') + '.png';
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+	});
+	strip.insertBefore(img, strip.firstChild);
+	while (strip.querySelectorAll('img').length > STRIP_MAX) strip.lastElementChild.remove();
+}
+document.getElementById('shutter').addEventListener('click', snap);
+document.addEventListener('keydown', function (e) {
+	if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); snap(); }
+});
+
+/* ============================== controls ============================== */
+document.querySelectorAll('.mode').forEach(function (btn) {
+	btn.addEventListener('click', function () {
+		blip(880);
+		mode = btn.dataset.mode;
+		document.querySelectorAll('.mode').forEach(function (b) { b.classList.toggle('sel', b === btn); });
+	});
+});
+document.querySelectorAll('.stamp').forEach(function (btn) {
+	btn.addEventListener('click', function () {
+		blip(1200);
+		var k = btn.dataset.stamp;
+		stampsOn[k] = !stampsOn[k];
+		btn.classList.toggle('sel', stampsOn[k]);
+	});
+});
+document.getElementById('agc').addEventListener('click', function () {
+	blip(980);
+	agcOn = !agcOn;
+	this.classList.toggle('sel', agcOn);
+	if (!agcOn) { agcLo = 0; agcHi = 255; } // snap back to identity, no glide-out
+});
+document.getElementById('invert').addEventListener('click', function () {
+	blip(760);
+	invertOn = !invertOn;
+	this.classList.toggle('sel', invertOn);
+});
+</script>
+</body>
+</html>

@@ -30,8 +30,8 @@
 		<div>
 			<div class="panel-label">LIVE TOUR</div>
 			<div class="panel-copy">
-				{openWindowCount} windows open · {installedAppCount} apps available ·
-				{ctx.storage.status} storage seam
+				{openWindowCount} windows open · {installedAppCount} apps available · storage online at {ctx
+					.storage.namespace}
 			</div>
 		</div>
 		<div class="tour-actions">

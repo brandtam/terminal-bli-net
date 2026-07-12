@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { getShopCatalog, canUninstall, isOwned } from '$lib/terminalos';
 	import type { ShopItem } from '$lib/terminalos';
+	import { getAppIconKind, getAppIconSprite } from '$lib/terminalos/apps/app-install';
 	import { getAppContext } from '$lib/os/os-context';
+	import PixelIcon from '$lib/components/PixelIcon.svelte';
 
 	// Zero-prop: the window reads os/fs from the host-provided context, not props,
 	// so the OS renders it identically to every other window (Slice 6 migration).
@@ -112,7 +114,15 @@
 		<div class="shop-list">
 			{#each catalog as item (item.app.id)}
 				<div class="shop-item" data-testid={`shelf-item-${item.app.id}`}>
-					<div class="shop-item-icon">{item.app.icon}</div>
+					<!-- Pixel icon (kind or manifest sprite) preferred over the raw emoji
+					     `icon` string, which stays a text-only fallback elsewhere. -->
+					<div class="shop-item-icon">
+						<PixelIcon
+							kind={getAppIconKind(item.app.id)}
+							sprite={getAppIconSprite(item.app.id)}
+							size={28}
+						/>
+					</div>
 					<div class="shop-item-info">
 						<div class="shop-item-name">{item.app.name}</div>
 						<div class="shop-item-desc">{item.app.description}</div>

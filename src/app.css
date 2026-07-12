@@ -33,6 +33,13 @@ body {
 	image-rendering: pixelated;
 }
 
+/* Firefox has no ::-webkit-scrollbar; scrollbar-width/color (inherited from
+   the root) is as close as it gets to the blocky ink-on-paper bars below. */
+html {
+	scrollbar-width: auto;
+	scrollbar-color: var(--ink) var(--paper);
+}
+
 ::-webkit-scrollbar {
 	width: 14px;
 	height: 14px;
