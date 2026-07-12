@@ -34,7 +34,7 @@
 		"changeset:version": "node scripts/changesets.js version",
 		"format": "prettier --write .",
 		"prepare": "husky",
-		"deploy-cloudflare": "pnpm build && wrangler pages deploy .svelte-kit/cloudflare",
+		"deploy-cloudflare": "pnpm build && wrangler deploy",
 		"deploy-cloudflare:dry": "pnpm build"
 	},
 	"dependencies": {

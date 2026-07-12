@@ -5,23 +5,10 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
 	preprocess: vitePreprocess(),
 	kit: {
-		adapter: adapter({
-			routes: {
-				include: ['/*'],
-				exclude: [
-					'<build>',
-					'<prerendered>',
-					'/bots/*',
-					'/themes/*',
-					'/favicon.*',
-					'/*.png',
-					'/*.ico',
-					'/*.xml',
-					'/*.svg',
-					'/site.webmanifest'
-				]
-			}
-		})
+		// No `routes` option: that only shapes the Pages-era _routes.json. On a
+		// Workers deploy, static assets are served before the Worker runs, so the
+		// old exclude list (/bots/*, /themes/*, favicons) is covered by default.
+		adapter: adapter()
 	}
 };
 

@@ -1,14 +1,23 @@
 {
 	"name": "terminal-bli-net",
+	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2026-05-24",
 	"compatibility_flags": ["nodejs_compat"],
-	"pages_build_output_dir": ".svelte-kit/cloudflare",
-	// KV binding "KV" must be configured in the Cloudflare Pages dashboard,
-	// or uncomment below with your own namespace ID from `wrangler kv namespace create KV`.
-	// Local dev (miniflare) creates an in-memory KV automatically.
-	// "kv_namespaces": [{ "binding": "KV", "id": "YOUR_KV_NAMESPACE_ID" }],
-	// ReminderAgent runs as a separate Worker because Cloudflare Pages cannot
-	// export Durable Object classes from the Pages adapter output.
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	// Preview URLs for non-production versions (the Workers stand-in for Pages
+	// branch previews). Enable non-production branch builds in Workers Builds too.
+	"preview_urls": true,
+	// On a Workers deploy this file is the source of truth for bindings —
+	// `wrangler deploy` drops anything configured only in the dashboard, so the
+	// KV binding must live here. Self-hosters: replace the id with your own from
+	// `wrangler kv namespace create KV`. Local dev (miniflare) creates an
+	// in-memory KV automatically.
+	"kv_namespaces": [{ "binding": "KV", "id": "f80e014c3a4f47d9895294d3aefdf516" }],
+	// ReminderAgent stays a separate Worker for now (docs/adr/0008 keeps the
+	// fold-in out of scope).
 	// REMINDER_SERVICE → the reminder Worker's subscribe/confirm endpoints.
 	// SPEND_LEDGER → the same Worker's /ledger/* endpoints, which front the single
 	// global SpendLedgerDO that enforces every dollar ceiling exactly (docs/adr/0005).
@@ -28,8 +37,7 @@
 	// OpenAI options:  gpt-4o-mini (default), gpt-4o, gpt-4.1-mini, gpt-4.1
 	// Turnstile Gate (proof-of-human in front of chat spend). To ACTIVATE:
 	//   1. uncomment PUBLIC_TURNSTILE_SITE_KEY below (the public widget key), and
-	//   2. set the secret (this is a Pages project, not a Worker):
-	//        wrangler pages secret put TURNSTILE_SECRET
+	//   2. set the secret: wrangler secret put TURNSTILE_SECRET
 	// Activate both together — a live site key without the server secret would
 	// re-challenge every message. Until then the gate fails open (no challenge).
 	"vars": {
