@@ -4,7 +4,7 @@ A retro desktop you visit in a browser. It looks like what the inside of a compu
 
 Open TV Guide to see what's on. Channels run shows on a schedule like mid-80s cable. If a show is airing, you can chat with the characters — they know what episode they're in.
 
-Built with SvelteKit, deployed on Cloudflare Pages.
+Built with SvelteKit, deployed on Cloudflare Workers.
 
 ## Visit it
 
@@ -113,7 +113,7 @@ Terminal HD stores its filesystem manifest and preferences in localStorage, with
 
 ## Deploy
 
-Deployed to Cloudflare Pages. Secrets (`ANTHROPIC_API_KEY`, optionally `OPENAI_API_KEY`) are set via the Pages dashboard or `wrangler secret put`.
+Deployed to Cloudflare Workers (`pnpm deploy-cloudflare`, or Workers Builds on push). Secrets (`ANTHROPIC_API_KEY`, optionally `OPENAI_API_KEY`, `TURNSTILE_SECRET`) are set via `wrangler secret put`. The KV namespace is bound in `wrangler.jsonc` — self-hosters swap in their own id from `wrangler kv namespace create KV`.
 
 ## Release notes
 
