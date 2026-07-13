@@ -6,10 +6,25 @@
 	import { TerminalBuffer } from './terminal-buffer.svelte';
 	import { charsPerSecond, BAUD_RATES, type BaudRate } from './terminal';
 	import { systemByNumber, systemById } from './content';
+	import type { CanonSystem } from './content/types';
 	import { formatNumber } from './content/types';
-	import { connect, step, type MachineState } from './bbs-machine';
+	import {
+		connect,
+		deliver,
+		entryEcho,
+		inputKind,
+		step,
+		type MachineRequest,
+		type MachineResponse,
+		type MachineState,
+		type Mode,
+		type StepResult
+	} from './bbs-machine';
+	import * as api from './api';
+	import type { Session } from './api';
+	import { loadProgress, saveProgress } from './persistence';
 
-	const { os, storage, lifecycle } = getAppContext();
+	const { os, fs, storage, lifecycle, turnstileSiteKey } = getAppContext();
 
 	type View = 'dial' | 'call';
 	type CallPhase = 'connecting' | 'session' | 'busy' | 'no-answer' | 'dropped';
@@ -18,11 +33,21 @@
 	let phase = $state<CallPhase>('connecting');
 	let number = $state('');
 	let baud = $state<BaudRate>(storage.get<BaudRate>('baud', 2400));
+	/** The line being typed on input screens, mirrored from the machine. */
+	let inputEcho = $state('');
 	const term = new TerminalBuffer();
 
 	// Session state lives outside $state on purpose: only key handlers read it,
 	// and every step replaces it wholesale.
 	let machine: MachineState | null = null;
+	/** Bearer session for /api/dialer/*; persisted in AppData progress.json. */
+	let session: Session | null = null;
+	/** Bumped on every dial/hang-up so stale async work knows to stand down. */
+	let callSeq = 0;
+	/** The trunk probe racing the handshake audio (fired at DIAL). */
+	let lineCheck: Promise<LineCheck> | null = null;
+
+	type LineCheck = { mode: Mode; session: Session | null };
 
 	let line: AudioLine | null = null;
 	let synth: ModemSynth | null = null;
@@ -100,14 +125,19 @@
 		s?.stopAll();
 		dialToneOn = false;
 		clearScheduled();
+		callSeq++;
 		view = 'call';
 		phase = 'connecting';
 		machine = null;
+		inputEcho = '';
 		term.clear();
 		term.print(`{W}ATDT ${formatNumber(number)}{/}`);
 		term.print('{W}DIALING...{/}');
 
 		const system = systemByNumber(number);
+		// Probe the trunk while the modems scream at each other — by CONNECT we
+		// know whether this call is live or LOCAL MODE (ADR 0008 degradation).
+		lineCheck = system ? checkLine(system) : null;
 		// Boards have one phone line; occasionally it's busy (PRD). Real
 		// occupancy replaces the dice once the live line lands.
 		const busyLine = system !== null && Math.random() < 0.07;
@@ -148,35 +178,74 @@
 		term.print('{W}NEGOTIATING...{/}');
 		synth?.playHandshake();
 		schedule(() => term.print(`{*G}CONNECT ${baud}{/}`), HANDSHAKE.connectAtS * 1000);
-		schedule(() => {
-			const system = systemByNumber(number);
-			if (!system) return;
-			const started = connect(system);
-			machine = started.state;
-			term.printLines(started.prints);
-			phase = 'session';
-		}, HANDSHAKE.totalS * 1000);
+		schedule(() => void startSession(), HANDSHAKE.totalS * 1000);
+	}
+
+	/**
+	 * The handshake finished: settle the trunk probe (a slow answer past the
+	 * grace window counts as line noise — LOCAL MODE, never a hang) and log
+	 * the caller in.
+	 */
+	async function startSession(): Promise<void> {
+		const system = systemByNumber(number);
+		if (!system) return;
+		const seq = callSeq;
+		const check = await Promise.race([
+			lineCheck ?? Promise.resolve({ mode: 'local' as const, session: null }),
+			settleAfter(3000, { mode: 'local' as const, session: null })
+		]);
+		if (seq !== callSeq || view !== 'call') return; // caller hung up while we waited
+		session = check.session;
+		phase = 'session';
+		applyResult(
+			connect(system, { mode: check.mode, sessionHandle: check.session?.handle ?? null }),
+			system
+		);
+	}
+
+	/** Load stored progress and probe the trunk; expired sessions are shed here. */
+	async function checkLine(system: CanonSystem): Promise<LineCheck> {
+		const progress = await loadProgress(fs);
+		const stored = progress.session;
+		const status = await api.probeLine(system.id, stored?.token);
+		if (status === 'local') return { mode: 'local', session: stored };
+		if (status === 'login') {
+			if (stored) await saveProgress(fs, { session: null });
+			return { mode: 'online', session: null };
+		}
+		return { mode: 'online', session: stored };
+	}
+
+	function settleAfter<T>(ms: number, value: T): Promise<T> {
+		return new Promise((resolve) => window.setTimeout(() => resolve(value), ms));
 	}
 
 	function hangupToDial(): void {
 		clearScheduled();
+		callSeq++;
 		synth?.stopAll();
 		machine = null;
+		inputEcho = '';
 		term.clear();
 		view = 'dial';
 		phase = 'connecting';
 		ensureDialTone();
 	}
 
-	// ── Session keys ────────────────────────────────────────────────────────
+	// ── Session keys and the api request loop ───────────────────────────────
 
 	function sessionKey(key: string): void {
 		if (!machine) return;
 		const system = systemById(machine.systemId);
 		if (!system) return;
-		const result = step(machine, key, system);
+		applyResult(step(machine, key, system), system);
+	}
+
+	/** The one funnel for machine output: state, prints, echo, hangup, requests. */
+	function applyResult(result: StepResult, system: CanonSystem): void {
 		machine = result.state;
 		term.printLines(result.prints);
+		inputEcho = entryEcho(result.state);
 		if (result.hangup) {
 			phase = 'dropped';
 			schedule(() => {
@@ -184,13 +253,117 @@
 				term.print('{R}NO CARRIER{/}');
 			}, 1500);
 			schedule(() => hangupToDial(), 3000);
+			return;
 		}
+		if (result.requests?.length) void runRequests(result.requests, system);
+	}
+
+	/** Perform machine requests in order, feeding outcomes back to deliver(). */
+	async function runRequests(requests: MachineRequest[], system: CanonSystem): Promise<void> {
+		const seq = callSeq;
+		for (const request of requests) {
+			const response = await perform(request, system);
+			if (seq !== callSeq || !machine) return; // the call ended while we waited
+			applyResult(deliver(machine, response, system), system);
+		}
+	}
+
+	async function perform(request: MachineRequest, system: CanonSystem): Promise<MachineResponse> {
+		const board = system.id;
+		const token = session?.token ?? '';
+		switch (request.kind) {
+			case 'login': {
+				const result = await api.login(request.handle, request.password);
+				if (result.ok) {
+					await keepSession(result.value);
+					return { kind: 'login', result: 'ok', handle: result.value.handle };
+				}
+				return {
+					kind: 'login',
+					result: result.error.kind === 'local' ? 'local' : 'no-carrier'
+				};
+			}
+			case 'register': {
+				const result = await api.register(
+					request.handle,
+					request.password,
+					request.questionnaire,
+					turnstileSiteKey
+				);
+				if (result.ok) {
+					await keepSession(result.value);
+					return { kind: 'register', result: 'ok', handle: result.value.handle };
+				}
+				if (result.error.kind === 'local') return { kind: 'register', result: 'local' };
+				const message =
+					result.error.kind === 'refused' ? result.error.message : 'THE LINE GARBLED THAT.';
+				return { kind: 'register', result: 'refused', message };
+			}
+			case 'topics': {
+				const result = await api.fetchTopics(board, token);
+				if (result.ok) return { kind: 'topics', result: 'ok', topics: result.value };
+				return { kind: 'topics', result: await authedFailure(result.error) };
+			}
+			case 'posts': {
+				const result = await api.fetchPosts(board, request.topicId, token);
+				if (result.ok) return { kind: 'posts', result: 'ok', posts: result.value };
+				return { kind: 'posts', result: await authedFailure(result.error) };
+			}
+			case 'submit-topic': {
+				const result = await api.submitTopic(board, token, {
+					section: request.section,
+					title: request.title,
+					body: request.body
+				});
+				return submitOutcome(result);
+			}
+			case 'submit-reply': {
+				const result = await api.submitReply(board, request.topicId, token, request.body);
+				return submitOutcome(result);
+			}
+		}
+	}
+
+	function submitOutcome(result: api.ApiResult<unknown>): MachineResponse {
+		if (result.ok) return { kind: 'submit', result: 'ok' };
+		if (result.error.kind === 'refused')
+			return { kind: 'submit', result: 'refused', message: result.error.message };
+		if (result.error.kind === 'no-carrier') {
+			void dropSession();
+			return { kind: 'submit', result: 'no-carrier' };
+		}
+		return { kind: 'submit', result: 'local' };
+	}
+
+	/** Map a read failure: 401 sheds the stored session, anything else is line noise. */
+	async function authedFailure(error: api.ApiError): Promise<'no-carrier' | 'local'> {
+		if (error.kind === 'no-carrier') {
+			await dropSession();
+			return 'no-carrier';
+		}
+		return 'local';
+	}
+
+	async function keepSession(value: Session): Promise<void> {
+		session = value;
+		await saveProgress(fs, { session: value });
+	}
+
+	async function dropSession(): Promise<void> {
+		session = null;
+		await saveProgress(fs, { session: null });
 	}
 
 	function onKeydown(event: KeyboardEvent): void {
 		// Keys belong to this window only while it's frontmost.
 		if (!lifecycle.focused) return;
-		const key = event.key === 'Escape' ? 'q' : event.key;
+		let key = event.key;
+		if (key === 'Escape') {
+			// ESC backs up like Q on single-key screens; while a line is being
+			// typed it stays inert — the buffer belongs to the caller.
+			if (view !== 'dial' && machine && inputKind(machine) !== 'keys') return;
+			key = 'q';
+		}
 		if (view === 'dial') {
 			if (/^[0-9]$/.test(key)) {
 				event.preventDefault();
@@ -204,16 +377,17 @@
 			}
 			return;
 		}
-		if (key.length !== 1 && key !== 'Enter') return;
+		if (key.length !== 1 && key !== 'Enter' && key !== 'Backspace') return;
 		event.preventDefault();
 		// Type-ahead, like a live line: your keystroke reached the host no
 		// matter what the screen was doing. A key mid-type completes the
 		// screen (the PRD's merciful skip) and then still acts below, so
-		// rapid navigation never drops input. Enter is the pure-skip key —
-		// the machine binds nothing to it, same as CR noise on a real board.
+		// rapid navigation never drops input. On single-key screens the
+		// machine binds nothing to Enter, so it stays a safe pure-skip key;
+		// on line-input screens Enter submits the typed line.
 		if (term.typing) term.skip();
-		if (key.length !== 1) return;
 		if (phase === 'session') sessionKey(key);
+		else if (key.length !== 1) return;
 		else if (phase === 'busy') {
 			if (key.toLowerCase() === 'r') dial();
 			else if (key.toLowerCase() === 'q') hangupToDial();
@@ -243,10 +417,11 @@
 		return () => cancelAnimationFrame(raf);
 	});
 
-	/** Pins the terminal to the bottom; reading the line count re-runs this
-	 * (attachments are effects) after every printed line. */
+	/** Pins the terminal to the bottom; reading the line count and the input
+	 * echo re-runs this (attachments are effects) after every printed line
+	 * and every keystroke on the input line. */
 	const autoscroll: Attachment<HTMLElement> = (el) => {
-		if (term.lines.length === 0) return;
+		if (term.lines.length === 0 && inputEcho.length === 0) return;
 		el.scrollTop = el.scrollHeight;
 	};
 </script>
@@ -302,7 +477,7 @@
 					<div class="line">
 						{#each runs as run, j (j)}<span class={run.fg ? `fg-${run.fg.replace('*', 'b')}` : ''}
 								>{run.text}</span
-							>{/each}{#if i === term.lines.length - 1}<span class="cursor">█</span>{/if}
+							>{/each}{#if i === term.lines.length - 1}{inputEcho}<span class="cursor">█</span>{/if}
 					</div>
 				{/each}
 			</div>
