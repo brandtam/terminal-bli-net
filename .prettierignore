@@ -13,6 +13,9 @@ pnpm-lock.yaml
 package-lock.json
 yarn.lock
 
-# Per-machine agent state, not repo tooling
-.claude/projects/
-.claude/settings.local.json
+# Agent state and tooling, not project code
+.claude/
+
+# Prose docs — formatting is authorial, not tool-enforced
+/docs
+CONTEXT.md

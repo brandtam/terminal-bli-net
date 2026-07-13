@@ -1,0 +1,17 @@
+// Test-only wrangler config for the Dialer vitest pool project. The real
+// deploy config is the repo-root wrangler.jsonc; this one exists because the
+// site worker's `main` imports the adapter-generated SvelteKit bundle, which
+// doesn't exist until a build — tests only need the DO class and D1.
+{
+	"name": "dialer-test",
+	"main": "./worker-entry.ts",
+	"compatibility_date": "2026-05-24",
+	"compatibility_flags": ["nodejs_compat"],
+	"d1_databases": [
+		{ "binding": "DIALER_DB", "database_name": "dialer-db", "database_id": "dialer-db-test" }
+	],
+	"durable_objects": {
+		"bindings": [{ "name": "DIALER_BOARD_NODE", "class_name": "DialerBoardNode" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["DialerBoardNode"] }]
+}

@@ -16,7 +16,7 @@ import {
  */
 
 describe('synthAppLibrary', () => {
-	it('produces all 21 apps in manifest order', () => {
+	it('produces all 22 apps in manifest order', () => {
 		const ids = synthAppLibrary().map((a) => a.id);
 		expect(ids).toEqual([
 			'finder',
@@ -39,6 +39,7 @@ describe('synthAppLibrary', () => {
 			'zorquest',
 			'calc',
 			'paint',
+			'dialer',
 			'vcr'
 		]);
 	});

@@ -1430,6 +1430,54 @@ export const MANIFESTS = [
 	}),
 
 	defineApp({
+		id: 'dialer',
+		name: 'The Dialer',
+		fileName: 'Dialer.app',
+		category: 'entertainment',
+		description: 'Dial-up terminal. Four boards. Maybe more.',
+		icon: '☎',
+		removable: true,
+		desktopAliasByDefault: false,
+		isSystem: false,
+		// Coming-soon reserves the app id NOW — its server side already exists
+		// (/api/dialer/*, docs/adr/0008 route-ownership guardrail) — while the
+		// store shows only a teaser box. The app itself (windows, launch,
+		// aboutSpec) flips this to 'released'.
+		status: 'coming-soon',
+		iconKind: 'doc',
+		// A desk telephone, manifest-owned (no shared PixelIcon glyph edit).
+		iconSprite: [
+			'................',
+			'................',
+			'..KKKKKKKKKKKK..',
+			'.KRRKKKKKKKKRRK.',
+			'.KRRRRRRRRRRRRK.',
+			'.KKRRKKKKKKRRKK.',
+			'..KKKKRRRRKKKK..',
+			'....KRRRRRRK....',
+			'...KRRRRRRRRK...',
+			'..KRRWWRRWWRRK..',
+			'..KRRWWRRWWRRK..',
+			'..KRRWWRRWWRRK..',
+			'..KRRRRRRRRRRK..',
+			'..KKKKKKKKKKKK..',
+			'................',
+			'................'
+		],
+		store: {
+			category: 'ent',
+			publisher: 'CROSSTALK SYSTEMS',
+			tagline: 'Your modem misses you.',
+			boxIcon: 'phone',
+			back: 'A 2400-baud terminal and a phone line into a town that never logged off. Four boards answer — and the callers are real. Rumor says a fifth board answers too, if you know where to look.',
+			inside: ['Real handshake audio', 'Live boards, real callers', 'One number nobody posts'],
+			reqs: 'Terminal OS 1.0 · Speakers on'
+		},
+		menus: () => [],
+		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
+	}),
+
+	defineApp({
 		id: 'vcr',
 		name: 'VCR',
 		fileName: 'VCR.app',
