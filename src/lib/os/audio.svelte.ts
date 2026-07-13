@@ -29,7 +29,21 @@ export type OsAudioContext = Pick<
 	| 'createBuffer'
 	| 'createBufferSource'
 	| 'createPeriodicWave'
+	| 'createBiquadFilter'
 >;
+
+/**
+ * A raw line into the shared context, handed out by `line()`. `ctx` is the
+ * one OS AudioContext (schedule on its clock); `out` is where the app's
+ * graph terminates — it routes through the OS master gain, so the single
+ * mute/volume setting and hidden-tab suspend govern app synths too.
+ */
+export type AudioLine = {
+	ctx: OsAudioContext;
+	out: GainNode;
+	/** Detach the line's output. Call from the window's lifecycle cleanup. */
+	close(): void;
+};
 
 export type ToneWave = 'square' | 'pulse' | 'triangle' | 'noise';
 
@@ -194,6 +208,22 @@ export class OsAudioClass {
 		};
 		source.start(t0);
 		source.stop(t1);
+	}
+
+	/**
+	 * A raw line for an app whose sound outgrows the chip-tone voices —
+	 * continuous tones, scheduled frequency sweeps, filtered noise. Returns
+	 * null before the first user gesture, so take the line inside a gesture
+	 * handler and hold onto it. A line taken while muted still plays later:
+	 * mute lives in the master gain, not in the line.
+	 */
+	line(): AudioLine | null {
+		const ctx = this.ctx;
+		const master = this.masterGain;
+		if (!ctx || !master) return null;
+		const out = ctx.createGain();
+		out.connect(master);
+		return { ctx, out, close: () => out.disconnect() };
 	}
 
 	// ── Internals ─────────────────────────────────────────────────────────

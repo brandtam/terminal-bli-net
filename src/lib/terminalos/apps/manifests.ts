@@ -1439,10 +1439,10 @@ export const MANIFESTS = [
 		removable: true,
 		desktopAliasByDefault: false,
 		isSystem: false,
-		// Coming-soon reserves the app id NOW — its server side already exists
+		// Coming-soon reserves the app id — its server side already exists
 		// (/api/dialer/*, docs/adr/0008 route-ownership guardrail) — while the
-		// store shows only a teaser box. The app itself (windows, launch,
-		// aboutSpec) flips this to 'released'.
+		// store shows only a teaser box. The window ships behind the flag; the
+		// release slice flips this to 'released' once the app is whole.
 		status: 'coming-soon',
 		iconKind: 'doc',
 		// A desk telephone, manifest-owned (no shared PixelIcon glyph edit).
@@ -1473,6 +1473,15 @@ export const MANIFESTS = [
 			inside: ['Real handshake audio', 'Live boards, real callers', 'One number nobody posts'],
 			reqs: 'Terminal OS 1.0 · Speakers on'
 		},
+		windows: [
+			{
+				match: { kind: 'exact', id: 'dialer' },
+				role: 'app',
+				title: () => 'The Dialer',
+				size: () => ({ w: 720, h: 540 }),
+				component: () => import('$lib/apps/dialer/DialerWindow.svelte')
+			}
+		],
 		menus: () => [],
 		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
 	}),

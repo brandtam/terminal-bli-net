@@ -120,7 +120,14 @@ function createMockContext() {
 			bufferSources.push(s);
 			return s;
 		}),
-		createPeriodicWave: vi.fn(() => ({ id: 'pulse-wave' }))
+		createPeriodicWave: vi.fn(() => ({ id: 'pulse-wave' })),
+		createBiquadFilter: vi.fn(() => ({
+			type: 'lowpass',
+			frequency: fakeParam(350),
+			Q: fakeParam(1),
+			connect: vi.fn(),
+			disconnect: vi.fn()
+		}))
 	};
 	return { ctx, gains, oscillators, bufferSources };
 }
@@ -309,6 +316,43 @@ describe('hidden tab', () => {
 		fakeDocument.hidden = true;
 		audio.beep();
 		expect(mock.oscillators).toHaveLength(0);
+	});
+});
+
+describe('line', () => {
+	it('returns null before the first user gesture', () => {
+		const audio = createAudio();
+		expect(audio.line()).toBeNull();
+	});
+
+	it('hands out the shared context and an output routed under the master gain', () => {
+		const audio = createUnlockedAudio();
+		const line = audio.line();
+		expect(line).not.toBeNull();
+		expect(line!.ctx).toBe(mock.ctx);
+		// gains[0] is the master; the line's out is a fresh gain wired into it.
+		expect(mock.gains).toHaveLength(2);
+		expect(mock.gains[1].connect).toHaveBeenCalledWith(mock.gains[0]);
+	});
+
+	it('close() detaches the line output', () => {
+		const audio = createUnlockedAudio();
+		const line = audio.line()!;
+		line.close();
+		expect(mock.gains[1].disconnect).toHaveBeenCalled();
+	});
+
+	it('still hands out a line while muted — mute lives in the master gain', () => {
+		const audio = createUnlockedAudio();
+		audio.setMuted(true);
+		expect(audio.line()).not.toBeNull();
+		expect(mock.gains[0].gain.value).toBe(0);
+	});
+
+	it('returns null after destroy', () => {
+		const audio = createUnlockedAudio();
+		audio.destroy();
+		expect(audio.line()).toBeNull();
 	});
 });
 
