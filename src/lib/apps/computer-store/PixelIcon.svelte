@@ -129,6 +129,21 @@
 			<rect x="11" y="5" width="1" height="1" fill="#0a0a0a" />
 			<rect x="11" y="7" width="1" height="1" fill="#0a0a0a" />
 		</svg>
+	{:else if name === 'phone'}
+		<svg viewBox="0 0 16 16" shape-rendering="crispEdges">
+			<!-- handset bar and ear/mouth cups -->
+			<rect x="1" y="2" width="14" height="3" fill="#f54e00" stroke="#0a0a0a" />
+			<rect x="1" y="4" width="3" height="2" fill="#f54e00" stroke="#0a0a0a" />
+			<rect x="12" y="4" width="3" height="2" fill="#f54e00" stroke="#0a0a0a" />
+			<!-- body -->
+			<rect x="5" y="6" width="6" height="2" fill="#f54e00" stroke="#0a0a0a" />
+			<rect x="3" y="8" width="10" height="6" fill="#f54e00" stroke="#0a0a0a" />
+			<!-- keypad -->
+			<rect x="5" y="9" width="2" height="1" fill="#ffffff" />
+			<rect x="9" y="9" width="2" height="1" fill="#ffffff" />
+			<rect x="5" y="11" width="2" height="1" fill="#ffffff" />
+			<rect x="9" y="11" width="2" height="1" fill="#ffffff" />
+		</svg>
 	{:else if name === 'camera'}
 		<svg viewBox="0 0 16 16" shape-rendering="crispEdges">
 			<rect x="2" y="5" width="9" height="7" fill="#3a322a" stroke="#0a0a0a" />

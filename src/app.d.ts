@@ -5,6 +5,17 @@ declare global {
 		interface Platform {
 			env: {
 				KV: KVNamespace;
+				// Dialer (docs/adr/0008: app-prefixed bindings). Present on a real
+				// Workers deploy and under wrangler dev; plain `pnpm dev` emulates D1
+				// but cannot host same-worker DO classes — /api/dialer/* answers 503
+				// there and the app degrades to LOCAL MODE.
+				DIALER_DB: D1Database;
+				DIALER_FILES: R2Bucket;
+				DIALER_BOARD_NODE: DurableObjectNamespace<
+					import('$lib/server/dialer/board-node').DialerBoardNode
+				>;
+				/** Kill switch secret: truthy -> every /api/dialer/* answers 503. */
+				DIALER_FORCE_LOCAL?: string;
 				REMINDER_SERVICE?: Fetcher;
 				SPEND_LEDGER?: Fetcher;
 				SPEND_LEDGER_REQUIRED?: string;

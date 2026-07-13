@@ -65,9 +65,14 @@ export default defineConfig(({ mode }) => {
 				'scripts/**/*.{test,spec}.{js,ts}',
 				'workers/**/*.{test,spec}.{js,ts}'
 			],
-			// The Durable Object suite needs the real Workers runtime — it runs in the
-			// Cloudflare pool project instead (workers/reminder-agent/vitest.config.ts).
-			exclude: [...configDefaults.exclude, 'workers/reminder-agent/test/**']
+			// The Durable Object suites need the real Workers runtime — they run in
+			// the Cloudflare pool projects instead (workers/reminder-agent/ and
+			// src/lib/server/dialer/ each carry their own vitest.config.ts).
+			exclude: [
+				...configDefaults.exclude,
+				'workers/reminder-agent/test/**',
+				'src/lib/server/dialer/test/**'
+			]
 		}
 	};
 });

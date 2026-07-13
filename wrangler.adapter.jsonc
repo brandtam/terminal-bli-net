@@ -1,0 +1,15 @@
+// Adapter-only wrangler config — read EXCLUSIVELY by adapter-cloudflare via
+// svelte.config.js `adapter({ config: 'wrangler.adapter.jsonc' })`.
+//
+// Why it exists: the adapter rimrafs and rewrites whatever `main` points at in
+// the config it reads. The real wrangler.jsonc points `main` at our hand-written
+// Worker entry (src/worker/index.ts), which must never be deleted by a build —
+// so the adapter gets this config, whose `main` is the SvelteKit worker the
+// adapter itself generates. Deploys and `wrangler dev` always use wrangler.jsonc.
+{
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	}
+}

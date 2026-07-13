@@ -1,11 +1,22 @@
 {
 	"name": "terminal-bli-net",
-	"main": ".svelte-kit/cloudflare/_worker.js",
+	// The hand-written Worker entry: wraps the adapter-generated SvelteKit worker
+	// (imported as `sveltekit-worker`, aliased below) and adds what SvelteKit
+	// output can't carry — Durable Object class exports and the cron dispatch.
+	// The adapter itself builds against wrangler.adapter.jsonc; see that file.
+	"main": "src/worker/index.ts",
 	"compatibility_date": "2026-05-24",
 	"compatibility_flags": ["nodejs_compat"],
 	"assets": {
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
+	},
+	// Bare specifier for the generated SvelteKit worker. A relative import would
+	// drag the whole generated server bundle into `checkJs` typechecking (~1600
+	// errors); the alias plus an ambient d.ts (src/worker/sveltekit-worker.d.ts)
+	// keeps the boundary typed and the bundle out of svelte-check's reach.
+	"alias": {
+		"sveltekit-worker": "./.svelte-kit/cloudflare/_worker.js"
 	},
 	// Preview URLs for non-production versions (the Workers stand-in for Pages
 	// branch previews). Enable non-production branch builds in Workers Builds too.
@@ -16,6 +27,31 @@
 	// `wrangler kv namespace create KV`. Local dev (miniflare) creates an
 	// in-memory KV automatically.
 	"kv_namespaces": [{ "binding": "KV", "id": "f80e014c3a4f47d9895294d3aefdf516" }],
+	// ── Dialer (docs/adr/0008: app-prefixed bindings, one namespace per app) ──
+	// D1: the Dialer's system of record (callers, sessions, boards, files, scores).
+	// Self-hosters: `wrangler d1 create dialer-db`, paste the id here, then
+	// `wrangler d1 migrations apply dialer-db` (--local for dev, --remote to deploy).
+	"d1_databases": [
+		{
+			"binding": "DIALER_DB",
+			"database_name": "dialer-db",
+			"database_id": "342e5819-e390-4b19-b7d7-b9a39198ec3a",
+			"migrations_dir": "migrations/dialer"
+		}
+	],
+	// R2: dithered image bodies only (text files live inline in D1). No public
+	// access — every download goes through /api/dialer/files/<id>.
+	// Self-hosters: `wrangler r2 bucket create dialer-files`.
+	"r2_buckets": [{ "binding": "DIALER_FILES", "bucket_name": "dialer-files" }],
+	// One DialerBoardNode per PUBLIC board: WebSocket presence, node chat, the
+	// caller counter. Exported from src/worker/durable-objects.ts.
+	"durable_objects": {
+		"bindings": [{ "name": "DIALER_BOARD_NODE", "class_name": "DialerBoardNode" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["DialerBoardNode"] }],
+	// Nightly Dialer sweep at 05:00 UTC (midnight Eastern). Dispatched by
+	// src/worker/cron.ts — one dispatch-table entry per app (docs/adr/0008).
+	"triggers": { "crons": ["0 5 * * *"] },
 	// ReminderAgent stays a separate Worker for now (docs/adr/0008 keeps the
 	// fold-in out of scope).
 	// REMINDER_SERVICE → the reminder Worker's subscribe/confirm endpoints.

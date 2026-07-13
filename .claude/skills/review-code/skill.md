@@ -14,17 +14,25 @@ This review covers three layers: **architecture**, **design system**, and **code
 
 ### Filesystem API
 
-- [ ] New app storage uses the virtual filesystem (`$lib/os/filesystem`), not raw `localStorage` or `appRead`/`appWrite`
-- [ ] Files are created in the correct folder (`DOCS_ID`, `RECORDINGS_ID`, etc.)
+- [ ] New app storage uses the virtual filesystem (`TerminalFS`, `$lib/terminalos/filesystem`), not raw `localStorage` or the legacy `appRead`/`appWrite`
+- [ ] Files are created in the correct well-known folder (`DOCUMENTS_ID`, `RECORDINGS_ID`, `APPDATA_ID`, `DESKTOP_ID` — `$lib/terminalos/filesystem/well-known-ids`)
 - [ ] File names are validated for uniqueness within their parent folder
 - [ ] The `appId` on created files matches the owning app so Finder can open them
 
-### App registry
+### App manifest (the only registration point)
 
-- [ ] New apps have an entry in `src/lib/os/app-registry.ts` with `id`, `name`, `filename`, `about`, `menus`
-- [ ] Window IDs for the app are registered in `WINDOW_APP_MAP` in `src/lib/os/os-api.ts`
-- [ ] Window IDs are added to `KNOWN_WINDOW_IDS` in Desktop.svelte or handled by a prefix check in `isKnownWindowId`
-- [ ] `getWindowDef` returns a title and size for the new window ID pattern
+- [ ] New apps are ONE `defineApp` entry in `src/lib/terminalos/apps/manifests.ts` — `id`, `name`, `fileName`, `category`, `icon`/`iconSprite`, `windows`, `menus`, `aboutSpec`, and a `store` block for the Computer Store
+- [ ] No OS files were edited to add the app: `WINDOW_APP_MAP`, `getWindowDef`, the app library, and the store catalog are all synthesized from `MANIFESTS` (`zero-os-edit.test.ts` is the guardrail — it must still pass)
+- [ ] Catalog count/order tests updated: `store-data.test.ts` (store size), `app-catalog.test.ts` (manifest order)
+
+### App server side (ADR 0008 — app-owned API routes)
+
+- [ ] Routes live under `src/routes/api/<app-id>/`; the directory name is the manifest app id (`api-route-ownership.test.ts` enforces this; OS routes need the explicit allowlist)
+- [ ] Bindings in `wrangler.jsonc` carry the app-id prefix (e.g. `DIALER_DB`), and `src/app.d.ts` `App.Platform` is updated to match
+- [ ] Shared-surface footprint is minimal: one re-export line in `src/worker/durable-objects.ts` per DO class, one entry in `src/worker/cron.ts` per cron handler — never app routing in `src/worker/index.ts`
+- [ ] Cron dispatch keys match `wrangler.jsonc` `triggers.crons` (`src/worker/cron.test.ts` enforces this)
+- [ ] The app degrades when its API is unreachable (LOCAL MODE pattern) — it may shrink, it must not brick
+- [ ] Server logic never gates on "installed" (a client-side localStorage claim); access control is app-issued credentials
 
 ### Data flow
 
@@ -80,10 +88,10 @@ This review covers three layers: **architecture**, **design system**, and **code
 
 ### TypeScript
 
-- [ ] `npm run check` passes with 0 errors
+- [ ] `pnpm check` passes with 0 errors
 - [ ] No `any` types — use proper interfaces
 - [ ] New interfaces/types go in `src/lib/types.ts` if shared, or local if component-specific
-- [ ] Imports use `$lib/` aliases, not relative paths crossing module boundaries
+- [ ] Imports use `$lib/` aliases, not relative paths crossing module boundaries (exception: the deployed Worker entry graph — `src/worker/` and everything it imports — must use relative imports; wrangler bundles it without SvelteKit's aliases)
 
 ### Svelte 5
 
@@ -96,7 +104,8 @@ This review covers three layers: **architecture**, **design system**, and **code
 
 - [ ] New pure functions have tests (Vitest, `describe`/`it` blocks)
 - [ ] Tests verify behavior through public interfaces, not implementation details
-- [ ] `npx vitest run` passes — all existing tests still green
+- [ ] `pnpm test:unit` passes — all existing tests still green (this runs all vitest projects: unit, plus the workers-pool suites)
+- [ ] Durable Object / D1 code is tested in a workers-pool project (see `src/lib/server/dialer/vitest.config.ts`), not mocked in node — node-side mocks are for route/glue logic only
 
 ### Persistence
 

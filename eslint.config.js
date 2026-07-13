@@ -10,7 +10,7 @@ export default [
 	prettier,
 	...svelte.configs['flat/prettier'],
 	{
-		files: ['**/*.ts', '**/*.js'],
+		files: ['**/*.ts', '**/*.js', '**/*.mjs'],
 		languageOptions: {
 			parser: tsParser,
 			globals: {
@@ -45,6 +45,16 @@ export default [
 				FormData: 'readonly',
 				DurableObjectNamespace: 'readonly',
 				DurableObjectState: 'readonly',
+				D1Database: 'readonly',
+				R2Bucket: 'readonly',
+				ExecutionContext: 'readonly',
+				ScheduledController: 'readonly',
+				WebSocket: 'readonly',
+				WebSocketPair: 'readonly',
+				WebSocketRequestResponsePair: 'readonly',
+				Headers: 'readonly',
+				BufferSource: 'readonly',
+				App: 'readonly',
 				RequestInit: 'readonly',
 				EmailAddress: 'readonly',
 				EventSource: 'readonly',
@@ -153,6 +163,6 @@ export default [
 		}
 	},
 	{
-		ignores: ['.svelte-kit/', 'build/', 'node_modules/', 'static/', 'bots/', 'scripts/']
+		ignores: ['.svelte-kit/', 'build/', 'node_modules/', 'static/', 'bots/', 'scripts/', '.claude/']
 	}
 ];

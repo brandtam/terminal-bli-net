@@ -25,8 +25,8 @@ function knownBoxIcons(): Set<string> {
 }
 
 describe('store catalog', () => {
-	it('has 12 apps', () => {
-		expect(APPS).toHaveLength(12);
+	it('has 13 apps', () => {
+		expect(APPS).toHaveLength(13);
 	});
 
 	it('every app has required fields', () => {

@@ -2,6 +2,8 @@
 .DS_Store
 .claude/projects/
 .claude/settings.local.json
+# Agent worktrees: per-machine working copies (own .svelte-kit etc.), never repo state
+.claude/worktrees/
 .codex/
 .agents/
 node_modules
