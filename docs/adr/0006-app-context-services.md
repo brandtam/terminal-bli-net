@@ -23,6 +23,8 @@ Nothing OS-owned caught leaked timers or oscillators on window close: cleanup re
 
 The OS proves the layer with minimal touchpoints: alert dialogs play `error()` (progress alerts stay silent — they announce work, not a problem), and menu-bar picks play `blip()`.
 
+_Amended 2026-07-12 (Dialer build):_ the chip-tone voices turned out to be the right vocabulary for UI sound but too small for an app whose sound _is_ the product — the Dialer's modem handshake needs continuous tones, per-millisecond frequency stepping, and bandpass-filtered noise that `tone()` cannot express. Rather than let the app mint its own `AudioContext` (bypassing gesture unlock, mute, and hidden-tab suspend), the layer now hands out a raw line: `os.audio.line()` returns `{ ctx, out, close }` — the one shared context plus a fresh `GainNode` routed under the master gain — or `null` before the first user gesture. An app builds any graph it wants against `ctx` and terminates it at `out`; the OS mute/volume setting and visibility suspend govern it for free, and `close()` (registered with `lifecycle.onCleanup`) detaches the graph on window close. The chip voices stay the default; the line is for apps that have outgrown them.
+
 ### The lifecycle contract
 
 `lifecycle` on AppContext is now real and tiny:

@@ -77,6 +77,8 @@ export default [
 				AudioContext: 'readonly',
 				AudioContextState: 'readonly',
 				AudioBuffer: 'readonly',
+				AudioBufferSourceNode: 'readonly',
+				AudioNode: 'readonly',
 				AudioScheduledSourceNode: 'readonly',
 				GainNode: 'readonly',
 				PeriodicWave: 'readonly',

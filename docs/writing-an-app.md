@@ -182,6 +182,20 @@ os.audio.tone({ wave: 'pulse', freq: 220, dur: 90, gain: 0.7 }); // low-level vo
 
 `tone` takes `wave: 'square' | 'pulse' | 'triangle' | 'noise'`, `freq` in Hz, `dur` in milliseconds, and `gain` 0–1. Everything is synthesized — there are no audio assets. You never need to guard a call: the layer drops tones silently when the user has muted sound, when the tab is hidden, or before the first user gesture (browser autoplay policy). Mute and volume are one persisted OS-level setting (`os.audio.setMuted(...)` / `os.audio.setVolume(...)`), so apps shouldn't ship their own mute toggles.
 
+If your sound outgrows the chip voices — continuous tones, scheduled frequency sweeps, filtered noise — take a raw line instead of minting your own context:
+
+```ts
+const line = os.audio.line(); // null before the first user gesture
+if (line) {
+	const osc = line.ctx.createOscillator();
+	osc.connect(line.out); // routed under the OS master gain
+	osc.start();
+	lifecycle.onCleanup(() => line.close());
+}
+```
+
+`line()` hands you the one shared `AudioContext` plus an output `GainNode` under the master gain, so OS mute/volume and hidden-tab suspend still apply to everything you build. Call it inside a gesture handler (it returns `null` before the first gesture) and register `close()` with `lifecycle.onCleanup`.
+
 ## Opening documents (the file → window path)
 
 If your app opens files (a text editor, a media player), make it a **prefix window** and declare what it handles:
