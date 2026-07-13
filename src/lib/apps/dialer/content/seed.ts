@@ -6,7 +6,8 @@ import type { CanonSystem, CanonTopic } from './types';
  * and community share one surface"). Topics key on (board, slug); posts key
  * on (topic, created_at) — re-running a seed inserts nothing. Seeded rows are
  * `canon=1 pinned=1` and immutable by construction: no API path updates or
- * deletes them.
+ * deletes them. `pinned_rank` numbers topics in module order — the authored
+ * fiction order the pinned block lists in, online and LOCAL MODE alike.
  *
  * The generated file is a real migration (migrations/dialer/000N_canon_*.sql),
  * locked to this generator by a file-snapshot test in seed.test.ts — editing a
@@ -44,19 +45,20 @@ export function canonSeedSql(system: CanonSystem): string {
 		`-- Idempotent: topics key on (board, slug), posts on (topic, created_at).`,
 		''
 	];
+	let rank = 0;
 	for (const section of system.sections) {
 		for (const topic of section.topics) {
-			statements.push(topicSql(system.id, section.slug, topic), '');
+			statements.push(topicSql(system.id, section.slug, topic, rank++), '');
 		}
 	}
 	return statements.join('\n');
 }
 
-function topicSql(board: string, section: string, topic: CanonTopic): string {
+function topicSql(board: string, section: string, topic: CanonTopic, rank: number): string {
 	const createdAt = postEpoch(topic, 0);
 	const lines = [
-		`INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned)`,
-		`SELECT ${sql(board)}, ${sql(section)}, ${sql(topic.slug)}, ${sql(topic.title)}, ${sql(topic.posts[0].author)}, ${createdAt}, 1, 1`,
+		`INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned, pinned_rank)`,
+		`SELECT ${sql(board)}, ${sql(section)}, ${sql(topic.slug)}, ${sql(topic.title)}, ${sql(topic.posts[0].author)}, ${createdAt}, 1, 1, ${rank}`,
 		`WHERE NOT EXISTS (SELECT 1 FROM topics WHERE board = ${sql(board)} AND slug = ${sql(topic.slug)});`
 	];
 	topic.posts.forEach((post, i) => {

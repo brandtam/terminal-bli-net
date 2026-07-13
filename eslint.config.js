@@ -43,6 +43,8 @@ export default [
 				PointerEvent: 'readonly',
 				DataTransfer: 'readonly',
 				FormData: 'readonly',
+				AbortController: 'readonly',
+				DOMException: 'readonly',
 				DurableObjectNamespace: 'readonly',
 				DurableObjectState: 'readonly',
 				D1Database: 'readonly',

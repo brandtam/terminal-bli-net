@@ -66,7 +66,7 @@ export async function listTopics(db: D1Database, board: PublicBoard): Promise<To
 			 GROUP BY t.id
 			 HAVING t.canon = 1 OR COUNT(p.id) > 0
 			 ORDER BY t.pinned DESC,
-			          CASE WHEN t.pinned = 1 THEN t.created_at END ASC,
+			          CASE WHEN t.pinned = 1 THEN t.pinned_rank END ASC,
 			          last_post_at DESC`
 		)
 		.bind(board)

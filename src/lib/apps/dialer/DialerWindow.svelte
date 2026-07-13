@@ -22,6 +22,14 @@
 	} from './bbs-machine';
 	import * as api from './api';
 	import type { Session } from './api';
+	import {
+		GUARD_MS,
+		commandKey,
+		guardElapsed,
+		hayesOnline,
+		watchKey,
+		type HayesResult
+	} from './hayes';
 	import { loadProgress, saveProgress } from './persistence';
 
 	const { os, fs, storage, lifecycle, turnstileSiteKey } = getAppContext();
@@ -44,6 +52,10 @@
 	let session: Session | null = null;
 	/** Bumped on every dial/hang-up so stale async work knows to stand down. */
 	let callSeq = 0;
+	/** The Hayes layer under the session: +++ escape and AT command mode. */
+	let hayes = hayesOnline();
+	/** Pending guard-time check after a +++; any key cancels it. */
+	let guardTimer = 0;
 	/** The trunk probe racing the handshake audio (fired at DIAL). */
 	let lineCheck: Promise<LineCheck> | null = null;
 
@@ -98,6 +110,7 @@
 
 	lifecycle.onCleanup(() => {
 		clearScheduled();
+		window.clearTimeout(guardTimer);
 		synth?.stopAll();
 		line?.close();
 	});
@@ -125,10 +138,12 @@
 		s?.stopAll();
 		dialToneOn = false;
 		clearScheduled();
+		window.clearTimeout(guardTimer);
 		callSeq++;
 		view = 'call';
 		phase = 'connecting';
 		machine = null;
+		hayes = hayesOnline();
 		inputEcho = '';
 		term.clear();
 		term.print(`{W}ATDT ${formatNumber(number)}{/}`);
@@ -222,14 +237,47 @@
 
 	function hangupToDial(): void {
 		clearScheduled();
+		window.clearTimeout(guardTimer);
 		callSeq++;
 		synth?.stopAll();
 		machine = null;
+		hayes = hayesOnline();
 		inputEcho = '';
 		term.clear();
 		view = 'dial';
 		phase = 'connecting';
 		ensureDialTone();
+	}
+
+	/** Drop the line: carrier drop, NO CARRIER, back to the dial screen. */
+	function dropCarrier(): void {
+		window.clearTimeout(guardTimer);
+		phase = 'dropped';
+		inputEcho = '';
+		schedule(() => {
+			synth?.playCarrierDrop();
+			term.print('{R}NO CARRIER{/}');
+		}, 1500);
+		schedule(() => hangupToDial(), 3000);
+	}
+
+	/** ALT-H, the ProComm/Telix hangup key: drop the line from any call
+	 * phase. The window owns it — no wait screen or stalled request can
+	 * take it away from the caller. */
+	function altHangup(): void {
+		if (view !== 'call' || phase === 'dropped') return;
+		clearScheduled();
+		if (phase === 'session') {
+			term.print('');
+			term.print('{W}+++ATH{/}');
+			hayes = hayesOnline();
+			inputEcho = '';
+			dropCarrier();
+		} else {
+			// No carrier yet (dialing, busy, no answer) — just put the
+			// handset down.
+			hangupToDial();
+		}
 	}
 
 	// ── Session keys and the api request loop ───────────────────────────────
@@ -245,17 +293,26 @@
 	function applyResult(result: StepResult, system: CanonSystem): void {
 		machine = result.state;
 		term.printLines(result.prints);
-		inputEcho = entryEcho(result.state);
+		// While the modem holds the line (+++ escape), the command entry owns
+		// the cursor — an async deliver() must not put the session echo back.
+		if (hayes.mode !== 'command') inputEcho = entryEcho(result.state);
 		if (result.hangup) {
-			phase = 'dropped';
-			schedule(() => {
-				synth?.playCarrierDrop();
-				term.print('{R}NO CARRIER{/}');
-			}, 1500);
-			schedule(() => hangupToDial(), 3000);
+			dropCarrier();
 			return;
 		}
 		if (result.requests?.length) void runRequests(result.requests, system);
+	}
+
+	/** The one funnel for modem-layer output: state, prints, echo, actions. */
+	function applyHayes(result: HayesResult): void {
+		hayes = result.state;
+		term.printLines(result.prints);
+		if (result.action === 'hangup') {
+			dropCarrier();
+			return;
+		}
+		if (result.action === 'resume') term.print(`{*G}CONNECT ${baud}{/}`);
+		inputEcho = hayes.mode === 'command' ? hayes.entry : machine ? entryEcho(machine) : '';
 	}
 
 	/** Perform machine requests in order, feeding outcomes back to deliver(). */
@@ -357,11 +414,23 @@
 	function onKeydown(event: KeyboardEvent): void {
 		// Keys belong to this window only while it's frontmost.
 		if (!lifecycle.focused) return;
+		// ALT-H hangs up from anywhere in a call — checked by physical key
+		// (event.code) because macOS turns Option-H into a dead character.
+		if (event.altKey && event.code === 'KeyH' && view === 'call') {
+			event.preventDefault();
+			altHangup();
+			return;
+		}
 		let key = event.key;
 		if (key === 'Escape') {
 			// ESC backs up like Q on single-key screens; while a line is being
-			// typed it stays inert — the buffer belongs to the caller.
-			if (view !== 'dial' && machine && inputKind(machine) !== 'keys') return;
+			// typed (or the modem holds the line) it stays inert — the buffer
+			// belongs to the caller.
+			if (
+				view !== 'dial' &&
+				(hayes.mode === 'command' || (machine && inputKind(machine) !== 'keys'))
+			)
+				return;
 			key = 'q';
 		}
 		if (view === 'dial') {
@@ -386,8 +455,20 @@
 		// machine binds nothing to Enter, so it stays a safe pure-skip key;
 		// on line-input screens Enter submits the typed line.
 		if (term.typing) term.skip();
-		if (phase === 'session') sessionKey(key);
-		else if (key.length !== 1) return;
+		if (phase === 'session') {
+			// Every key disarms a pending +++ guard — silence means silence.
+			window.clearTimeout(guardTimer);
+			if (hayes.mode === 'command') {
+				applyHayes(commandKey(hayes, key, performance.now()));
+				return;
+			}
+			const watched = watchKey(hayes, key, performance.now());
+			hayes = watched.state;
+			if (watched.arm) {
+				guardTimer = window.setTimeout(() => applyHayes(guardElapsed(hayes)), GUARD_MS);
+			}
+			sessionKey(key);
+		} else if (key.length !== 1) return;
 		else if (phase === 'busy') {
 			if (key.toLowerCase() === 'r') dial();
 			else if (key.toLowerCase() === 'q') hangupToDial();
@@ -470,16 +551,24 @@
 			</div>
 		</div>
 	{:else}
-		<div class="screen" {@attach autoscroll}>
-			<div class="term">
-				{#each term.lines as runs, i (i)}
-					<!-- Spans stay glued together: stray whitespace would shift columns. -->
-					<div class="line">
-						{#each runs as run, j (j)}<span class={run.fg ? `fg-${run.fg.replace('*', 'b')}` : ''}
-								>{run.text}</span
-							>{/each}{#if i === term.lines.length - 1}{inputEcho}<span class="cursor">█</span>{/if}
-					</div>
-				{/each}
+		<div class="call">
+			<div class="screen" {@attach autoscroll}>
+				<div class="term">
+					{#each term.lines as runs, i (i)}
+						<!-- Spans stay glued together: stray whitespace would shift columns. -->
+						<div class="line">
+							{#each runs as run, j (j)}<span class={run.fg ? `fg-${run.fg.replace('*', 'b')}` : ''}
+									>{run.text}</span
+								>{/each}{#if i === term.lines.length - 1}{inputEcho}<span class="cursor">█</span
+								>{/if}
+						</div>
+					{/each}
+				</div>
+			</div>
+			<!-- The terminal program's status line, ProComm style. -->
+			<div class="status-bar">
+				<span>ALT-H HANG UP</span>
+				<span>{baud} N81</span>
 			</div>
 		</div>
 	{/if}
@@ -653,11 +742,29 @@
 
 	/* ── Terminal ────────────────────────────────────────────────────── */
 
+	.call {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
 	.screen {
 		flex: 1;
 		overflow-y: auto;
 		overflow-x: hidden;
 		padding: 8px 12px;
+	}
+
+	.status-bar {
+		display: flex;
+		justify-content: space-between;
+		font-family: var(--brand-font-display);
+		font-size: 8px;
+		letter-spacing: 1px;
+		padding: 4px 12px;
+		border-top: 1px solid var(--phos);
+		opacity: 0.7;
 	}
 
 	.term {

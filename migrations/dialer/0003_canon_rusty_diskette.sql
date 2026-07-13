@@ -4,8 +4,8 @@
 --   pnpm test:unit -- --update
 -- Idempotent: topics key on (board, slug), posts on (topic, created_at).
 
-INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned)
-SELECT 'rusty-diskette', 'general', 'halloween-87', 'HALLOWEEN PLANS?', 'CAPT.VECTOR', 560779200, 1, 1
+INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned, pinned_rank)
+SELECT 'rusty-diskette', 'general', 'halloween-87', 'HALLOWEEN PLANS?', 'CAPT.VECTOR', 560779200, 1, 1, 0
 WHERE NOT EXISTS (SELECT 1 FROM topics WHERE board = 'rusty-diskette' AND slug = 'halloween-87');
 
 INSERT INTO posts (topic_id, author, body, created_at, canon, pinned)
@@ -35,8 +35,8 @@ which for you means 3 AM. -- CV', 560865720, 1, 1
 FROM topics t WHERE t.board = 'rusty-diskette' AND t.slug = 'halloween-87'
   AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.topic_id = t.id AND p.canon = 1 AND p.created_at = 560865720);
 
-INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned)
-SELECT 'rusty-diskette', 'general', 'amiga-vs-st', 'AMIGA VS ST (ROUND 40)', 'CAPT.VECTOR', 559828800, 1, 1
+INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned, pinned_rank)
+SELECT 'rusty-diskette', 'general', 'amiga-vs-st', 'AMIGA VS ST (ROUND 40)', 'CAPT.VECTOR', 559828800, 1, 1, 1
 WHERE NOT EXISTS (SELECT 1 FROM topics WHERE board = 'rusty-diskette' AND slug = 'amiga-vs-st');
 
 INSERT INTO posts (topic_id, author, body, created_at, canon, pinned)
@@ -67,8 +67,8 @@ vs 512. it didn''t happen, per rule 2.', 560088120, 1, 1
 FROM topics t WHERE t.board = 'rusty-diskette' AND t.slug = 'amiga-vs-st'
   AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.topic_id = t.id AND p.canon = 1 AND p.created_at = 560088120);
 
-INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned)
-SELECT 'rusty-diskette', 'general', 'back-room-joke', 'WHAT DOES CV KEEP IN THE BACK?', 'NO.CARRIER', 560174400, 1, 1
+INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned, pinned_rank)
+SELECT 'rusty-diskette', 'general', 'back-room-joke', 'WHAT DOES CV KEEP IN THE BACK?', 'NO.CARRIER', 560174400, 1, 1, 2
 WHERE NOT EXISTS (SELECT 1 FROM topics WHERE board = 'rusty-diskette' AND slug = 'back-room-joke');
 
 INSERT INTO posts (topic_id, author, body, created_at, canon, pinned)
@@ -86,8 +86,8 @@ interesting weather out here by the garage.
 FROM topics t WHERE t.board = 'rusty-diskette' AND t.slug = 'back-room-joke'
   AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.topic_id = t.id AND p.canon = 1 AND p.created_at = 560260860);
 
-INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned)
-SELECT 'rusty-diskette', 'trade', 'wtb-1541', 'WTB: WORKING 1541', 'PHRACTURE', 560347200, 1, 1
+INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned, pinned_rank)
+SELECT 'rusty-diskette', 'trade', 'wtb-1541', 'WTB: WORKING 1541', 'PHRACTURE', 560347200, 1, 1, 3
 WHERE NOT EXISTS (SELECT 1 FROM topics WHERE board = 'rusty-diskette' AND slug = 'wtb-1541');
 
 INSERT INTO posts (topic_id, author, body, created_at, canon, pinned)
@@ -104,8 +104,8 @@ in board history and I am LISTENING. -- CV', 560347260, 1, 1
 FROM topics t WHERE t.board = 'rusty-diskette' AND t.slug = 'wtb-1541'
   AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.topic_id = t.id AND p.canon = 1 AND p.created_at = 560347260);
 
-INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned)
-SELECT 'rusty-diskette', 'trade', 'hayes-clone', 'FS: HAYES-COMPATIBLE 1200, $60', 'NO.CARRIER', 560606400, 1, 1
+INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned, pinned_rank)
+SELECT 'rusty-diskette', 'trade', 'hayes-clone', 'FS: HAYES-COMPATIBLE 1200, $60', 'NO.CARRIER', 560606400, 1, 1, 4
 WHERE NOT EXISTS (SELECT 1 FROM topics WHERE board = 'rusty-diskette' AND slug = 'hayes-clone');
 
 INSERT INTO posts (topic_id, author, body, created_at, canon, pinned)
@@ -115,8 +115,8 @@ $60 or best offer. upgrading to 2400 like a civilized person.', 560606400, 1, 1
 FROM topics t WHERE t.board = 'rusty-diskette' AND t.slug = 'hayes-clone'
   AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.topic_id = t.id AND p.canon = 1 AND p.created_at = 560606400);
 
-INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned)
-SELECT 'rusty-diskette', 'grapevine', 'night-circuit', 'WHERE THE NIGHT PEOPLE WENT', 'PHRACTURE', 560433600, 1, 1
+INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned, pinned_rank)
+SELECT 'rusty-diskette', 'grapevine', 'night-circuit', 'WHERE THE NIGHT PEOPLE WENT', 'PHRACTURE', 560433600, 1, 1, 5
 WHERE NOT EXISTS (SELECT 1 FROM topics WHERE board = 'rusty-diskette' AND slug = 'night-circuit');
 
 INSERT INTO posts (topic_id, author, body, created_at, canon, pinned)
@@ -139,8 +139,8 @@ Mary if you''re reading this, the envelope was padded.
 FROM topics t WHERE t.board = 'rusty-diskette' AND t.slug = 'night-circuit'
   AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.topic_id = t.id AND p.canon = 1 AND p.created_at = 560520060);
 
-INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned)
-SELECT 'rusty-diskette', 'grapevine', 'exchange-rumor', 'WEIRD NUMBERS IN THE EXCHANGE', 'NO.CARRIER', 560692800, 1, 1
+INSERT INTO topics (board, section, slug, title, author, created_at, canon, pinned, pinned_rank)
+SELECT 'rusty-diskette', 'grapevine', 'exchange-rumor', 'WEIRD NUMBERS IN THE EXCHANGE', 'NO.CARRIER', 560692800, 1, 1, 6
 WHERE NOT EXISTS (SELECT 1 FROM topics WHERE board = 'rusty-diskette' AND slug = 'exchange-rumor');
 
 INSERT INTO posts (topic_id, author, body, created_at, canon, pinned)

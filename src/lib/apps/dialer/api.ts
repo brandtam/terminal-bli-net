@@ -38,41 +38,56 @@ export type ApiError =
 
 export type ApiResult<T> = { ok: true; value: T } | { ok: false; error: ApiError };
 
+/** A line that answers nothing for this long is dead air, not a slow host.
+ * The abort lands in the catch below → LOCAL MODE, so a stalled request can
+ * never strand a caller on a wait screen. */
+export const REQUEST_TIMEOUT_MS = 15_000;
+
 async function request<T>(
 	path: string,
 	init: { method?: string; token?: string; body?: unknown } = {}
 ): Promise<ApiResult<T>> {
-	let response: Response;
+	// A plain AbortController + setTimeout (not AbortSignal.timeout) so fake
+	// timers can drive the deadline in tests. The signal also covers the body
+	// read, so the timer lives until the response is fully consumed.
+	const abort = new AbortController();
+	const deadline = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
 	try {
-		response = await fetch(`/api/dialer/${path}`, {
-			method: init.method ?? 'GET',
-			headers: {
-				...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-				...(init.token ? { Authorization: `Bearer ${init.token}` } : {})
-			},
-			...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {})
-		});
-	} catch {
-		return { ok: false, error: { kind: 'local' } };
-	}
-
-	if (response.ok) {
+		let response: Response;
 		try {
-			return { ok: true, value: (await response.json()) as T };
+			response = await fetch(`/api/dialer/${path}`, {
+				method: init.method ?? 'GET',
+				headers: {
+					...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+					...(init.token ? { Authorization: `Bearer ${init.token}` } : {})
+				},
+				...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+				signal: abort.signal
+			});
 		} catch {
 			return { ok: false, error: { kind: 'local' } };
 		}
-	}
-	if (response.status === 401) return { ok: false, error: { kind: 'no-carrier' } };
-	if (response.status >= 500) return { ok: false, error: { kind: 'local' } };
 
-	let message = 'REFUSED';
-	try {
-		message = ((await response.json()) as { message?: string }).message ?? message;
-	} catch {
-		// keep the fallback
+		if (response.ok) {
+			try {
+				return { ok: true, value: (await response.json()) as T };
+			} catch {
+				return { ok: false, error: { kind: 'local' } };
+			}
+		}
+		if (response.status === 401) return { ok: false, error: { kind: 'no-carrier' } };
+		if (response.status >= 500) return { ok: false, error: { kind: 'local' } };
+
+		let message = 'REFUSED';
+		try {
+			message = ((await response.json()) as { message?: string }).message ?? message;
+		} catch {
+			// keep the fallback
+		}
+		return { ok: false, error: { kind: 'refused', message } };
+	} finally {
+		clearTimeout(deadline);
 	}
-	return { ok: false, error: { kind: 'refused', message } };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { env } from './env';
 import { describe, it, expect } from 'vitest';
+import { systemById } from '../../../apps/dialer/content';
 import { registerCaller } from '../auth';
 import {
 	createPost,
@@ -33,7 +34,14 @@ describe('canon seed (migration 0003)', () => {
 		const canon = topics.filter((t) => t.canon);
 		expect(canon.length).toBeGreaterThanOrEqual(7);
 		expect(topics.slice(0, canon.length).every((t) => t.pinned)).toBe(true);
-		// Fiction order within the pinned block: oldest thread first.
+		// Parity with LOCAL MODE: the pinned block lists in the content
+		// module's authored order (pinned_rank), exactly as canonTopics()
+		// projects it offline — not by created_at, which the fiction never
+		// wrote monotonically.
+		const fictionOrder = systemById('rusty-diskette')!.sections.flatMap((s) =>
+			s.topics.map((t) => t.slug)
+		);
+		expect(canon.map((t) => t.slug)).toEqual(fictionOrder);
 		const halloween = canon.find((t) => t.slug === 'halloween-87');
 		expect(halloween?.postCount).toBe(3);
 		expect(halloween?.author).toBe('CAPT.VECTOR');
