@@ -12,5 +12,17 @@ export function isPublicBoard(value: string): value is PublicBoard {
 	return (PUBLIC_BOARDS as readonly string[]).includes(value);
 }
 
+/**
+ * Message sections per public board (PRD content spec). Section slugs live in
+ * the `topics.section` column; posting validates against this list so the API
+ * can't grow junk sections. The client content modules bind to the same slugs
+ * (seed generator + LOCAL MODE rendering) — a guard test keeps them aligned.
+ */
+export const BOARD_SECTIONS: Record<PublicBoard, readonly string[]> = {
+	'rusty-diskette': ['general', 'trade', 'grapevine'],
+	'night-circuit': ['late-shift', 'phreak-physics'],
+	foundry: ['the-floor', 'demo-den', 'old-iron']
+};
+
 /** A board answers BUSY once this many callers are connected (real occupancy). */
 export const BOARD_MAX_CALLERS = 8;

@@ -36,6 +36,11 @@ export async function withBoardNode<T>(run: () => Promise<T>): Promise<T> {
 	}
 }
 
+/** A JSON body field as a string — anything else (number, object, absent) is ''. */
+export function asString(value: unknown): string {
+	return typeof value === 'string' ? value : '';
+}
+
 /** The authenticated handle behind `Authorization: Bearer <token>`, or 401. */
 export async function requireSession(
 	env: DialerEnv,

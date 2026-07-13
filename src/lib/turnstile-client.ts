@@ -35,19 +35,34 @@ declare global {
 
 let scriptPromise: Promise<void> | null = null;
 
+/** A script fetch that hangs fires neither onload nor onerror — without a
+ * deadline every caller awaiting a token would stall with it. The challenge
+ * itself gets no deadline: an interactive solve legitimately waits on the
+ * user, and the widget's own timeout-callback covers a stuck one. */
+export const SCRIPT_TIMEOUT_MS = 15_000;
+
 function loadScript(): Promise<void> {
 	if (window.turnstile) return Promise.resolve();
 	if (scriptPromise) return scriptPromise;
 
 	scriptPromise = new Promise<void>((resolve, reject) => {
 		const script = document.createElement('script');
+		const fail = (message: string) => {
+			scriptPromise = null;
+			script.remove();
+			reject(new Error(message));
+		};
+		const deadline = setTimeout(() => fail('Turnstile script timed out'), SCRIPT_TIMEOUT_MS);
 		script.src = SCRIPT_URL;
 		script.async = true;
 		script.defer = true;
-		script.onload = () => resolve();
+		script.onload = () => {
+			clearTimeout(deadline);
+			resolve();
+		};
 		script.onerror = () => {
-			scriptPromise = null;
-			reject(new Error('Turnstile script failed to load'));
+			clearTimeout(deadline);
+			fail('Turnstile script failed to load');
 		};
 		document.head.appendChild(script);
 	});

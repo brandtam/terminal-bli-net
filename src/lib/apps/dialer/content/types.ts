@@ -56,3 +56,16 @@ export type CanonSystem = {
 export function formatNumber(digits: string): string {
 	return `${digits.slice(0, 3)}-${digits.slice(3)}`;
 }
+
+/**
+ * Format an epoch-seconds timestamp the way boards print dates: MM/DD/YY.
+ * Canon post dates round-trip through the seed generator unchanged; real
+ * callers' posts pick up today's date — which reads just as period-correct.
+ */
+export function formatEraDate(epochSeconds: number): string {
+	const d = new Date(epochSeconds * 1000);
+	const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+	const dd = String(d.getUTCDate()).padStart(2, '0');
+	const yy = String(d.getUTCFullYear() % 100).padStart(2, '0');
+	return `${mm}/${dd}/${yy}`;
+}
