@@ -26,3 +26,9 @@ export const BOARD_SECTIONS: Record<PublicBoard, readonly string[]> = {
 
 /** A board answers BUSY once this many callers are connected (real occupancy). */
 export const BOARD_MAX_CALLERS = 8;
+
+/** Daily connect-time budget in minutes (PRD "rate limits as fiction"). */
+export const DAILY_MINUTES_BUDGET = 45;
+
+/** Remaining-minute marks that earn an in-fiction warning line. */
+export const TIME_WARNINGS = [10, 1] as const;

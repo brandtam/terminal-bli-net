@@ -121,7 +121,7 @@ test('About This Terminal shows version', async ({ page }) => {
 
 test('Computer Store opens from the dock', async ({ page }) => {
 	await loadDesktop(page);
-	await page.getByRole('button', { name: '🏪 Computer Store' }).click();
+	await page.locator('.dock-item[title="Computer Store"]').click();
 	await expect(page.locator('.window .title:has-text("Computer Store")')).toBeVisible();
 });
 

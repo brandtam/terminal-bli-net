@@ -8,6 +8,7 @@ import { recorderState } from '$lib/apps/recorder/recorder-state.svelte';
 import { launchTextEdit } from '$lib/apps/textedit/textedit-launch';
 import { launchStickies } from '$lib/apps/stickies/stickies-launch';
 import { launchChatrbot } from '$lib/apps/chatrbot/chatrbot-launch';
+import { dialerBus } from '$lib/apps/dialer/bus';
 
 /**
  * One manifest per app — the single source of truth for app identity. The
@@ -1439,11 +1440,10 @@ export const MANIFESTS = [
 		removable: true,
 		desktopAliasByDefault: false,
 		isSystem: false,
-		// Coming-soon reserves the app id — its server side already exists
-		// (/api/dialer/*, docs/adr/0008 route-ownership guardrail) — while the
-		// store shows only a teaser box. The window ships behind the flag; the
-		// release slice flips this to 'released' once the app is whole.
-		status: 'coming-soon',
+		// Live: the app is whole — dial screen, live boards, files, the door
+		// game, the Back Room, the hunt, and the Autodialer, over its own
+		// /api/dialer/* server side (docs/adr/0008 route-ownership guardrail).
+		status: 'released',
 		iconKind: 'doc',
 		// A desk telephone, manifest-owned (no shared PixelIcon glyph edit).
 		iconSprite: [
@@ -1480,10 +1480,69 @@ export const MANIFESTS = [
 				title: () => 'The Dialer',
 				size: () => ({ w: 720, h: 540 }),
 				component: () => import('$lib/apps/dialer/DialerWindow.svelte')
+			},
+			{
+				match: { kind: 'exact', id: 'dialer-prefs' },
+				role: 'prefs',
+				title: () => 'Dialer Preferences',
+				size: () => ({ w: 360, h: 380 }),
+				component: () => import('$lib/apps/dialer/DialerPrefs.svelte')
 			}
 		],
-		menus: () => [],
-		aboutSpec: { title: '', version: '', tagline: '', glyph: '', glyphBg: '', sections: [] }
+		// The menu bar reaches the window through the dialerBus module store —
+		// menus(os) closures can't touch component state directly.
+		menus: (os) => [
+			{
+				label: 'File',
+				items: [
+					{ type: 'action', label: 'Hang Up', shortcut: '⌘H', action: () => dialerBus.hangUp() },
+					{ type: 'action', label: 'Close', shortcut: '⌘W', action: () => os.closeFocused() }
+				]
+			},
+			{
+				label: 'Line',
+				items: [
+					{ type: 'action', label: 'Phonebook…', action: () => dialerBus.showPhonebook() },
+					{ type: 'action', label: 'Autodialer…', action: () => dialerBus.startSweep() },
+					{
+						type: 'action',
+						label: 'Preferences…',
+						shortcut: '⌘,',
+						action: () => os.openWindow('dialer-prefs')
+					}
+				]
+			},
+			{
+				label: 'Help',
+				items: [{ type: 'action', label: 'About The Dialer', action: () => os.openAbout('dialer') }]
+			}
+		],
+		aboutSpec: {
+			title: 'The Dialer',
+			version: 'v1.0',
+			tagline: 'shall we place a call?',
+			glyph: '☎',
+			glyphBg: '#1a1206',
+			glyphFg: '#ffb000',
+			sections: [
+				{
+					h: 'WHAT IT IS',
+					body: 'A 2400-baud modem, a phone line, and every board in the 616 that still answers. Dial the number on the sticky note, sit through the handshake, and you are on The Rusty Diskette. The boards are real: the callers, the posts, the files, and the person in [C]hat are all live.'
+				},
+				{
+					h: 'HOW TO USE IT',
+					body: 'Type a number and press DIAL. Read the boards, post, upload a file (upload one, earn three downloads). Numbers you see on screen get filed in the Phonebook — dial them to find more boards. The Autodialer sweeps a block of the exchange, one a night. There is a fifth number nobody posts.'
+				},
+				{
+					h: 'THE RULES OF THE HOUSE',
+					body: 'Forty-five minutes of connect time a day. One post a minute. The sysop cleans up overnight — mind your manners and he stays out of your way. Lose your password and you register a new handle; that was period-correct too.'
+				},
+				{
+					h: 'CREDITS',
+					body: 'Captain Vector, Mainframe Mary, Slag, and one operator who never came back. Built on Terminal OS. No real modems were harmed.'
+				}
+			]
+		}
 	}),
 
 	defineApp({

@@ -285,5 +285,196 @@ grown sysop tear up a little. The bar is high.
 
 posted with permission of the management (me) -- CV`
 		}
-	]
+	],
+	yell: `{Y}The Captain wanders in from the garage, soldering iron in hand.{/}
+
+{*Y}CV:{/} You rang? Make it quick, I've got a power supply on the bench
+{*Y}CV:{/} in a very delicate mood. If it's about the ratio: upload
+{*Y}CV:{/} something. If it's about the WEATHER: I have no idea what
+{*Y}CV:{/} you're talking about. -- CV`,
+	backRoom: {
+		codeWord: 'WEATHER',
+		gate: `THE BACK ROOM -- MEMBERS ONLY.
+
+WHO SENT YOU?`,
+		welcome: `{*Y}...checking the list... checking it twice... yep, there you are.{/}
+
+WELCOME TO THE BACK ROOM. The good stuff, as promised.
+
+House rule, and it's the only one: YOU'RE ONE OF US NOW.
+DON'T POST THE WORD. -- CV`,
+		files: [
+			{
+				name: 'SLAG.ANS',
+				uploader: 'SLAG',
+				date: '05/17/87',
+				downloads: 12,
+				body: `{R}
+        ................................................
+        :                                              :
+        :        {*R}M O L T E N   P O U R{R}                 :
+        :                                              :
+        :              {*W}_________{R}                       :
+        :              {*W}|       |{R}                       :
+        :              {*W}| LADLE |{R}                       :
+        :              {*W}|_______|{R}                       :
+        :                 {*Y}| |{R}                          :
+        :                 {*Y}| |{R}   {*Y}the pour{R}               :
+        :                {*Y}.:::.{R}                         :
+        :              {*Y}.:::::::.{R}                       :
+        :            {W}_____________{R}                     :
+        :                                              :
+        :   {W}the screen that made a sysop cry.{R}          :
+        :   {W}he knows who he is. -- SLAG{R}                :
+        :                                              :
+        ................................................
+{/}`
+			},
+			{
+				name: 'CRASHLOG.TXT',
+				uploader: 'CAPT.VECTOR',
+				date: '03/22/87',
+				downloads: 31,
+				body: `             THE NIGHT THE DRIVE DIED (AND CAME BACK)
+                    as told by Captain Vector
+              [BACK ROOM EXCLUSIVE. NOT FOR REPOST.]
+
+March 14th, 11:52 PM. I'm closing up the garage and the Diskette
+starts making a sound I can only describe as a coin in a blender.
+The 40 MEGABYTE drive. My drive. The one I mention.
+
+11:54, the sound stops. So does the drive. Dead. No spin, no
+click, nothing. Three years of board history on that platter and
+the last backup was -- I will be honest with this group and only
+this group -- January.
+
+I did everything wrong first. Power cycled it six times. Checked
+the same cable twice. Said some things I won't repeat to a piece
+of Seagate hardware like it could hear me. Nothing.
+
+12:40 AM, I remember the old field trick: stiction. The heads
+were stuck to the platter. The fix, and I swear this is real, is
+PERCUSSIVE. You hold the drive flat, you give it one firm rotary
+twist of the wrist, and you pray to whoever handles peripherals.
+
+I stood in my garage at a quarter to one in the morning, holding
+three years of this community over a workbench, and I TWISTED.
+
+She spun up. First try. Every sector readable.
+
+The drive has run warm and perfect ever since, the backups are
+weekly now, and the wrist stays ready. That's the whole story.
+The legend outside says I rebuilt the controller from scratch.
+The Back Room gets the truth: your Captain fixed the board with
+a flick of the wrist and has been dining out on it since March.
+
+-- CV`
+			},
+			{
+				name: 'CHILI.TXT',
+				uploader: 'CAPT.VECTOR',
+				date: '02/09/87',
+				downloads: 27,
+				body: `          CAPTAIN VECTOR'S FOUR-ALARM GARAGE CHILI
+        second place, Otsego County Cook-Off, 1985 AND 1986
+        (the judge both years was the same man. draw your own
+         conclusions. i have drawn mine.)
+
+YOU WILL NEED:
+  2 lb chuck, cubed. not ground. we are not animals.
+  1 lb hot italian sausage (the secret. now you know.)
+  2 onions, 1 green pepper, 6 cloves garlic (yes, six)
+  2 cans crushed tomatoes
+  1 bottle dark beer (half for the pot)
+  chili powder til your arm gets tired, then once more
+  1 square baking chocolate (the OTHER secret. two secrets.)
+  cumin, oregano, salt, cayenne to regret level
+
+PROCEDURE:
+  1. Brown the meat in batches. Crowd the pan and you'll steam
+     it, and steamed meat is how you get third place.
+  2. Onions, pepper, garlic in the fat. Don't rush them.
+  3. Everything in the pot. Low heat. Lid cracked.
+  4. Three hours minimum. Four is better. The board runs
+     itself, go check the pot.
+  5. The chocolate goes in at hour two. Tell nobody.
+
+Serve with saltines and a cold one. Feeds six normal people or
+three sysops. Do not enter it in Otsego County, that division
+is rigged.
+
+-- CV`
+			}
+		]
+	},
+	door: {
+		name: 'GRIM CORRIDOR',
+		intro: `{*W}G R I M   C O R R I D O R{/}
+             a Rusty Diskette exclusive -- v1.1 -- by CV
+
+You are a person of modest courage and one (1) torch, unlit.
+Beneath the old grain elevator runs a corridor nobody walks
+twice. The county records say it isn't there. The high-score
+table says otherwise.
+`,
+		rooms: [
+			{
+				body: `{Y}== THE GRATE =={/}
+
+A rusted grate hangs open over a stairway going down. Cold air
+moves past you like it's leaving on purpose. Scratched into the
+brick, in letters gone green: "IT DOESN'T LIKE THE LIGHT."
+
+  [D]escend the stair`,
+				exits: { D: 1 }
+			},
+			{
+				body: `{Y}== THE LONG DARK =={/}
+
+The stairs end in black. Somewhere ahead -- ten feet? forty? --
+something is breathing. Slow. Patient. The kind of breathing
+that has been down here a while and is in no hurry at all.
+
+Your torch is still unlit. Your feet are still yours.
+
+  [F]orward, quietly
+  [T]orch -- strike it and light the thing`,
+				exits: { F: 'die', T: 2 }
+			},
+			{
+				body: `{Y}== THE LAIR =={/}
+
+The torch catches and the dark jumps back. In the corner of a
+round brick chamber crouches the CORRIDOR GRIM -- all shoulder
+and no face, big as a furnace. It flinches from the flame and
+lets out a sound like a drain unclogging in reverse.
+
+It doesn't like the light. It is, however, between you and the
+stairs on the far side. It watches the torch. Only the torch.
+
+  [A]ttack it while it's cowering
+  [S]lip along the wall, torch held high`,
+				exits: { A: 'die', S: 'win' }
+			}
+		],
+		win: `You keep the flame between you and it the whole way. It presses
+itself into the brick and lets you pass -- and as your boot hits
+the far stair, from the dark comes a low, wet sigh. Almost
+grateful. Nobody has visited in a long, long time.
+
+You surface behind the elevator with your torch, your boots, and
+a story exactly nobody at the diner will believe.
+
+{*Y}YOU HAVE SURVIVED THE GRIM CORRIDOR.{/}`,
+		death: `The dark decides it is done being patient.
+
+There is no pain. There is barely even a sound -- just the sense
+of a very large drain, and you, and the fact that only one of
+you is leaving. The county records are correct: there is nothing
+down here at all.
+
+{*R}YOU DIED IN THE GRIM CORRIDOR.{/}  (No score. The Grim keeps it.)`,
+		winScore: 616
+	},
+	live: true
 };

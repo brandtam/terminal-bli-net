@@ -72,7 +72,8 @@ describe('synthApps', () => {
 				'software-shop',
 				'computer-store',
 				'vcr',
-				'textedit'
+				'textedit',
+				'dialer'
 			].sort()
 		);
 	});

@@ -13,8 +13,6 @@ import type { PublicContentCatalog } from './content-catalog';
 // Env — mirrors the bindings declared in wrangler.jsonc / app.d.ts
 // ---------------------------------------------------------------------------
 
-/* eslint-disable no-undef */
-
 // A confirmation email is sent at most once per address per this window, so the
 // endpoint can't be turned into a mail-bomb against a victim via rotating IPs.
 const CONFIRM_RESEND_THROTTLE_SECONDS = 300;

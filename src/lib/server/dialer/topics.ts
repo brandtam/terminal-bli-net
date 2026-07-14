@@ -127,13 +127,19 @@ export async function listPosts(
 	}));
 }
 
-/** Start a topic with its first post. One transaction — no topic without a post. */
+/**
+ * Start a topic with its first post. One transaction — no topic without a
+ * post. `hidden` inserts the post flagged (invisible): the route holds every
+ * community write behind the moderation verdict and flips it visible on OK —
+ * an all-flagged community topic doesn't list, so the topic hides with it.
+ */
 export async function createTopic(
 	db: D1Database,
 	board: PublicBoard,
 	author: string,
 	input: { section: string; title: string; body: string },
-	now: Date
+	now: Date,
+	hidden = false
 ): Promise<CreateTopicResult> {
 	if (!BOARD_SECTIONS[board].includes(input.section)) {
 		return { ok: false, reason: 'invalid-section' };
@@ -156,9 +162,9 @@ export async function createTopic(
 			.bind(board, input.section, title, author, nowS),
 		db
 			.prepare(
-				'INSERT INTO posts (topic_id, author, body, created_at) VALUES (last_insert_rowid(), ?1, ?2, ?3)'
+				'INSERT INTO posts (topic_id, author, body, created_at, flagged) VALUES (last_insert_rowid(), ?1, ?2, ?3, ?4)'
 			)
-			.bind(author, body, nowS)
+			.bind(author, body, nowS, hidden ? 1 : 0)
 	]);
 	return {
 		ok: true,
@@ -174,7 +180,8 @@ export async function createPost(
 	topicId: number,
 	author: string,
 	rawBody: string,
-	now: Date
+	now: Date,
+	hidden = false
 ): Promise<CreatePostResult> {
 	const body = cleanBody(rawBody);
 	if (!body) return { ok: false, reason: 'invalid-body' };
@@ -189,10 +196,25 @@ export async function createPost(
 	if (!(await claimCooldown(db, author, nowS))) return { ok: false, reason: 'cooldown' };
 
 	const result = await db
-		.prepare('INSERT INTO posts (topic_id, author, body, created_at) VALUES (?1, ?2, ?3, ?4)')
-		.bind(topicId, author, body, nowS)
+		.prepare(
+			'INSERT INTO posts (topic_id, author, body, created_at, flagged) VALUES (?1, ?2, ?3, ?4, ?5)'
+		)
+		.bind(topicId, author, body, nowS, hidden ? 1 : 0)
 		.run();
 	return { ok: true, postId: result.meta.last_row_id };
+}
+
+/** Make a hidden post visible (moderation cleared it). */
+export async function setPostVisible(db: D1Database, postId: number): Promise<void> {
+	await db.prepare('UPDATE posts SET flagged = 0 WHERE id = ?1 AND canon = 0').bind(postId).run();
+}
+
+/** Soft-delete a post (moderation rejected it); the nightly sweep hard-deletes. */
+export async function softDeletePost(db: D1Database, postId: number, now: Date): Promise<void> {
+	await db
+		.prepare('UPDATE posts SET deleted_at = ?2 WHERE id = ?1 AND canon = 0')
+		.bind(postId, epochSeconds(now))
+		.run();
 }
 
 /**

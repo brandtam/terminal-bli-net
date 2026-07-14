@@ -18,6 +18,10 @@ export interface DialerEnv {
 	DIALER_FORCE_LOCAL?: string;
 	/** Shared with the chat gate; registration reuses the same Turnstile seam. */
 	TURNSTILE_SECRET?: string;
+	/** Shared with the chat backend; the moderation seam rides the same key. */
+	ANTHROPIC_API_KEY?: string;
+	/** Optional moderation model override (moderation.ts has the default). */
+	DIALER_MODERATION_MODEL?: string;
 }
 
 export function isForcedLocal(env: Pick<DialerEnv, 'DIALER_FORCE_LOCAL'>): boolean {

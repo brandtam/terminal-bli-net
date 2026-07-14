@@ -1,8 +1,8 @@
-import type { CanonSystem } from './content/types';
-import { formatEraDate } from './content/types';
+import type { CanonSystem, CanonFile } from './content/types';
+import { formatEraDate, fileKind } from './content/types';
 import { canonDateEpoch } from './content/seed';
 import { escapeMarkup, wrapText } from './terminal';
-import type { LivePost, LiveTopic } from './api';
+import type { LiveFile, LivePost, LiveScore, LiveTopic } from './api';
 
 /**
  * The BBS session machine: pure `(state, input) → (state, prints, requests)`.
@@ -54,7 +54,23 @@ export type Screen =
 	| { id: 'post-wait'; compose: Extract<Screen, { id: 'compose-body' }> }
 	| { id: 'topics-refresh'; section: number } // after posting a new topic
 	| { id: 'files' }
+	| { id: 'files-wait' }
 	| { id: 'file-view'; file: number }
+	| { id: 'file-dl-wait' }
+	| { id: 'upload-kind' }
+	| { id: 'upload-name'; image: boolean }
+	| { id: 'upload-body'; name: string; lines: string[] }
+	| { id: 'upload-wait' }
+	| { id: 'chat' }
+	| { id: 'door'; room: number }
+	| { id: 'door-score-wait' }
+	| { id: 'yell-wait' }
+	| { id: 'backroom-gate' }
+	| { id: 'backroom' }
+	| { id: 'backroom-file'; file: number }
+	| { id: 'secret-login' }
+	| { id: 'secret-password'; handle: string }
+	| { id: 'secret-menu' }
 	| { id: 'ended' };
 
 export type MachineState = {
@@ -72,6 +88,16 @@ export type MachineState = {
 	topics: LiveTopic[] | null;
 	/** The open topic's thread. */
 	posts: LivePost[] | null;
+	/** File-area listing — fetched per visit online, built from canon in local. */
+	files: LiveFile[] | null;
+	/** Who's connected right now — pushed by the window from the node socket. */
+	online: string[];
+	/** Minutes left in today's budget, from the node; null until it says. */
+	timeRemaining: number | null;
+	/** Rolling tail of keys typed at the main menu — the Back Room listens. */
+	menuKeys: string;
+	/** The caller's date for the LODESTONE visitors log, YY-MM-DD. */
+	visitDate: string;
 };
 
 /** Work the window performs against api.ts, then feeds back via deliver(). */
@@ -81,14 +107,49 @@ export type MachineRequest =
 	| { kind: 'topics' }
 	| { kind: 'posts'; topicId: number }
 	| { kind: 'submit-topic'; section: string; title: string; body: string }
-	| { kind: 'submit-reply'; topicId: number; body: string };
+	| { kind: 'submit-reply'; topicId: number; body: string }
+	| { kind: 'files' }
+	| { kind: 'download'; fileId: string }
+	| { kind: 'upload-text'; name: string; fileKind: 'txt' | 'md'; body: string }
+	/** The window opens a picker, dithers to CGA, uploads, and delivers `upload`. */
+	| { kind: 'pick-image'; name: string }
+	| { kind: 'submit-score'; score: number }
+	| { kind: 'chat-send'; text: string }
+	/** The window answers after a believable pause — the sysop was in the garage. */
+	| { kind: 'yell' };
 
 export type MachineResponse =
 	| { kind: 'login'; result: 'ok' | 'no-carrier' | 'local'; handle?: string }
 	| { kind: 'register'; result: 'ok' | 'refused' | 'local'; handle?: string; message?: string }
 	| { kind: 'topics'; result: 'ok' | 'no-carrier' | 'local'; topics?: LiveTopic[] }
 	| { kind: 'posts'; result: 'ok' | 'no-carrier' | 'local'; posts?: LivePost[] }
-	| { kind: 'submit'; result: 'ok' | 'refused' | 'no-carrier' | 'local'; message?: string };
+	| {
+			kind: 'submit';
+			result: 'ok' | 'refused' | 'no-carrier' | 'local';
+			message?: string;
+			/** Moderation seam down: posted but hidden until the nightly re-audit. */
+			held?: boolean;
+	  }
+	| { kind: 'files'; result: 'ok' | 'no-carrier' | 'local'; files?: LiveFile[] }
+	| {
+			kind: 'download';
+			result: 'ok' | 'refused' | 'no-carrier' | 'local';
+			file?: LiveFile;
+			/** Text body; null for images (the window displays those itself). */
+			body?: string | null;
+			message?: string;
+	  }
+	| {
+			kind: 'upload';
+			result: 'ok' | 'refused' | 'no-carrier' | 'local' | 'aborted';
+			message?: string;
+			held?: boolean;
+	  }
+	| { kind: 'scores'; result: 'ok' | 'no-carrier' | 'local'; scores?: LiveScore[] }
+	| { kind: 'chat'; handle: string; text: string }
+	| { kind: 'presence'; online: string[] }
+	| { kind: 'time'; remaining: number }
+	| { kind: 'yell' };
 
 export type StepResult = {
 	state: MachineState;
@@ -98,6 +159,8 @@ export type StepResult = {
 	hangup?: boolean;
 	/** Async work for the window; outcomes come back through deliver(). */
 	requests?: MachineRequest[];
+	/** A completed download — the window animates the XMODEM bar before typing. */
+	transfer?: { name: string; size: number };
 };
 
 const LOCAL_NOTICE = '{R}LOCAL MODE -- LINE NOISE ON THE TRUNK{/}';
@@ -123,6 +186,8 @@ export type ConnectOptions = {
 	mode: Mode;
 	/** Handle from a stored session — skips the login interrogation. */
 	sessionHandle?: string | null;
+	/** Today, YY-MM-DD, for the LODESTONE visitors log. The window passes the real date. */
+	visitDate?: string;
 };
 
 /** Begin a session right after CONNECT: banner, notices, any-key gate. */
@@ -137,8 +202,25 @@ export function connect(system: CanonSystem, opts: ConnectOptions = { mode: 'loc
 		tries: 0,
 		reg: { handle: '', password: '', answers: [] },
 		topics: local ? canonTopics(system) : null,
-		posts: null
+		posts: null,
+		files: local ? canonFiles(system) : null,
+		online: [],
+		timeRemaining: null,
+		menuKeys: '',
+		visitDate: opts.visitDate ?? '87-10-31'
 	};
+
+	// A secret system replaces the whole BBS flow: bare carrier, LOGIN:, and
+	// nothing else. Entirely static — LOCAL MODE changes nothing here.
+	if (system.secret) {
+		// A stored board handle rides along for the visitors log, even offline.
+		const withHandle = { ...state, handle: opts.sessionHandle ?? state.handle };
+		return {
+			state: { ...withHandle, screen: { id: 'secret-login' } },
+			prints: ['', '{W}LOGIN:{/}']
+		};
+	}
+
 	const notices = local ? [LOCAL_NOTICE, GUEST_NOTICE] : [];
 	return { state, prints: [system.banner, ...notices, '', '{W}[ PRESS ANY KEY ]{/}'] };
 }
@@ -152,10 +234,17 @@ export function inputKind(state: MachineState): 'keys' | 'line' | 'masked' {
 		case 'topics':
 		case 'compose-title':
 		case 'compose-body':
+		case 'files':
+		case 'upload-name':
+		case 'upload-body':
+		case 'chat':
+		case 'backroom-gate':
+		case 'secret-login':
 			return 'line';
 		case 'login-password':
 		case 'reg-password':
 		case 'reg-password2':
+		case 'secret-password':
 			return 'masked';
 		default:
 			return 'keys';
@@ -179,16 +268,47 @@ export function step(state: MachineState, key: string, system: CanonSystem): Ste
 			if (key === 'Enter' || key === 'Backspace') return ignore(state); // any *printable* key
 			return leaveGate(state, system);
 
-		case 'menu':
-			if (k === 'm') return openBoards(state, system);
-			if (k === 'f') return to(state, { id: 'files' }, renderFiles(system));
+		case 'menu': {
+			// The Back Room listens to everything typed at the menu — the code
+			// word opens the gate even though it never appears in any listing.
+			const listening = withMenuKeys(state, key);
+			if (system.backRoom && listening.menuKeys.endsWith(system.backRoom.codeWord.toLowerCase())) {
+				return to({ ...listening, menuKeys: '' }, { id: 'backroom-gate' }, [
+					'',
+					system.backRoom.gate
+				]);
+			}
+			if (k === 'm') return openBoards(listening, system);
+			if (k === 'f') return openFiles(listening, system);
+			if (k === 'd' && system.door) {
+				return to(listening, { id: 'door', room: 0 }, [
+					'',
+					system.door.intro,
+					system.door.rooms[0].body
+				]);
+			}
+			if (k === 'w' && system.live) return { state: listening, prints: renderWho(listening) };
+			if (k === 'c' && system.live) {
+				if (listening.mode === 'local') {
+					return { state: listening, prints: ['{R}CHAT NEEDS A LIVE LINE. (LOCAL MODE){/}'] };
+				}
+				return to(listening, { id: 'chat' }, renderChatIntro(listening));
+			}
+			if (k === 'y') {
+				return {
+					state: { ...listening, screen: { id: 'yell-wait' } },
+					prints: ['', '{W}YOU YELL FOR THE SYSOP. SOMEWHERE, A CHAIR CREAKS...{/}'],
+					requests: [{ kind: 'yell' }]
+				};
+			}
 			if (k === 'g')
 				return {
-					state: { ...state, screen: { id: 'ended' } },
+					state: { ...listening, screen: { id: 'ended' } },
 					prints: renderGoodbye(),
 					hangup: true
 				};
-			return ignore(state);
+			return { state: listening, prints: [] };
+		}
 
 		case 'sections': {
 			if (k === 'q') return to(state, { id: 'menu' }, renderMenu(system, state));
@@ -227,17 +347,93 @@ export function step(state: MachineState, key: string, system: CanonSystem): Ste
 			return ignore(state);
 		}
 
-		case 'files': {
-			if (k === 'q') return to(state, { id: 'menu' }, renderMenu(system, state));
-			const idx = digit(k, system.files.length);
-			if (idx !== null)
-				return to(state, { id: 'file-view', file: idx }, renderFileView(system, idx));
+		case 'file-view':
+			if (k === 'q') return to(state, { id: 'files' }, renderFiles(state));
+			return ignore(state);
+
+		case 'upload-kind': {
+			if (k === 'q') return to(state, { id: 'files' }, renderFiles(state));
+			if (k === 't')
+				return to(state, { id: 'upload-name', image: false }, [
+					'',
+					'{W}FILENAME FOR THE BOARD (8.3 STYLE, .TXT OR .MD):{/}'
+				]);
+			if (k === 'i')
+				return to(state, { id: 'upload-name', image: true }, [
+					'',
+					'{W}FILENAME FOR THE BOARD (8.3 STYLE, .PNG):{/}',
+					'{C}IT WILL BE DITHERED TO 16 COLORS. THAT IS NOT A BUG, THAT IS 1987.{/}'
+				]);
 			return ignore(state);
 		}
 
-		case 'file-view':
-			if (k === 'q') return to(state, { id: 'files' }, renderFiles(system));
+		case 'door': {
+			const door = system.door;
+			if (!door) return to(state, { id: 'menu' }, renderMenu(system, state));
+			if (k === 'q') {
+				return to(state, { id: 'menu' }, [
+					'',
+					'{Y}YOU BACK OUT OF THE CORRIDOR. IT DOES NOT FOLLOW. PROBABLY.{/}',
+					...renderMenu(system, state)
+				]);
+			}
+			const exit = door.rooms[s.room]?.exits[k.toUpperCase()];
+			if (exit === undefined) return ignore(state);
+			if (exit === 'die') {
+				return to(state, { id: 'menu' }, ['', door.death, ...renderMenu(system, state)]);
+			}
+			if (exit === 'win') {
+				if (state.mode === 'online') {
+					return {
+						state: { ...state, screen: { id: 'door-score-wait' } },
+						prints: ['', door.win, '', '{W}BANKING YOUR RUN WITH THE SCOREKEEPER...{/}'],
+						requests: [{ kind: 'submit-score', score: door.winScore }]
+					};
+				}
+				return to(state, { id: 'menu' }, [
+					'',
+					door.win,
+					'',
+					'{C}THE SCOREKEEPER NEEDS A LIVE LINE. YOUR LEGEND STAYS LOCAL.{/}',
+					...renderMenu(system, state)
+				]);
+			}
+			return to(state, { id: 'door', room: exit }, ['', door.rooms[exit].body]);
+		}
+
+		case 'backroom': {
+			const room = system.backRoom;
+			if (!room || k === 'q') return to(state, { id: 'menu' }, renderMenu(system, state));
+			const idx = digit(k, room.files.length);
+			if (idx !== null) {
+				return to(
+					state,
+					{ id: 'backroom-file', file: idx },
+					renderCanonFileBody(room.files[idx], 'BACK ROOM')
+				);
+			}
 			return ignore(state);
+		}
+
+		case 'backroom-file':
+			if (k === 'q') return to(state, { id: 'backroom' }, renderBackRoom(system));
+			return ignore(state);
+
+		case 'secret-menu': {
+			const secret = system.secret;
+			if (!secret) return ignore(state);
+			if (k === 'q' || k === 'g') {
+				return {
+					state: { ...state, screen: { id: 'ended' } },
+					prints: ['', '{C}THE LINE STAYS OPEN A MOMENT LONGER THAN IT NEEDS TO.{/}'],
+					hangup: true
+				};
+			}
+			if (k === 'v') return { state, prints: renderVisitors(state, system) };
+			const screen = secret.screens.find((sc) => sc.key.toLowerCase() === k);
+			if (!screen || screen.key === 'V') return ignore(state);
+			return { state, prints: ['', screen.body, '', renderSecretPrompt(secret)] };
+		}
 
 		// Waits sit between a request and its deliver(); keys mean nothing yet.
 		case 'auth-wait':
@@ -245,6 +441,11 @@ export function step(state: MachineState, key: string, system: CanonSystem): Ste
 		case 'read-wait':
 		case 'post-wait':
 		case 'topics-refresh':
+		case 'files-wait':
+		case 'file-dl-wait':
+		case 'upload-wait':
+		case 'door-score-wait':
+		case 'yell-wait':
 		case 'ended':
 			return ignore(state);
 
@@ -260,10 +461,13 @@ function lineStep(state: MachineState, key: string, system: CanonSystem): StepRe
 	}
 	if (key !== 'Enter') {
 		if (key.length !== 1 || state.entry.length >= MAX_ENTRY_CHARS) return ignore(state);
-		// The topic prompt takes a typed number, but its lettered commands act
-		// on the keypress like every single-key screen — [Q] muscle memory
-		// must not wait for Enter. A number in progress disables the shortcut.
-		if (state.screen.id === 'topics' && state.entry === '' && /^[pq]$/i.test(key)) {
+		// The topic and file prompts take a typed number, but their lettered
+		// commands act on the keypress like every single-key screen — [Q]
+		// muscle memory must not wait for Enter. A number in progress disables
+		// the shortcut.
+		const instant =
+			state.screen.id === 'topics' ? /^[pq]$/i : state.screen.id === 'files' ? /^[qu]$/i : null;
+		if (instant && state.entry === '' && instant.test(key)) {
 			return submitLine(state, key.toLowerCase(), system);
 		}
 		return { state: { ...state, entry: state.entry + key }, prints: [] };
@@ -289,6 +493,7 @@ function submitLine(state: MachineState, line: string, system: CanonSystem): Ste
 				return to(state, { id: 'reg-handle' }, [
 					'',
 					'{*W}NEW CALLER.{/} THE SYSOP KEEPS A LIST; LET US GET YOU ON IT.',
+					'{C}(/A AT ANY PROMPT BACKS OUT.){/}',
 					'',
 					'{W}PICK A HANDLE (2-16 CHARS: A-Z 0-9 . -):{/}'
 				]);
@@ -306,6 +511,7 @@ function submitLine(state: MachineState, line: string, system: CanonSystem): Ste
 		}
 
 		case 'reg-handle': {
+			if (isRegAbort(line)) return abortRegistration(state);
 			const handle = line.toUpperCase();
 			if (!HANDLE_RE.test(handle)) {
 				return {
@@ -322,6 +528,7 @@ function submitLine(state: MachineState, line: string, system: CanonSystem): Ste
 		}
 
 		case 'reg-password': {
+			if (isRegAbort(line)) return abortRegistration(state);
 			if (line.length < PASSWORD_MIN || line.length > PASSWORD_MAX) {
 				return {
 					state,
@@ -334,6 +541,7 @@ function submitLine(state: MachineState, line: string, system: CanonSystem): Ste
 		}
 
 		case 'reg-password2': {
+			if (isRegAbort(line)) return abortRegistration(state);
 			if (line !== state.reg.password) {
 				return to({ ...state, reg: { ...state.reg, password: '' } }, { id: 'reg-password' }, [
 					"{R}THEY DON'T MATCH.{/}",
@@ -349,6 +557,7 @@ function submitLine(state: MachineState, line: string, system: CanonSystem): Ste
 		}
 
 		case 'reg-q': {
+			if (isRegAbort(line)) return abortRegistration(state);
 			if (!line) return ignore(state);
 			const answers = [...state.reg.answers, line];
 			const nextQ = s.q + 1;
@@ -439,6 +648,136 @@ function submitLine(state: MachineState, line: string, system: CanonSystem): Ste
 			}
 			const screen: Screen = { ...s, lines: [...s.lines, line] };
 			return { state: { ...state, screen }, prints: [] };
+		}
+
+		case 'files': {
+			if (!line) return ignore(state);
+			const command = line.toLowerCase();
+			if (command === 'q') return to(state, { id: 'menu' }, renderMenu(system, state));
+			if (command === 'u') {
+				if (state.mode === 'local') {
+					return { state, prints: ['{R}UPLOADS NEED A LIVE LINE. (LOCAL MODE){/}'] };
+				}
+				return to(state, { id: 'upload-kind' }, [
+					'',
+					'{W}UPLOAD WHAT? {*Y}[T]{/}{W}EXT FILE  {*Y}[I]{/}{W}MAGE  {*Y}[Q]{/}{W} NEVER MIND:{/}'
+				]);
+			}
+			const files = state.files ?? [];
+			const index = /^\d+$/.test(command) ? Number(command) : NaN;
+			if (!Number.isInteger(index) || index < 1 || index > files.length) {
+				return { state, prints: ['{R}NO SUCH FILE.{/}'] };
+			}
+			return openFile(state, system, index - 1);
+		}
+
+		case 'upload-name': {
+			if (line.toLowerCase() === '/a') return to(state, { id: 'files' }, renderFiles(state));
+			const name = line.toUpperCase();
+			const wanted = s.image
+				? /^[A-Z0-9][A-Z0-9_-]{0,7}\.PNG$/
+				: /^[A-Z0-9][A-Z0-9_-]{0,7}\.(TXT|MD)$/;
+			if (!wanted.test(name)) {
+				return {
+					state,
+					prints: [
+						`{R}THAT NAME DOESN'T SCAN. 8.3 STYLE, ${s.image ? '.PNG' : '.TXT OR .MD'}.{/}`,
+						'{W}FILENAME (OR /A TO ABORT):{/}'
+					]
+				};
+			}
+			if (s.image) {
+				return {
+					state: { ...state, screen: { id: 'upload-wait' } },
+					prints: ['{W}PICK YOUR IMAGE...{/}'],
+					requests: [{ kind: 'pick-image', name }]
+				};
+			}
+			return to(state, { id: 'upload-body', name, lines: [] }, [
+				'',
+				'{*W}LINE EDITOR.{/} TYPE THE FILE, ONE LINE AT A TIME.',
+				'{W}/S ALONE ON A LINE SAVES. /A ABORTS.{/}',
+				''
+			]);
+		}
+
+		case 'upload-body': {
+			const command = line.toLowerCase();
+			if (command === '/a') {
+				return to(state, { id: 'files' }, [
+					'{Y}ABORTED. THE DRIVE THANKS YOU FOR THE SPACE.{/}',
+					...renderFiles(state)
+				]);
+			}
+			if (command === '/s') {
+				const body = s.lines.join('\n').trim();
+				if (!body) return { state, prints: ['{R}NOTHING TO SAVE.{/}'] };
+				return {
+					state: { ...state, screen: { id: 'upload-wait' } },
+					prints: ['{W}SENDING... THE DRIVE GRINDS APPRECIATIVELY.{/}'],
+					requests: [
+						{
+							kind: 'upload-text',
+							name: s.name,
+							fileKind: s.name.endsWith('.MD') ? 'md' : 'txt',
+							body
+						}
+					]
+				};
+			}
+			const screen: Screen = { ...s, lines: [...s.lines, line] };
+			return { state: { ...state, screen }, prints: [] };
+		}
+
+		case 'chat': {
+			if (!line) return ignore(state);
+			if (line.toLowerCase() === '/q') {
+				return to(state, { id: 'menu' }, [
+					'{C}YOU DROP OUT OF THE NODE CHANNEL.{/}',
+					...renderMenu(system, state)
+				]);
+			}
+			// The node echoes the line back to everyone including us; printing
+			// happens on the echo so every caller sees the same order.
+			return { state, prints: [], requests: [{ kind: 'chat-send', text: line }] };
+		}
+
+		case 'backroom-gate': {
+			if (!line) return ignore(state);
+			const room = system.backRoom;
+			if (!room) return to(state, { id: 'menu' }, renderMenu(system, state));
+			// Any answer works. The Captain pretends to check the list either way.
+			return to(state, { id: 'backroom' }, ['', room.welcome, ...renderBackRoom(system)]);
+		}
+
+		case 'secret-login': {
+			if (!line) return ignore(state);
+			return to(state, { id: 'secret-password', handle: line.toUpperCase() }, ['{W}PASSWORD:{/}']);
+		}
+
+		case 'secret-password': {
+			const secret = system.secret;
+			if (!secret) return ignore(state);
+			const good =
+				s.handle === secret.loginHandle.toUpperCase() &&
+				line.toUpperCase() === secret.loginPassword.toUpperCase();
+			if (good) {
+				return to({ ...state, tries: 0 }, { id: 'secret-menu' }, renderSecretWelcome(secret));
+			}
+			const tries = state.tries + 1;
+			if (tries >= MAX_LOGIN_TRIES) {
+				return {
+					state: { ...state, tries, screen: { id: 'ended' } },
+					prints: ['', '{R}ACCESS DENIED.{/}'],
+					hangup: true
+				};
+			}
+			return to({ ...state, tries }, { id: 'secret-login' }, [
+				'',
+				'{R}ACCESS DENIED.{/}',
+				'',
+				'{W}LOGIN:{/}'
+			]);
 		}
 
 		default:
@@ -548,7 +887,9 @@ export function deliver(
 					'{W}YOUR DRAFT STANDS. /S TO TRY AGAIN, /A TO ABORT.{/}'
 				]);
 			}
-			const prints = ['{*G}POSTED. THE BOARD REMEMBERS.{/}'];
+			const prints = response.held
+				? ['{Y}SAVED. THE SYSOP REVIEWS NEW MESSAGES OVERNIGHT.{/}']
+				: ['{*G}POSTED. THE BOARD REMEMBERS.{/}'];
 			if (compose.replyTo !== null) {
 				return {
 					state: {
@@ -564,6 +905,137 @@ export function deliver(
 				prints,
 				requests: [{ kind: 'topics' }]
 			};
+		}
+
+		case 'files': {
+			if (response.result === 'local') return degrade(state, system);
+			if (response.result === 'no-carrier') return sessionDropped(state);
+			const stocked = { ...state, files: response.files ?? [] };
+			return to(stocked, { id: 'files' }, renderFiles(stocked));
+		}
+
+		case 'download': {
+			if (state.screen.id !== 'file-dl-wait') return ignore(state);
+			if (response.result === 'local') {
+				return degrade(state, system, ['{R}THE TRANSFER DIED WITH THE LINE.{/}']);
+			}
+			if (response.result === 'no-carrier') return sessionDropped(state);
+			if (response.result === 'refused') {
+				return to(state, { id: 'files' }, [
+					`{R}${response.message ?? 'REFUSED.'}{/}`,
+					...renderFiles(state)
+				]);
+			}
+			const file = response.file;
+			if (!file) return to(state, { id: 'files' }, renderFiles(state));
+			const bodyLines =
+				file.kind === 'png'
+					? ['{C}[ IMAGE RECEIVED -- RENDERED ON YOUR SCREEN ]{/}']
+					: [renderDownloadedBody(file, response.body ?? '')];
+			return {
+				state: { ...state, screen: { id: 'files' } },
+				prints: [
+					'',
+					`{C}---- ${file.name} -- ${file.size} BYTES -- FROM ${escapeMarkup(file.uploader)} ----{/}`,
+					'',
+					...bodyLines,
+					'',
+					filesPrompt(state)
+				],
+				transfer: { name: file.name, size: file.size }
+			};
+		}
+
+		case 'upload': {
+			if (state.screen.id !== 'upload-wait') return ignore(state);
+			if (response.result === 'local') {
+				return degrade(state, system, ["{R}THE LINE CRACKLED. THE FILE DIDN'T MAKE IT.{/}"]);
+			}
+			if (response.result === 'no-carrier') return sessionDropped(state);
+			if (response.result === 'aborted') {
+				return to(state, { id: 'files' }, ['{Y}NEVER MIND, THEN.{/}', ...renderFiles(state)]);
+			}
+			if (response.result === 'refused') {
+				return to(state, { id: 'files' }, [
+					`{R}${response.message ?? 'REFUSED.'}{/}`,
+					...renderFiles(state)
+				]);
+			}
+			const prints = response.held
+				? ['{Y}RECEIVED. THE SYSOP REVIEWS NEW FILES OVERNIGHT -- CHECK BACK TOMORROW.{/}']
+				: ['{*G}RECEIVED. THE RATIO SMILES ON YOU: +3 CREDITS.{/}'];
+			// Refresh the listing so the caller sees their file (or doesn't, if held).
+			return {
+				state: { ...state, screen: { id: 'files-wait' } },
+				prints,
+				requests: [{ kind: 'files' }]
+			};
+		}
+
+		case 'scores': {
+			if (state.screen.id !== 'door-score-wait') return ignore(state);
+			if (response.result === 'local') {
+				return degrade(state, system, [
+					'{R}THE SCOREKEEPER DROPPED OFF THE LINE. YOUR LEGEND STAYS LOCAL.{/}'
+				]);
+			}
+			if (response.result === 'no-carrier') return sessionDropped(state);
+			return to(state, { id: 'menu' }, [
+				'',
+				...renderScores(system, response.scores ?? []),
+				...renderMenu(system, state)
+			]);
+		}
+
+		case 'chat': {
+			if (state.screen.id !== 'chat') return ignore(state);
+			return {
+				state,
+				prints: [`{*C}<${escapeMarkup(response.handle)}>{/} ${escapeMarkup(response.text)}`]
+			};
+		}
+
+		case 'presence': {
+			const previous = state.online;
+			const stocked = { ...state, online: response.online };
+			if (state.screen.id !== 'chat') return { state: stocked, prints: [] };
+			const joined = response.online.filter((h) => !previous.includes(h));
+			const left = previous.filter((h) => !response.online.includes(h));
+			return {
+				state: stocked,
+				prints: [
+					...joined.map((h) => `{C}-- ${escapeMarkup(h)} JOINS THE NODE --{/}`),
+					...left.map((h) => `{C}-- ${escapeMarkup(h)} DROPS CARRIER --{/}`)
+				]
+			};
+		}
+
+		case 'time': {
+			const stocked = { ...state, timeRemaining: response.remaining };
+			if (response.remaining <= 0) {
+				return {
+					state: { ...stocked, screen: { id: 'ended' } },
+					prints: ['', "{R}TIME'S UP -- CALL BACK TOMORROW.{/}"],
+					hangup: true
+				};
+			}
+			if (response.remaining <= 1) {
+				return { state: stocked, prints: ['{R}ONE MINUTE LEFT TODAY. SAY YOUR GOODBYES.{/}'] };
+			}
+			if (response.remaining <= 10) {
+				return {
+					state: stocked,
+					prints: [`{Y}${response.remaining} MINUTES LEFT TODAY. THE CLOCK IS REAL.{/}`]
+				};
+			}
+			return { state: stocked, prints: [] };
+		}
+
+		case 'yell': {
+			if (state.screen.id !== 'yell-wait') return ignore(state);
+			const reply =
+				system.yell ?? '{C}THE SYSOP IS NOT ANSWERING. THE BOARD RUNS ITSELF TONIGHT.{/}';
+			return to(state, { id: 'menu' }, ['', reply, ...renderMenu(system, state)]);
 		}
 	}
 }
@@ -636,6 +1108,35 @@ function abortCompose(
 	]);
 }
 
+/** [F] from the menu: canon straight away, live boards fetch the real listing. */
+function openFiles(state: MachineState, system: CanonSystem): StepResult {
+	if (state.mode === 'local') {
+		const stocked = { ...state, files: canonFiles(system) };
+		return to(stocked, { id: 'files' }, renderFiles(stocked));
+	}
+	return {
+		state: { ...state, screen: { id: 'files-wait' } },
+		prints: ['{W}READING THE DRIVE...{/}'],
+		requests: [{ kind: 'files' }]
+	};
+}
+
+/** A file by listing index: local reads the canon body, online downloads (1 credit). */
+function openFile(state: MachineState, system: CanonSystem, index: number): StepResult {
+	const file = (state.files ?? [])[index];
+	if (!file) return { state, prints: ['{R}NO SUCH FILE.{/}'] };
+	if (state.mode === 'local') {
+		const canon = system.files.find((f) => f.name === file.name);
+		if (!canon) return { state, prints: ['{R}NO SUCH FILE.{/}'] };
+		return to(state, { id: 'file-view', file: index }, renderCanonFileBody(canon, 'FILE AREA'));
+	}
+	return {
+		state: { ...state, screen: { id: 'file-dl-wait' } },
+		prints: [`{W}REQUESTING ${file.name}...{/}`],
+		requests: [{ kind: 'download', fileId: file.id }]
+	};
+}
+
 /**
  * The trunk went quiet mid-call: swap to canon content, keep the session
  * moving at the main menu. Never a dead end.
@@ -645,9 +1146,24 @@ function degrade(state: MachineState, system: CanonSystem, extra: string[] = [])
 		...state,
 		mode: 'local',
 		topics: canonTopics(system),
-		posts: null
+		posts: null,
+		files: canonFiles(system)
 	};
 	return to(local, { id: 'menu' }, ['', ...extra, LOCAL_NOTICE, ...renderMenu(system, local)]);
+}
+
+function isRegAbort(line: string): boolean {
+	return line.toLowerCase() === '/a';
+}
+
+/** /A anywhere in registration backs out to the login prompt — no dead ends. */
+function abortRegistration(state: MachineState): StepResult {
+	return to({ ...state, reg: { handle: '', password: '', answers: [] } }, { id: 'login-handle' }, [
+		'',
+		'{Y}CHANGED YOUR MIND. THE LIST SURVIVES WITHOUT YOU.{/}',
+		'',
+		'{W}HANDLE (OR "NEW" TO REGISTER):{/}'
+	]);
 }
 
 /** An authed request answered 401: the session is dead, log in again. */
@@ -708,16 +1224,45 @@ function sectionTopics(state: MachineState, system: CanonSystem, section: number
 	return (state.topics ?? []).filter((t) => t.section === slug);
 }
 
+/**
+ * Canon files as LiveFile rows for LOCAL MODE — same deterministic ids the
+ * seed migration uses, so read-tracking and rendering never fork by mode.
+ */
+export function canonFiles(system: CanonSystem): LiveFile[] {
+	return system.files.map((file) => ({
+		id: `canon:${system.id}:${file.name}`,
+		name: file.name,
+		kind: fileKind(file),
+		size: byteLength(file.body),
+		uploader: file.uploader,
+		downloads: file.downloads,
+		createdAt: canonDateEpoch(file.date),
+		canon: true
+	}));
+}
+
+function byteLength(text: string): number {
+	return new TextEncoder().encode(text).length;
+}
+
 // ── Screen renderers ─────────────────────────────────────────────────────────
 
 function renderMenu(system: CanonSystem, state: MachineState): string[] {
+	const status =
+		state.mode === 'online' && state.timeRemaining !== null
+			? [`{C}TIME REMAINING TODAY: ${state.timeRemaining} MIN{/}`]
+			: [];
 	return [
 		'',
 		`{*W}${system.name.toUpperCase()}{/}  --  MAIN MENU`,
 		`{C}CALLER: ${state.handle}{/}`,
+		...status,
 		'',
 		'  {*Y}[M]{/}essage boards',
 		'  {*Y}[F]{/}ile area',
+		...(system.door ? [`  {*Y}[D]{/}oor game -- ${system.door.name}`] : []),
+		...(system.live ? ["  {*Y}[W]{/}ho's online", '  {*Y}[C]{/}hat'] : []),
+		'  {*Y}[Y]{/}ell for sysop',
 		'  {*Y}[G]{/}oodbye (hang up)',
 		'',
 		'{W}COMMAND:{/}'
@@ -785,27 +1330,135 @@ function renderComposeIntro(): string[] {
 	];
 }
 
-function renderFiles(system: CanonSystem): string[] {
-	const lines = ['', '{*W}FILE AREA{/}', '', '      NAME          SIZE  UPLOADER        DLS'];
-	system.files.forEach((f, i) => {
-		const size = String(f.body.length).padStart(5);
+function renderFiles(state: MachineState): string[] {
+	const files = state.files ?? [];
+	const lines = ['', '{*W}FILE AREA{/}', '', '      NAME          SIZE  UPLOADER          DLS'];
+	files.forEach((f, i) => {
+		const num = `[${i + 1}]`.padStart(4);
 		lines.push(
-			`  {*Y}[${i + 1}]{/} ${f.name.padEnd(12)} ${size}  ${f.uploader.padEnd(14)} ${String(f.downloads).padStart(4)}`
+			`{*Y}${num}{/} ${escapeMarkup(f.name).padEnd(12)} ${String(f.size).padStart(5)}  ${escapeMarkup(f.uploader).padEnd(16)} ${String(f.downloads).padStart(4)}`
 		);
 	});
-	lines.push('', '{W}FILE # TO VIEW OR [Q] FOR MAIN MENU:{/}');
+	if (files.length === 0) lines.push('  {C}THE DRIVE IS EMPTY. HISTORY AWAITS.{/}');
+	if (state.mode === 'online') {
+		lines.push('', '{C}EVERY DOWNLOAD SPENDS A CREDIT. UPLOAD 1, EARN 3.{/}');
+	}
+	lines.push('', filesPrompt(state));
 	return lines;
 }
 
-function renderFileView(system: CanonSystem, file: number): string[] {
-	const f = system.files[file];
+function filesPrompt(state: MachineState): string {
+	const upload = state.mode === 'online' ? '  [U]PLOAD' : '';
+	return `{W}FILE # TO READ${upload}  OR [Q] FOR MAIN MENU:{/}`;
+}
+
+/** A canon file body, viewed free of charge (LOCAL MODE and the Back Room). */
+function renderCanonFileBody(file: CanonFile, backTo: string): string[] {
 	return [
 		'',
-		`{C}---- ${f.name} -- uploaded by ${f.uploader}, ${f.date} ----{/}`,
+		`{C}---- ${file.name} -- uploaded by ${file.uploader}, ${file.date} ----{/}`,
 		'',
-		f.body,
+		file.body,
 		'',
-		'{W}[Q] BACK TO FILE AREA:{/}'
+		`{W}[Q] BACK TO ${backTo}:{/}`
+	];
+}
+
+/** A downloaded body: canon colors itself, community text is escaped + wrapped. */
+function renderDownloadedBody(file: LiveFile, body: string): string {
+	if (file.canon) return body;
+	return wrapText(escapeMarkup(body), 78).join('\n');
+}
+
+function renderWho(state: MachineState): string[] {
+	if (state.mode === 'local') {
+		return [
+			'',
+			"{*W}WHO'S ONLINE{/}",
+			'',
+			'{C}NO NODE LINE IN LOCAL MODE. JUST YOU AND THE MOON.{/}'
+		];
+	}
+	const lines = ['', "{*W}WHO'S ONLINE{/}", ''];
+	if (state.online.length === 0) {
+		lines.push('{C}JUST YOU ON THE LINE. IT HAPPENS.{/}');
+	} else {
+		state.online.forEach((h) => {
+			const you = h === state.handle ? '  {C}(YOU){/}' : '';
+			lines.push(`  {*C}${escapeMarkup(h)}{/}${you}`);
+		});
+	}
+	return lines;
+}
+
+function renderChatIntro(state: MachineState): string[] {
+	return [
+		'',
+		'{*W}NODE CHANNEL{/} -- LINES GO TO EVERYONE ON THE BOARD. /Q LEAVES.',
+		state.online.length > 1
+			? `{C}ON THE NODE: ${state.online.map((h) => escapeMarkup(h)).join(', ')}{/}`
+			: '{C}NOBODY ELSE ON THE NODE. TALK TO THE ROOM ANYWAY.{/}',
+		''
+	];
+}
+
+function renderBackRoom(system: CanonSystem): string[] {
+	const room = system.backRoom;
+	if (!room) return [];
+	const lines = ['', '{*W}THE BACK ROOM{/}', ''];
+	room.files.forEach((f, i) => {
+		lines.push(`  {*Y}[${i + 1}]{/} ${f.name.padEnd(12)}  ${f.uploader.padEnd(14)} ${f.date}`);
+	});
+	lines.push('', '{W}FILE # TO READ OR [Q] TO SLIP BACK OUT:{/}');
+	return lines;
+}
+
+function renderScores(system: CanonSystem, scores: LiveScore[]): string[] {
+	const name = system.door?.name ?? 'DOOR GAME';
+	const lines = ['', `{*W}${name} -- HALL OF LEGENDS{/}`, ''];
+	if (scores.length === 0) {
+		lines.push('{C}THE TABLE IS EMPTY. YOU MAY BE THE FIRST.{/}');
+	} else {
+		scores.forEach((s, i) => {
+			lines.push(
+				`  ${String(i + 1).padStart(2)}. ${escapeMarkup(s.handle).padEnd(18)} ${String(s.score).padStart(6)}  ${formatEraDate(s.createdAt)}`
+			);
+		});
+	}
+	return lines;
+}
+
+function renderSecretWelcome(secret: NonNullable<CanonSystem['secret']>): string[] {
+	return [
+		'',
+		'{G}CONNECTED.{/}',
+		'',
+		'{*W}PROJECT LODESTONE{/} -- REMOTE OPERATOR CONSOLE',
+		'',
+		renderSecretPrompt(secret)
+	];
+}
+
+function renderSecretPrompt(secret: NonNullable<CanonSystem['secret']>): string {
+	const items = secret.screens.map((sc) => `[${sc.key}]${sc.label.slice(1).toUpperCase()}`);
+	return `{W}${items.join('  ')}  [Q]UIT:{/}`;
+}
+
+function renderVisitors(state: MachineState, system: CanonSystem): string[] {
+	const secret = system.secret;
+	if (!secret) return [];
+	const header = secret.screens.find((sc) => sc.key === 'V')?.body ?? 'VISITORS.LOG';
+	const caller = `${state.handle.padEnd(14)} ${state.visitDate}`;
+	return [
+		'',
+		header,
+		'',
+		...secret.visitorsSeed.map((line) => `  ${line}`),
+		`  ${escapeMarkup(caller)}`,
+		'',
+		`{*W}${secret.eventLine}{/}`,
+		'',
+		renderSecretPrompt(secret)
 	];
 }
 
@@ -822,6 +1475,12 @@ function renderGoodbye(): string[] {
 
 function to(state: MachineState, screen: Screen, prints: string[]): StepResult {
 	return { state: { ...state, screen }, prints };
+}
+
+/** Append a printable key to the menu's rolling code-word buffer. */
+function withMenuKeys(state: MachineState, key: string): MachineState {
+	if (key.length !== 1) return state;
+	return { ...state, menuKeys: (state.menuKeys + key.toLowerCase()).slice(-12) };
 }
 
 function ignore(state: MachineState): StepResult {
