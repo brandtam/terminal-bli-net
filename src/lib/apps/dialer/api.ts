@@ -31,6 +31,24 @@ export type LivePost = {
 	canon: boolean;
 };
 
+/** A file as the board lists it; bodies arrive separately via downloadFile. */
+export type LiveFile = {
+	id: string;
+	name: string;
+	kind: 'txt' | 'md' | 'png';
+	size: number;
+	uploader: string;
+	downloads: number;
+	createdAt: number;
+	canon: boolean;
+};
+
+export type LiveScore = {
+	handle: string;
+	score: number;
+	createdAt: number;
+};
+
 export type ApiError =
 	| { kind: 'local' } // no line: network failure, 503, any 5xx
 	| { kind: 'no-carrier' } // 401: bad login or dead session
@@ -175,4 +193,104 @@ export function submitReply(
 		token,
 		body: { body }
 	});
+}
+
+export async function fetchFiles(board: string, token: string): Promise<ApiResult<LiveFile[]>> {
+	const result = await request<{ files: LiveFile[] }>(`boards/${board}/files`, { token });
+	return result.ok ? { ok: true, value: result.value.files } : result;
+}
+
+export type Downloaded = {
+	file: LiveFile;
+	/** Text body; null for images (see imageBlob). */
+	body: string | null;
+	/** The PNG bytes for kind 'png', already fetched — one credit, one trip. */
+	imageBlob: Blob | null;
+};
+
+/**
+ * Download a file (spends one ratio credit server-side). Text answers JSON;
+ * images answer raw PNG with the metadata riding an X-Dialer-File header.
+ */
+export async function downloadFile(fileId: string, token: string): Promise<ApiResult<Downloaded>> {
+	const abort = new AbortController();
+	const deadline = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
+	try {
+		let response: Response;
+		try {
+			response = await fetch(`/api/dialer/files/${fileId}`, {
+				headers: { Authorization: `Bearer ${token}` },
+				signal: abort.signal
+			});
+		} catch {
+			return { ok: false, error: { kind: 'local' } };
+		}
+		if (!response.ok) {
+			if (response.status === 401) return { ok: false, error: { kind: 'no-carrier' } };
+			if (response.status >= 500) return { ok: false, error: { kind: 'local' } };
+			let message = 'REFUSED';
+			try {
+				message = ((await response.json()) as { message?: string }).message ?? message;
+			} catch {
+				// keep the fallback
+			}
+			return { ok: false, error: { kind: 'refused', message } };
+		}
+		try {
+			if (response.headers.get('Content-Type')?.includes('image/png')) {
+				const meta = JSON.parse(response.headers.get('X-Dialer-File') ?? '') as LiveFile;
+				const blob = await response.blob();
+				return { ok: true, value: { file: meta, body: null, imageBlob: blob } };
+			}
+			const data = (await response.json()) as { file: LiveFile; body: string };
+			return { ok: true, value: { file: data.file, body: data.body, imageBlob: null } };
+		} catch {
+			return { ok: false, error: { kind: 'local' } };
+		}
+	} finally {
+		clearTimeout(deadline);
+	}
+}
+
+export function uploadTextFile(
+	board: string,
+	token: string,
+	input: { name: string; kind: 'txt' | 'md'; body: string }
+): Promise<ApiResult<{ fileId: string; held: boolean }>> {
+	return request(`boards/${board}/files`, { method: 'POST', token, body: input });
+}
+
+export function uploadImageFile(
+	board: string,
+	token: string,
+	input: { name: string; dataBase64: string }
+): Promise<ApiResult<{ fileId: string; held: boolean }>> {
+	return request(`boards/${board}/files`, {
+		method: 'POST',
+		token,
+		body: { name: input.name, kind: 'png', dataBase64: input.dataBase64 }
+	});
+}
+
+export async function fetchScores(board: string, token: string): Promise<ApiResult<LiveScore[]>> {
+	const result = await request<{ scores: LiveScore[] }>(`boards/${board}/scores`, { token });
+	return result.ok ? { ok: true, value: result.value.scores } : result;
+}
+
+export async function submitScore(
+	board: string,
+	token: string,
+	score: number
+): Promise<ApiResult<LiveScore[]>> {
+	const result = await request<{ scores: LiveScore[] }>(`boards/${board}/scores`, {
+		method: 'POST',
+		token,
+		body: { score }
+	});
+	return result.ok ? { ok: true, value: result.value.scores } : result;
+}
+
+/** Claim tonight's autodialer block; a refusal carries the phone company's opinion. */
+export function claimSweep(token: string): Promise<ApiResult<{ ok: boolean }>> {
+	return request('sweep', { method: 'POST', token });
 }

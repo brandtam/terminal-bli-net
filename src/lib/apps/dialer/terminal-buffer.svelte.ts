@@ -53,6 +53,32 @@ export class TerminalBuffer {
 		this.typing = false;
 	}
 
+	/**
+	 * Instantly append a fully-rendered line, bypassing the baud queue. For
+	 * status the caller rewrites in place (the XMODEM progress bar) rather than
+	 * types out — a gauge shouldn't stream one hash at a time.
+	 */
+	commit(markup: string): void {
+		if (this.col !== 0) {
+			this.lines.push([]);
+			this.col = 0;
+		}
+		this.lines[this.lines.length - 1] = compileMarkup(markup);
+		this.lines.push([]);
+		this.trim();
+	}
+
+	/** Replace the most recently committed line in place (the moving gauge). */
+	replaceLast(markup: string): void {
+		const index = this.col === 0 ? this.lines.length - 2 : this.lines.length - 1;
+		if (index >= 0) this.lines[index] = compileMarkup(markup);
+	}
+
+	private trim(): void {
+		if (this.lines.length > TerminalBuffer.MAX_LINES)
+			this.lines.splice(0, this.lines.length - TerminalBuffer.MAX_LINES);
+	}
+
 	/** The whole visible screen as plain text (for tests and copy/paste). */
 	toText(): string {
 		return this.lines.map((line) => line.map((r) => r.text).join('')).join('\n');

@@ -18,7 +18,7 @@ describe('dialerNightly', () => {
 			.bind('BUDGETEER')
 			.run();
 
-		await dialerNightly({ DIALER_DB: env.DIALER_DB });
+		await dialerNightly({ DIALER_DB: env.DIALER_DB, DIALER_FILES: env.DIALER_FILES });
 
 		const row = await env.DIALER_DB.prepare(
 			'SELECT minutes_today, uploads_today, ratio_credits FROM callers WHERE handle = ?1'
@@ -40,7 +40,7 @@ describe('dialerNightly', () => {
 			.bind('stale-hash', 'PRUNED', epochSeconds(NOW) - 100, epochSeconds(new Date()) - 1)
 			.run();
 
-		await dialerNightly({ DIALER_DB: env.DIALER_DB });
+		await dialerNightly({ DIALER_DB: env.DIALER_DB, DIALER_FILES: env.DIALER_FILES });
 
 		const rows = await env.DIALER_DB.prepare('SELECT token_hash FROM sessions WHERE handle = ?1')
 			.bind('PRUNED')
@@ -52,8 +52,8 @@ describe('dialerNightly', () => {
 
 	it('is idempotent', async () => {
 		await registerCaller(env.DIALER_DB, 'REPEATER', 'correct-horse', null, NOW);
-		await dialerNightly({ DIALER_DB: env.DIALER_DB });
-		await dialerNightly({ DIALER_DB: env.DIALER_DB });
+		await dialerNightly({ DIALER_DB: env.DIALER_DB, DIALER_FILES: env.DIALER_FILES });
+		await dialerNightly({ DIALER_DB: env.DIALER_DB, DIALER_FILES: env.DIALER_FILES });
 		const row = await env.DIALER_DB.prepare('SELECT minutes_today FROM callers WHERE handle = ?1')
 			.bind('REPEATER')
 			.first<{ minutes_today: number }>();

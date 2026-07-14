@@ -17,6 +17,20 @@
 
 	const cat = $derived(CATEGORIES[categoryId]);
 	const apps = $derived(cat.appIds.map((id) => APP_BY_ID[id]));
+
+	/**
+	 * Shrink boxes so the whole aisle fits the shelf. A centered flex row wider
+	 * than .shelf-area overflows equally on both sides, and .closeup's
+	 * overflow:hidden clips the outer boxes — the first box becomes unclickable.
+	 */
+	const BOX_GAP = 18;
+	let shelfWidth = $state(0);
+	const boxWidth = $derived(
+		shelfWidth === 0
+			? 132
+			: Math.min(132, Math.floor((shelfWidth - BOX_GAP * (apps.length - 1)) / apps.length))
+	);
+	const boxHeight = $derived(Math.round((boxWidth * 178) / 132));
 </script>
 
 <div class="closeup">
@@ -33,11 +47,13 @@
 	</div>
 
 	<!-- Shelf and boxes -->
-	<div class="shelf-area">
+	<div class="shelf-area" bind:clientWidth={shelfWidth}>
 		<div class="boxes">
 			{#each apps as app (app.id)}
 				<SoftwareBox
 					{app}
+					width={boxWidth}
+					height={boxHeight}
 					onclick={() => onpickup(app)}
 					comingSoon={getAppDef(app.id)?.status === 'coming-soon'}
 					status={owned.includes(app.id)

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { canonDateEpoch, canonSeedSql } from './seed';
-import { formatEraDate } from './types';
+import { canonDateEpoch, canonSeedSql, canonFilesSql } from './seed';
+import { formatEraDate, trainsAt } from './types';
 import { RUSTY_DISKETTE } from './rusty-diskette';
+import { NIGHT_CIRCUIT } from './night-circuit';
+import { FOUNDRY } from './foundry';
 import { CANON_SYSTEMS } from './index';
 import { BOARD_SECTIONS, isPublicBoard } from '$lib/server/dialer/boards';
 
@@ -12,6 +14,25 @@ describe('canon seed migration', () => {
 		await expect(canonSeedSql(RUSTY_DISKETTE)).toMatchFileSnapshot(
 			'../../../../../migrations/dialer/0003_canon_rusty_diskette.sql'
 		);
+	});
+
+	it('the committed Night Circuit seed matches the content module', async () => {
+		await expect(canonSeedSql(NIGHT_CIRCUIT)).toMatchFileSnapshot(
+			'../../../../../migrations/dialer/0004_canon_night_circuit.sql'
+		);
+	});
+
+	it('the committed Foundry seed matches the content module', async () => {
+		await expect(canonSeedSql(FOUNDRY)).toMatchFileSnapshot(
+			'../../../../../migrations/dialer/0005_canon_foundry.sql'
+		);
+	});
+
+	it('the committed canon file seed matches the content modules', async () => {
+		// One migration covers all three public boards' file areas. LODESTONE has
+		// no files and no live layer; Back Room files never leave the client.
+		const sql = [RUSTY_DISKETTE, NIGHT_CIRCUIT, FOUNDRY].map(canonFilesSql).join('\n');
+		await expect(sql).toMatchFileSnapshot('../../../../../migrations/dialer/0007_canon_files.sql');
 	});
 
 	it('escapes single quotes SQL-style', () => {
@@ -76,5 +97,21 @@ describe('content sections bind to the locked server sections', () => {
 				expect(BOARD_SECTIONS[system.id], `${system.id}/${section.slug}`).toContain(section.slug);
 			}
 		}
+	});
+});
+
+describe('baud caps', () => {
+	it('LODESTONE trains at 300 only (SCANLOG.TXT: "tried 1200, it won\'t train")', () => {
+		const lodestone = CANON_SYSTEMS.find((s) => s.id === 'lodestone')!;
+		expect(trainsAt(lodestone, 300)).toBe(true);
+		expect(trainsAt(lodestone, 1200)).toBe(false);
+		expect(trainsAt(lodestone, 2400)).toBe(false);
+		expect(trainsAt(lodestone, 9600)).toBe(false);
+	});
+
+	it('an uncapped system trains at any rate', () => {
+		const rusty = CANON_SYSTEMS.find((s) => s.id === 'rusty-diskette')!;
+		expect(rusty.maxBaud).toBeUndefined();
+		expect(trainsAt(rusty, 9600)).toBe(true);
 	});
 });

@@ -10,6 +10,7 @@ import type { DialerBoardNode } from '../board-node';
  */
 export interface DialerTestEnv {
 	DIALER_DB: D1Database;
+	DIALER_FILES: R2Bucket;
 	DIALER_BOARD_NODE: DurableObjectNamespace<DialerBoardNode>;
 	TEST_MIGRATIONS: D1Migration[];
 }

@@ -10,6 +10,7 @@
 	"d1_databases": [
 		{ "binding": "DIALER_DB", "database_name": "dialer-db", "database_id": "dialer-db-test" }
 	],
+	"r2_buckets": [{ "binding": "DIALER_FILES", "bucket_name": "dialer-files-test" }],
 	"durable_objects": {
 		"bindings": [{ "name": "DIALER_BOARD_NODE", "class_name": "DialerBoardNode" }]
 	},
