@@ -52,6 +52,13 @@
 	// Nightly Dialer sweep at 05:00 UTC (midnight Eastern). Dispatched by
 	// src/worker/cron.ts — one dispatch-table entry per app (docs/adr/0008).
 	"triggers": { "crons": ["0 5 * * *"] },
+	// Dialer AI moderation is OFF unless switched on. DIALER_MODERATION:
+	//   unset/"open" (default) — no LLM calls, posts/uploads publish immediately
+	//   "live" — every post/upload judged via ANTHROPIC_API_KEY, held on failure
+	//   "hold" — no LLM calls, every write held hidden until a flip back to live
+	// Set it in "vars" below (or as a secret to flip without a commit). Live mode
+	// spend is bounded by DIALER_MODERATION_DAILY_CAP LLM calls/UTC day (default
+	// 300) on top of the per-caller limits (60s post cooldown, 3 uploads/day).
 	// ReminderAgent stays a separate Worker for now (docs/adr/0008 keeps the
 	// fold-in out of scope).
 	// REMINDER_SERVICE → the reminder Worker's subscribe/confirm endpoints.

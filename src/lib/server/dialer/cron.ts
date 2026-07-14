@@ -5,8 +5,9 @@
  * step is idempotent and individually try/caught so one failure never starves
  * the rest.
  *
- *   1. re-audit still-hidden content through the moderation seam (skip the
- *      rest of the batch the moment the seam reports itself down)
+ *   1. re-audit still-hidden content through the moderation seam — live mode
+ *      only (skip the rest of the batch the moment the seam reports itself
+ *      down)
  *   2. hard-delete soft-deleted rows — R2 object first, then the D1 row —
  *      then collect R2 orphans
  *   3. post a canon-voiced sysop cleanup note on each board that lost content
@@ -21,7 +22,7 @@
  */
 import { epochSeconds } from './auth';
 import { grantUploadCredits, setFileVisible, softDeleteFile } from './files';
-import { moderateText } from './moderation';
+import { moderateText, moderationMode } from './moderation';
 import { SCORES_KEPT } from './scores';
 import type { DialerEnv } from './env';
 import type { PublicBoard } from './boards';
@@ -52,7 +53,12 @@ const SYSOP_NOTES: Record<PublicBoard, { sysop: string; section: string; body: s
 
 type CronEnv = Pick<
 	DialerEnv,
-	'DIALER_DB' | 'DIALER_FILES' | 'ANTHROPIC_API_KEY' | 'DIALER_MODERATION_MODEL'
+	| 'DIALER_DB'
+	| 'DIALER_FILES'
+	| 'ANTHROPIC_API_KEY'
+	| 'DIALER_MODERATION'
+	| 'DIALER_MODERATION_DAILY_CAP'
+	| 'DIALER_MODERATION_MODEL'
 >;
 
 export async function dialerNightly(env: CronEnv): Promise<void> {
@@ -61,11 +67,15 @@ export async function dialerNightly(env: CronEnv): Promise<void> {
 
 	// Step 1 — re-audit content still hidden behind flagged=1 (the seam was
 	// down when it was written). OK → visible (uploads earn their credits
-	// here, exactly once); REJECT → soft-deleted for step 2.
-	try {
-		await reauditFlagged(env, now);
-	} catch (err) {
-		console.error('[dialer cron] moderation re-audit failed', err);
+	// here, exactly once); REJECT → soft-deleted for step 2. Live mode only:
+	// 'open' and 'hold' make no LLM calls, so held rows wait for a live flip
+	// rather than getting published (or condemned) unjudged.
+	if (moderationMode(env) === 'live') {
+		try {
+			await reauditFlagged(env, now);
+		} catch (err) {
+			console.error('[dialer cron] moderation re-audit failed', err);
+		}
 	}
 
 	// Step 2 — hard-delete everything soft-deleted, R2 object before D1 row,
@@ -84,12 +94,17 @@ export async function dialerNightly(env: CronEnv): Promise<void> {
 		console.error('[dialer cron] sysop note failed', err);
 	}
 
-	// Step 4 — reset the daily budgets (connect minutes, upload count).
+	// Step 4 — reset the daily budgets (connect minutes, upload count) and
+	// prune stale moderation-call counter days (today's row stays live).
 	try {
 		await db
 			.prepare(
 				'UPDATE callers SET minutes_today = 0, uploads_today = 0 WHERE minutes_today <> 0 OR uploads_today <> 0'
 			)
+			.run();
+		await db
+			.prepare(`DELETE FROM meta WHERE key LIKE 'moderation-calls:%' AND key <> ?1`)
+			.bind(`moderation-calls:${now.toISOString().slice(0, 10)}`)
 			.run();
 	} catch (err) {
 		console.error('[dialer cron] daily budget reset failed', err);

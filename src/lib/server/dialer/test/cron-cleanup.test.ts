@@ -8,9 +8,10 @@ import { dialerNightly } from '../cron';
 const NOW = new Date('2026-07-12T12:00:00Z');
 const CRON_ENV = { DIALER_DB: env.DIALER_DB, DIALER_FILES: env.DIALER_FILES };
 
-// No ANTHROPIC_API_KEY in the test env, so the re-audit step sees the seam as
-// down and leaves flagged rows alone — which is itself the fail-closed
-// behavior these tests pin. Hard delete and the sysop note need no LLM.
+// No DIALER_MODERATION=live in the test env, so the re-audit step is skipped
+// and flagged rows stay put — which is itself the behavior these tests pin
+// (held content waits for a live flip, never publishes or dies unjudged).
+// Hard delete and the sysop note need no LLM.
 
 async function caller(handle: string): Promise<string> {
 	const result = await registerCaller(env.DIALER_DB, handle, 'password', null, NOW);

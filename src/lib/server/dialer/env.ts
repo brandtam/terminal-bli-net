@@ -20,6 +20,14 @@ export interface DialerEnv {
 	TURNSTILE_SECRET?: string;
 	/** Shared with the chat backend; the moderation seam rides the same key. */
 	ANTHROPIC_API_KEY?: string;
+	/**
+	 * Moderation switch: 'open' (default — no LLM calls, writes publish),
+	 * 'live' (judge every write), 'hold' (no LLM calls, writes held hidden).
+	 * A Worker var/secret, so it flips without a code change.
+	 */
+	DIALER_MODERATION?: string;
+	/** Max moderation LLM calls per UTC day in live mode (default 300). */
+	DIALER_MODERATION_DAILY_CAP?: string;
 	/** Optional moderation model override (moderation.ts has the default). */
 	DIALER_MODERATION_MODEL?: string;
 }
