@@ -186,42 +186,61 @@ function overBudgetMessage(reason: DenialReason): string {
 	return "[ STATIC ] ...that's all she wrote for today — we're off the air until the tower fires back up tomorrow. Same station, same dial.";
 }
 
-/** Build an SSE Response from a TextChunk source, hiding internal `usage` chunks. */
+/**
+ * Build an SSE Response from a TextChunk source, hiding internal `usage` chunks.
+ *
+ * The source is always drained to its end, even after the client hangs up: the
+ * provider bills for the whole generation, and usage only arrives on the final
+ * chunk, so stopping early would settle a paid request as $0.
+ */
 function sseResponse(
 	source: ReadableStream<TextChunk>,
 	hooks?: {
 		onUsage?: (chunk: TextChunk) => void;
 		onClose?: () => void | Promise<void>;
+		/** Keeps the drain alive past a client disconnect (the Worker's waitUntil). */
+		keepAlive?: (work: Promise<void>) => void;
 	},
 	extraHeaders?: Record<string, string>
 ): Response {
 	const encoder = new TextEncoder();
-	const stream = new ReadableStream({
-		async start(controller) {
-			const reader = source.getReader();
-			try {
-				while (true) {
-					const { done, value } = await reader.read();
-					if (done) break;
+	let clientConnected = true;
 
-					if (value.type !== 'usage') {
-						controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
-					}
-					if (value.usage) hooks?.onUsage?.(value);
-				}
-			} catch (e) {
-				console.error('[chat SSE] stream error:', e);
-				controller.enqueue(
-					encoder.encode(`data: ${JSON.stringify({ type: 'error', error: 'internal error' })}\n\n`)
-				);
-			} finally {
-				try {
-					await hooks?.onClose?.();
-				} catch (e) {
-					console.error('[chat SSE] close hook failed:', e);
-				}
-				controller.close();
+	async function drain(controller: ReadableStreamDefaultController<Uint8Array>): Promise<void> {
+		const send = (payload: unknown) => {
+			if (clientConnected) {
+				controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
 			}
+		};
+		const reader = source.getReader();
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+
+				if (value.type !== 'usage') send(value);
+				if (value.usage) hooks?.onUsage?.(value);
+			}
+		} catch (e) {
+			console.error('[chat SSE] stream error:', e);
+			send({ type: 'error', error: 'internal error' });
+		} finally {
+			if (clientConnected) controller.close();
+			try {
+				await hooks?.onClose?.();
+			} catch (e) {
+				console.error('[chat SSE] close hook failed:', e);
+			}
+		}
+	}
+
+	const stream = new ReadableStream<Uint8Array>({
+		start(controller) {
+			const draining = drain(controller);
+			hooks?.keepAlive?.(draining);
+		},
+		cancel() {
+			clientConnected = false;
 		}
 	});
 
@@ -374,9 +393,9 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 		options: { maxTokens: MAX_OUTPUT_TOKENS, temperature: 0.8 }
 	});
 
-	// Settle each provider Reservation to actual cost once the stream ends; release
-	// unused fallback holds. Runs in the SSE close hook so it fires even when the
-	// client disconnects mid-stream.
+	// Settle each provider Reservation to actual cost once the source is drained;
+	// release unused fallback holds. keepAlive carries the drain and this settlement
+	// past a client disconnect.
 	const actualByReservation = new Map<string, { provider: LlmProvider; usd: number }>();
 	function settleLedger(): Promise<void> {
 		const now = new Date();
@@ -411,16 +430,11 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 					console.error('[chat SSE] cost calculation failed:', e);
 				}
 			},
-			onClose: () => {
-				const settlement = settleLedger().catch((e) => {
+			onClose: () =>
+				settleLedger().catch((e) => {
 					console.error('[chat SSE] ledger settlement failed:', e);
-				});
-				if (platform.context?.waitUntil) {
-					platform.context.waitUntil(settlement);
-					return;
-				}
-				return settlement;
-			}
+				}),
+			keepAlive: (work) => platform.context?.waitUntil?.(work)
 		},
 		sessionHeaders
 	);
