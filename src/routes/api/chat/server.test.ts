@@ -453,6 +453,47 @@ describe('POST /api/chat', () => {
 		expect(releaseMock).toHaveBeenCalledWith('res-1', expect.any(Date));
 	});
 
+	it('reconciles actual cost when the client disconnects mid-stream', async () => {
+		let provider!: ReadableStreamDefaultController<TextChunk>;
+		streamCompletionMock.mockResolvedValueOnce(
+			new ReadableStream<TextChunk>({
+				start(controller) {
+					provider = controller;
+				}
+			})
+		);
+		const waitUntil = vi.fn<(work: Promise<unknown>) => void>();
+		const event = makeEvent(makeBody('Asia/Kathmandu'));
+
+		const response = await POST({
+			...event,
+			platform: { ...event.platform, context: { waitUntil } }
+		} as Parameters<typeof POST>[0]);
+
+		// The drain must be registered up front: a Worker can drop in-flight work the
+		// moment its client goes away, so registering at stream end would be too late.
+		expect(waitUntil).toHaveBeenCalled();
+
+		const reader = response.body!.getReader();
+		provider.enqueue({ type: 'text', text: 'Well, ' });
+		await reader.read();
+		await reader.cancel();
+
+		// The provider keeps generating, and billing, after the client hangs up.
+		provider.enqueue({ type: 'text', text: 'we are living in a society.' });
+		provider.enqueue({
+			type: 'done',
+			tokenCount: 7,
+			usage: { provider: 'openai', model: 'gpt-4o-mini', inputTokens: 5, outputTokens: 2 }
+		});
+		provider.close();
+		await Promise.all(waitUntil.mock.calls.map(([work]) => work));
+
+		expect(reconcileMock).toHaveBeenCalledTimes(1);
+		expect(reconcileMock.mock.calls[0][1]).toEqual({ provider: 'openai', usd: 0.01 });
+		expect(releaseMock).not.toHaveBeenCalled();
+	});
+
 	it('still forwards done chunks when reconciliation fails', async () => {
 		reconcileMock.mockRejectedValueOnce(new Error('ledger write failed'));
 

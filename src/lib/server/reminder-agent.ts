@@ -251,7 +251,7 @@ export class ReminderAgent extends Agent<ReminderAgentEnv> {
 	}
 
 	private async loadCatalog(): Promise<PublicContentCatalog> {
-		const contentUrl = this.env.REMINDER_CONTENT_URL ?? 'https://bli.net/api/data';
+		const contentUrl = this.env.REMINDER_CONTENT_URL ?? 'https://terminal.bli.net/api/data';
 		const response = await fetch(contentUrl, {
 			headers: { accept: 'application/json' },
 			signal: AbortSignal.timeout(CATALOG_FETCH_TIMEOUT_MS)
@@ -295,7 +295,7 @@ export class ReminderAgent extends Agent<ReminderAgentEnv> {
 
 	private async sendConfirmationEmail(email: string, token: string): Promise<void> {
 		const confirmUrl = new URL(
-			this.env.REMINDER_CONFIRM_URL ?? 'https://bli.net/api/subscribe/confirm'
+			this.env.REMINDER_CONFIRM_URL ?? 'https://terminal.bli.net/api/subscribe/confirm'
 		);
 		confirmUrl.searchParams.set('token', token);
 
